@@ -1,9 +1,7 @@
 <script lang="ts">
     import {
         type AnyGame,
-        GameState,
-        isOpenCeremony,
-        isOpenSolverSubmit,
+        GameState
     } from "$lib/common/game";
     import {
         CheckCircle,
@@ -26,10 +24,8 @@
     import { block_height_to_timestamp } from "$lib/common/countdown";
     import { ErgoPlatform } from "$lib/ergo/platform";
     import { type AnyParticipation } from "$lib/common/game";
-    import { type Box, type Amount } from "@fleet-sdk/core";
     import { explorer_uri, web_explorer_uri_tx } from "$lib/ergo/envs";
     import { get } from "svelte/store";
-    import { type RPBox } from "reputation-system";
     import {
         GAME,
         PARTICIPATION,
@@ -169,7 +165,7 @@
                 ) {
                     newSteps.push({
                         id: `resolution_started_${h}`,
-                        label: "Resolution Started",
+                        label: "Game seed was revealed.",
                         description:
                             "The game entered the resolution and judging phase.",
                         status: "completed",
@@ -468,7 +464,7 @@
             }
 
             // Resolution & Finalization
-            if (current.status === GameState.Resolution) {
+            if (current.status === GameState.Resolution && currentHeight < current.resolutionDeadline) {
                 newSteps.push({
                     id: "future_resolution",
                     label: "Resolution & Judging",
@@ -484,6 +480,20 @@
                             ? current.resolutionDeadline
                             : 9999999,
                     color: "text-lime-500 border-lime-500",
+                });
+            }
+
+            if (current.status === GameState.Resolution && currentHeight >= current.resolutionDeadline) {
+                newSteps.push({
+                    id: "future_finalization",
+                    label: "Finalization",
+                    description:
+                        "The game is ready to be finalized and prizes distributed.",
+                    status: "active",
+                    date: undefined,
+                    icon: Trophy,
+                    height: 9999999,
+                    color: "text-yellow-500 border-yellow-500",
                 });
             }
 

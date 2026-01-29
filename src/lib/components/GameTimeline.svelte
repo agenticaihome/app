@@ -400,12 +400,8 @@
 
         // 4. Future/Current Steps (only if game is not finalized/cancelled)
         if (current) {
-            const isActivePhase = current.status === GameState.Active;
-            const isPastActive =
-                current.status !== GameState.Active &&
-                current.status !== GameState.Cancelled_Draining;
-
-            if (isActivePhase) {
+            
+            if (current.status === GameState.Active) {
                 // Add sub-phases if active
                 if ("ceremonyDeadline" in current) {
                     const hashDeadline =

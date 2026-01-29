@@ -750,7 +750,7 @@ export async function fetchFinalizedGames(): Promise<Map<string, GameFinalized>>
         const resolutionBoxes = histBoxes.filter((b) => b.status === "Resolution").sort((a, b) => b.box.creationHeight - a.box.creationHeight);
         const lastResolutionBox = resolutionBoxes.length > 0 ? resolutionBoxes[0] as GameResolution : null;
         const judgeFinalizationBlock = lastResolutionBox?.resolutionDeadline || 0;
-        const winnerFinalizationGracePeriod = 64800; // 90 Days TODO take from script constants
+        const winnerFinalizationGracePeriod = getGameConstants().END_GAME_AUTH_GRACE_PERIOD;
 
         const finalized: GameFinalized = {
             boxId: lastResolutionBox?.boxId || currentBox.boxId, // Use resolution box ID if available

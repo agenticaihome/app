@@ -395,6 +395,7 @@
     let openSolverSubmit = false;
     let acceptedJudgeNominations: string[] = [];
     let isInvalidationMajorityReached = false;
+    let isUnavailableMajorityReached = false;
 
     // Refund State
     let isClaimingRefundFor: string | null = null;

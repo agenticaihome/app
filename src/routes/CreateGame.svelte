@@ -75,8 +75,8 @@
     let gameDescription: string = "";
     let creatorTokenId: string = "";
     let indetermismIndex: number = 1;
-    let deadlineValue: number;
-    let deadlineUnit: "days" | "minutes" = "days";
+    let gameTimeValue: number;
+    let gameTimeUnit: "days" | "minutes" = "days";
     let deadlineBlock: number | undefined;
     let deadlineBlockDateText: string = "";
     let resolverStakeAmount: number | undefined;
@@ -226,11 +226,11 @@
             gameTitle = `Dev Game [${randomHex.slice(0, 6)}]`;
 
             // Default to 20 minutes for quick testing
-            deadlineValue = 20;
-            deadlineUnit = "minutes";
+            gameTimeValue = 20;
+            gameTimeUnit = "minutes";
 
             // Trigger calculation immediately
-            calculateBlockLimit(deadlineValue, deadlineUnit);
+            calculateBlockLimit(gameTimeValue, gameTimeUnit);
         }
 
         // Set creatorTokenId from reputation proof only on load if not set
@@ -400,8 +400,8 @@
 
     // --- Logic functions
     $: {
-        if (deadlineValue > 0) {
-            calculateBlockLimit(deadlineValue, deadlineUnit);
+        if (gameTimeValue > 0) {
+            calculateBlockLimit(gameTimeValue, gameTimeUnit);
         } else {
             deadlineBlock = undefined;
             deadlineBlockDateText = "";
@@ -479,6 +479,10 @@
             return;
         }
         try {
+            // Ensure we have the latest height for accurate breakdown display
+            const latestHeight = await platform.get_current_height();
+            current_height.set(latestHeight);
+
             // User enters registration time (Phase 1)
             // We add SEED_MARGIN and PARTICIPATION_TIME_WINDOW to get the total deadlin
             let target_date = new Date();
@@ -531,12 +535,8 @@
      */
     function calculateTimeWeight(): bigint {
         if (!deadlineBlock) return 0n;
-        const currentHeight = platform.get_current_height();
-        // Use estimated current height for calculation (will be async in actual call)
-        // For simplicity, we assume duration is deadlineBlock - estimated current
-        // A more accurate version would use an async pattern
         const gameDuration = BigInt(
-            deadlineValue * (deadlineUnit === "days" ? 720 : 1),
+            gameTimeValue * (gameTimeUnit === "days" ? 720 : 1),
         ); // Approx blocks
 
         switch (timeFactorOption) {
@@ -908,10 +908,10 @@
                                     <div
                                         class="flex justify-between text-sm border-b border-border/50 pb-1"
                                     >
-                                        <span>Duration:</span>
+                                        <span>Game Time Duration:</span>
                                         <span class="font-mono"
-                                            >{deadlineValue}
-                                            {deadlineUnit}</span
+                                            >{gameTimeValue}
+                                            {gameTimeUnit}</span
                                         >
                                     </div>
                                     <div
@@ -1289,7 +1289,7 @@
                             >
                                 <div class="form-group lg:col-span-4">
                                     <div class="flex items-center gap-2 mb-1.5">
-                                        <Label for="deadlineValue" class="mb-0"
+                                        <Label for="gameTimeValue" class="mb-0"
                                             >Game Time</Label
                                         >
                                         <div class="group relative">
@@ -1309,15 +1309,15 @@
                                     </div>
                                     <div class="flex space-x-2">
                                         <Input
-                                            id="deadlineValue"
+                                            id="gameTimeValue"
                                             type="number"
-                                            bind:value={deadlineValue}
+                                            bind:value={gameTimeValue}
                                             min="1"
                                             placeholder="Time for robot upload"
                                             autocomplete="off"
                                         />
                                         <select
-                                            bind:value={deadlineUnit}
+                                            bind:value={gameTimeUnit}
                                             class="p-2 border border-slate-500/20 rounded-md bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-slate-500/20"
                                         >
                                             <option value="days">Days</option>
@@ -1334,7 +1334,7 @@
                                         follow.
                                     </p>
 
-                                    {#if deadlineValue > 0}
+                                    {#if gameTimeValue > 0}
                                         <div class="space-y-3 mt-6">
                                             <div>
                                                 <Label

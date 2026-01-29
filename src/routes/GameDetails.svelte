@@ -382,7 +382,6 @@
     let jsonUploadError: string | null = null;
     let isSubmitting: boolean = false;
     let showShareModal = false;
-    let showInfoBlocks = true;
 
     // Game Status State
     let participationIsEnded = true;

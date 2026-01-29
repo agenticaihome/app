@@ -922,6 +922,14 @@
                                             >{timeFactorOption}</span
                                         >
                                     </div>
+                                     <div
+                                        class="flex justify-between text-sm border-b border-border/50 pb-1"
+                                    >
+                                        <span>Estimated deadline:</span>
+                                        <span class="font-mono"
+                                            >{deadlineBlockDateText} ({deadlineBlock} block)
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 

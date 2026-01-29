@@ -153,7 +153,7 @@ async function fetchReputationOpinionsForTarget(
     }
 }
 
-async function getTransactionInfo(transactionId: string): Promise<any> {
+export async function getTransactionInfo(transactionId: string): Promise<any> {
     const url = `${get(explorer_uri)}/api/v1/transactions/${transactionId}`;
     try {
         const response = await fetch(url);

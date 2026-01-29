@@ -1,8 +1,6 @@
 <script lang="ts">
-    import {
-        type AnyGame,
-        GameState
-    } from "$lib/common/game";
+    import { type AnyGame, GameState } from "$lib/common/game";
+    import { type Box, type Amount } from "@fleet-sdk/core";
     import {
         CheckCircle,
         Circle,
@@ -31,6 +29,7 @@
         PARTICIPATION,
         PARTICIPATION_UNAVAILABLE,
     } from "$lib/ergo/reputation/types";
+    import { getTransactionInfo } from "$lib/ergo/fetch";
 
     export let history: AnyGame[] = [];
     export let currentGame: AnyGame | null = null;
@@ -40,22 +39,20 @@
     let showBotEvents = false;
 
     // Helper to get a readable date from block height or timestamp
-    async function getDateString(
-        blockOrTs: number,
-        isBlock: boolean = true,
-    ): Promise<string> {
-        if (!blockOrTs) return "Unknown";
-        let date: Date;
-        if (isBlock) {
-            const ts = await block_height_to_timestamp(
-                blockOrTs,
-                new ErgoPlatform(),
-            );
-            date = new Date(ts);
-        } else {
-            date = new Date(blockOrTs);
+    async function getDateString(box: Box<Amount> | null): Promise<string> {
+        if (!box) return "Unknown";
+
+        const txInfo = await getTransactionInfo(box.transactionId);
+        if (txInfo && txInfo.timestamp) {
+            return new Date(txInfo.timestamp).toLocaleString();
         }
-        return date.toLocaleString();
+
+        // Fallback to approximation
+        const ts = await block_height_to_timestamp(
+            box.creationHeight,
+            new ErgoPlatform(),
+        );
+        return new Date(ts).toLocaleString();
     }
 
     // Define timeline steps based on game state
@@ -119,7 +116,7 @@
                     label: "Game Created",
                     description: "The game was initialized on the blockchain.",
                     status: "completed",
-                    date: await getDateString(h, true),
+                    date: await getDateString(g.box),
                     icon: Sparkles,
                     height: h,
                     color: "text-blue-500 border-blue-500",
@@ -146,7 +143,7 @@
                         label: "Seed Updated",
                         description: "Randomness was added to the game seed.",
                         status: "completed",
-                        date: await getDateString(h, true),
+                        date: await getDateString(g.box),
                         icon: RefreshCw,
                         height: h,
                         color: "text-purple-500 border-purple-500",
@@ -169,7 +166,7 @@
                         description:
                             "The game entered the resolution and judging phase.",
                         status: "completed",
-                        date: await getDateString(h, true),
+                        date: await getDateString(g.box),
                         icon: Gavel,
                         height: h,
                         color: "text-lime-500 border-lime-500",
@@ -229,7 +226,7 @@
                         label: label,
                         description: description,
                         status: "completed",
-                        date: await getDateString(h, true),
+                        date: await getDateString(g.box),
                         icon: icon,
                         height: h,
                         color: color,
@@ -256,7 +253,7 @@
                 label: "New Participation",
                 description: `Player ${p.playerPK_Hex?.slice(0, 8)}... submitted a score.`,
                 status: "completed",
-                date: await getDateString(h, true),
+                date: await getDateString(p.box),
                 icon: User,
                 height: h,
                 color: "text-emerald-500 border-emerald-500",
@@ -279,7 +276,7 @@
                     label: "Bot Uploaded",
                     description: `Player uploaded their bot code (Box: ${p.solverIdBox.boxId.slice(0, 8)}...).`,
                     status: "completed",
-                    date: await getDateString(botH, true),
+                    date: await getDateString(p.solverIdBox),
                     icon: Bot,
                     height: botH,
                     color: "text-amber-500 border-amber-500",
@@ -334,7 +331,7 @@
                                 label: label,
                                 description: description,
                                 status: "completed",
-                                date: await getDateString(opH, true),
+                                date: await getDateString(opinion.box),
                                 icon: icon,
                                 height: opH,
                                 color: color,
@@ -375,7 +372,7 @@
                         label: "Judge Accepted",
                         description: `Judge ${opinion.token_id.slice(0, 8)}... accepted the game.`,
                         status: "completed",
-                        date: await getDateString(opH, true),
+                        date: await getDateString(opinion.box),
                         icon: Gavel,
                         height: opH,
                         color: "text-indigo-500 border-indigo-500",
@@ -396,7 +393,6 @@
 
         // 4. Future/Current Steps (only if game is not finalized/cancelled)
         if (current) {
-            
             if (current.status === GameState.Active) {
                 // Add sub-phases if active
                 if ("ceremonyDeadline" in current) {
@@ -464,7 +460,10 @@
             }
 
             // Resolution & Finalization
-            if (current.status === GameState.Resolution && currentHeight < current.resolutionDeadline) {
+            if (
+                current.status === GameState.Resolution &&
+                currentHeight < current.resolutionDeadline
+            ) {
                 newSteps.push({
                     id: "future_resolution",
                     label: "Resolution & Judging",
@@ -483,7 +482,10 @@
                 });
             }
 
-            if (current.status === GameState.Resolution && currentHeight >= current.resolutionDeadline) {
+            if (
+                current.status === GameState.Resolution &&
+                currentHeight >= current.resolutionDeadline
+            ) {
                 newSteps.push({
                     id: "future_finalization",
                     label: "Finalization",

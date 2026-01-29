@@ -38,13 +38,18 @@
 
     let showBotEvents = false;
 
-    // Helper to get a readable date from block height or timestamp
-    async function getDateString(box: Box<Amount> | null): Promise<string> {
-        if (!box) return "Unknown";
+    // Helper to get a readable date and height from block height or timestamp
+    async function getEventDetails(
+        box: Box<Amount> | null,
+    ): Promise<{ date: string; height: number }> {
+        if (!box) return { date: "Unknown", height: 0 };
 
         const txInfo = await getTransactionInfo(box.transactionId);
         if (txInfo && txInfo.timestamp) {
-            return new Date(txInfo.timestamp).toLocaleString();
+            return {
+                date: new Date(txInfo.timestamp).toLocaleString(),
+                height: txInfo.inclusionHeight || box.creationHeight,
+            };
         }
 
         // Fallback to approximation
@@ -52,7 +57,10 @@
             box.creationHeight,
             new ErgoPlatform(),
         );
-        return new Date(ts).toLocaleString();
+        return {
+            date: new Date(ts).toLocaleString(),
+            height: box.creationHeight,
+        };
     }
 
     // Define timeline steps based on game state
@@ -110,21 +118,23 @@
             const h = g.box.creationHeight;
             const txId = g.box.transactionId;
 
+            const { date: eventDate, height: eventHeight } =
+                await getEventDetails(g.box);
             if (i === 0) {
                 newSteps.push({
                     id: `created_${h}`,
                     label: "Game Created",
                     description: "The game was initialized on the blockchain.",
                     status: "completed",
-                    date: await getDateString(g.box),
+                    date: eventDate,
                     icon: Sparkles,
-                    height: h,
+                    height: eventHeight,
                     color: "text-blue-500 border-blue-500",
                     txId: txId,
                     details: {
                         "Box ID": g.boxId,
                         "Transaction ID": txId,
-                        Height: h,
+                        Height: eventHeight,
                         "Game ID": g.gameId,
                         "Creator Token": g.content.creatorTokenId || "None",
                     },
@@ -143,15 +153,15 @@
                         label: "Seed Updated",
                         description: "Randomness was added to the game seed.",
                         status: "completed",
-                        date: await getDateString(g.box),
+                        date: eventDate,
                         icon: RefreshCw,
-                        height: h,
+                        height: eventHeight,
                         color: "text-purple-500 border-purple-500",
                         txId: txId,
                         details: {
                             "Box ID": g.boxId,
                             "Transaction ID": txId,
-                            Height: h,
+                            Height: eventHeight,
                             "New Seed": g.seed,
                         },
                     });
@@ -166,15 +176,15 @@
                         description:
                             "The game entered the resolution and judging phase.",
                         status: "completed",
-                        date: await getDateString(g.box),
+                        date: eventDate,
                         icon: Gavel,
-                        height: h,
+                        height: eventHeight,
                         color: "text-lime-500 border-lime-500",
                         txId: txId,
                         details: {
                             "Box ID": g.boxId,
                             "Transaction ID": txId,
-                            Height: h,
+                            Height: eventHeight,
                             "Revealed S": (g as any).revealedS_Hex,
                         },
                     });
@@ -226,15 +236,15 @@
                         label: label,
                         description: description,
                         status: "completed",
-                        date: await getDateString(g.box),
+                        date: eventDate,
                         icon: icon,
-                        height: h,
+                        height: eventHeight,
                         color: color,
                         txId: txId,
                         details: {
                             "Box ID": g.boxId,
                             "Transaction ID": txId,
-                            Height: h,
+                            Height: eventHeight,
                             "Candidate Commitment": newCandidate || "None",
                             "Resolver Commission": resolverCommission,
                         },
@@ -247,21 +257,25 @@
         for (const p of parts) {
             const h = p.creationHeight;
 
+            const { date: pDate, height: pHeight } = await getEventDetails(
+                p.box,
+            );
+
             // Participation Event
             newSteps.push({
                 id: `part_${p.boxId}`,
                 label: "New Participation",
                 description: `Player ${p.playerPK_Hex?.slice(0, 8)}... submitted a score.`,
                 status: "completed",
-                date: await getDateString(p.box),
+                date: pDate,
                 icon: User,
-                height: h,
+                height: pHeight,
                 color: "text-emerald-500 border-emerald-500",
                 txId: p.transactionId,
                 details: {
                     "Box ID": p.boxId,
                     "Transaction ID": p.transactionId,
-                    Height: h,
+                    Height: pHeight,
                     "Player PK": p.playerPK_Hex || "Unknown",
                     Commitment: p.commitmentC_Hex,
                     "Solver ID": p.solverId_RawBytesHex,
@@ -270,22 +284,23 @@
 
             // Bot Box Event (if available)
             if (p.solverIdBox) {
-                const botH = p.solverIdBox.creationHeight;
+                const { date: botDate, height: botHeight } =
+                    await getEventDetails(p.solverIdBox);
                 newSteps.push({
                     id: `bot_box_${p.solverIdBox.boxId}`,
                     label: "Bot Uploaded",
                     description: `Player uploaded their bot code (Box: ${p.solverIdBox.boxId.slice(0, 8)}...).`,
                     status: "completed",
-                    date: await getDateString(p.solverIdBox),
+                    date: botDate,
                     icon: Bot,
-                    height: botH,
+                    height: botHeight,
                     color: "text-amber-500 border-amber-500",
                     txId: p.solverIdBox.transactionId,
                     isBotEvent: true,
                     details: {
                         "Box ID": p.solverIdBox.boxId,
                         "Transaction ID": p.solverIdBox.transactionId,
-                        Height: botH,
+                        Height: botHeight,
                         "Solver ID": p.solverId_RawBytesHex,
                     },
                 });
@@ -302,7 +317,8 @@
                             opinion.type.tokenId === PARTICIPATION;
 
                         if (isParticipation || isUnavailable) {
-                            const opH = (opinion as any).creationHeight;
+                            const { date: opDate, height: opHeight } =
+                                await getEventDetails(opinion.box);
 
                             let label = "Judge Voted";
                             let description = `Judge ${opinion.token_id.slice(0, 8)}... voted on participation ${p.commitmentC_Hex.slice(0, 8)}...`;
@@ -331,15 +347,15 @@
                                 label: label,
                                 description: description,
                                 status: "completed",
-                                date: await getDateString(opinion.box),
+                                date: opDate,
                                 icon: icon,
-                                height: opH,
+                                height: opHeight,
                                 color: color,
                                 txId: opinion.box_id,
                                 details: {
                                     "Opinion Box ID": opinion.box_id,
                                     "Judge Token": opinion.token_id,
-                                    Height: opH,
+                                    Height: opHeight,
                                     Polarization: opinion.polarization
                                         ? "Positive"
                                         : "Negative",
@@ -366,21 +382,22 @@
                     gameToCheck.judges.includes(opinion.token_id) &&
                     opinion.type.tokenId === GAME
                 ) {
-                    const opH = (opinion as any).creationHeight;
+                    const { date: opDate, height: opHeight } =
+                        await getEventDetails(opinion.box);
                     newSteps.push({
                         id: `op_game_${opinion.box_id}`,
                         label: "Judge Accepted",
                         description: `Judge ${opinion.token_id.slice(0, 8)}... accepted the game.`,
                         status: "completed",
-                        date: await getDateString(opinion.box),
+                        date: opDate,
                         icon: Gavel,
-                        height: opH,
+                        height: opHeight,
                         color: "text-indigo-500 border-indigo-500",
                         txId: opinion.box_id,
                         details: {
                             "Opinion Box ID": opinion.box_id,
                             "Judge Token": opinion.token_id,
-                            Height: opH,
+                            Height: opHeight,
                             "Game ID": gameToCheck.gameId,
                         },
                     });

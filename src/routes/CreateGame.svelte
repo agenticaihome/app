@@ -429,7 +429,7 @@
 
     // Helper function to format block duration into days, hours, and minutes
     function formatBlockDuration(blocks: number): string {
-        const minutes = blocks * 2; // Each block is ~2 minutes
+        const minutes = blocks * (new ErgoPlatform()).time_per_block / (60 * 1000); // Each block is ~2 minutes
         const days = Math.floor(minutes / (24 * 60));
         const hours = Math.floor((minutes % (24 * 60)) / 60);
         const mins = Math.floor(minutes % 60);

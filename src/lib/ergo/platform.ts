@@ -92,7 +92,6 @@ export class ErgoPlatform implements Platform {
     main_token = "ERG";
     icon = "";
     time_per_block = 2 * 60 * 1000;  // every 2 minutes
-    last_version = "v1_0";
 
     async get_current_height(): Promise<number> {
         const results = await Promise.allSettled([

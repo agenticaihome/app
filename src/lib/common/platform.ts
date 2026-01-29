@@ -23,8 +23,7 @@ export interface Platform {
     id: string;              // ergo, ethereum ...
     main_token: string;      // ERG, ETH ...
     icon: string;            // Ruta o URL del icono.
-    time_per_block: number;  // milisegundos
-    last_version: string;    // Versión del conjunto de contratos
+    time_per_block: number;  // milisegundos 
 
     get_current_height(): Promise<number>;
     get_balance(id?: string): Promise<Map<string, number>>;

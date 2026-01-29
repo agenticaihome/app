@@ -38,12 +38,7 @@
     } from "lucide-svelte";
     import { fetch_token_details } from "$lib/ergo/fetch";
     import * as Card from "$lib/components/ui/card";
-    import {
-        FileText,
-        ArrowRight,
-        BookOpen,
-        Code2,
-    } from "lucide-svelte";
+    import { FileText, ArrowRight, BookOpen, Code2 } from "lucide-svelte";
 
     import { reputation_proof } from "$lib/common/store";
     import {
@@ -410,16 +405,12 @@
         }
     }
 
-    $: registrationBlocks =
-        deadlineBlock
-            ? Math.max(
-                  0,
-                  deadlineBlock -
-                      current_height -
-                      solvingBlocks -
-                      lockdownBlocks,
-              )
-            : 0; // Phase 1
+    $: registrationBlocks = deadlineBlock
+        ? Math.max(
+              0,
+              deadlineBlock - current_height - solvingBlocks - lockdownBlocks,
+          )
+        : 0; // Phase 1
     $: totalBlocks = registrationBlocks + lockdownBlocks + solvingBlocks;
 
     let registrationEndDateText = "";
@@ -429,7 +420,8 @@
 
     // Helper function to format block duration into days, hours, and minutes
     function formatBlockDuration(blocks: number): string {
-        const minutes = blocks * (new ErgoPlatform()).time_per_block / (60 * 1000); // Each block is ~2 minutes
+        const minutes =
+            (blocks * new ErgoPlatform().time_per_block) / (60 * 1000); // Each block is ~2 minutes
         const days = Math.floor(minutes / (24 * 60));
         const hours = Math.floor((minutes % (24 * 60)) / 60);
         const mins = Math.floor(minutes % 60);
@@ -476,7 +468,6 @@
     }
 
     async function calculateBlockLimit() {
-
         const value = gameTimeValue;
         const unit = gameTimeUnit;
 
@@ -929,12 +920,13 @@
                                             >{timeFactorOption}</span
                                         >
                                     </div>
-                                     <div
+                                    <div
                                         class="flex justify-between text-sm border-b border-border/50 pb-1"
                                     >
                                         <span>Estimated deadline:</span>
                                         <span class="font-mono"
-                                            >{deadlineBlockDateText} ({deadlineBlock} block)
+                                            >{deadlineBlockDateText} ({deadlineBlock}
+                                            block)
                                         </span>
                                     </div>
                                 </div>

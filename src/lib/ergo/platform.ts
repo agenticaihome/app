@@ -26,11 +26,12 @@ import { claim_after_cancellation } from './actions/claim_after_cancellation';
 import { reclaim_after_grace } from './actions/reclaim_after_grace';
 import { create_opinion, update_opinion } from 'reputation-system';
 import { GAME, PARTICIPATION } from '$lib/ergo/reputation/types';
-import { reputation_proof } from '$lib/common/store';
+import { current_height, reputation_proof } from '$lib/common/store';
 import { get } from 'svelte/store';
 import { contribute_to_ceremony } from './actions/ceremony';
 import { batch_participations } from './actions/batch_participations';
 import { publish_solver_id } from './actions/publish_solver_id';
+import { th } from 'date-fns/locale';
 
 interface CreateGoPGamePlatformParams {
     gameServiceId: string;
@@ -93,24 +94,26 @@ export class ErgoPlatform implements Platform {
     time_per_block = 2 * 60 * 1000;  // every 2 minutes
     last_version = "v1_0";
 
-    async connect(): Promise<void> {
-        // Handled by wallet-svelte-component
-    }
-
     async get_current_height(): Promise<number> {
-        try {
-            return await ergo.get_current_height();
-        } catch {
-            try {
-                const response = await fetch(get(explorer_uri) + '/api/v1/networkState');
-                if (!response.ok) throw new Error(`La solicitud a la API falló: ${response.status}`);
-                const data = await response.json();
-                return data.height;
-            } catch (error) {
-                console.error("No se pudo obtener la altura de la red desde la API:", error);
-                throw new Error("No se puede obtener la altura actual.");
-            }
+        const results = await Promise.allSettled([
+            ergo.get_current_height(),
+            fetch(get(explorer_uri) + '/api/v1/networkState')
+                .then(res => res.ok ? res.json() : Promise.reject())
+                .then(data => data.height)
+        ]);
+
+        const heights = results
+            .filter((result): result is PromiseFulfilledResult<number> => result.status === 'fulfilled')
+            .map(result => result.value);
+
+        if (heights.length === 0) {
+            console.error("Both methods to get current height failed:", results);
+            throw new Error("Failed to get current block height from all sources.");
         }
+
+        const final_height = Math.max(...heights);
+        current_height.set(final_height);
+        return final_height;
     }
 
     async get_balance(id?: string): Promise<Map<string, number>> {

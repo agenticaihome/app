@@ -10,7 +10,6 @@
         network,
         audio_element,
         muted,
-        user_volume,
         current_height,
     } from "$lib/common/store";
     import CreateGame from "./CreateGame.svelte";
@@ -102,7 +101,6 @@
         }
 
         getCurrentHeight();
-        // balanceUpdateInterval = window.setInterval(updateWalletInfo, 30000);
 
         scrollingTextElement?.addEventListener(
             "animationiteration",

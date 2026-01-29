@@ -39,15 +39,13 @@
     import { fetch_token_details } from "$lib/ergo/fetch";
     import * as Card from "$lib/components/ui/card";
     import {
-        BrainCircuit,
         FileText,
-        Server,
         ArrowRight,
         BookOpen,
         Code2,
     } from "lucide-svelte";
 
-    import { reputation_proof, current_height } from "$lib/common/store";
+    import { reputation_proof } from "$lib/common/store";
     import {
         FileSourceCreation,
         fetchFileSourcesByHash,
@@ -57,6 +55,10 @@
     const constants = getGameConstants();
 
     let platform = new ErgoPlatform();
+
+    let current_height = 0;
+    const solvingBlocks = constants.PARTICIPATION_TIME_WINDOW;
+    const lockdownBlocks = constants.SEED_MARGIN;
 
     // --- State declarations
     let gameServiceIdStore = writable("");
@@ -91,7 +93,6 @@
 
     // Guide State
     let showGuide = true;
-    let guideStep = 0;
 
     // Didactic Modal State
     let showDidacticModal = false;
@@ -211,9 +212,10 @@
         }
     }
 
-    onMount(() => {
+    onMount(async () => {
         loadUserTokens();
-        setTimeout(loadUserTokens, 1000);
+
+        current_height = await platform.get_current_height();
 
         // DEV MODE AUTO-FILL
         if ($isDevMode) {
@@ -230,7 +232,7 @@
             gameTimeUnit = "minutes";
 
             // Trigger calculation immediately
-            calculateBlockLimit(gameTimeValue, gameTimeUnit);
+            calculateBlockLimit();
         }
 
         // Set creatorTokenId from reputation proof only on load if not set
@@ -401,21 +403,19 @@
     // --- Logic functions
     $: {
         if (gameTimeValue > 0) {
-            calculateBlockLimit(gameTimeValue, gameTimeUnit);
+            calculateBlockLimit();
         } else {
             deadlineBlock = undefined;
             deadlineBlockDateText = "";
         }
     }
 
-    $: solvingBlocks = constants.PARTICIPATION_TIME_WINDOW; // Phase 3
-    $: lockdownBlocks = constants.SEED_MARGIN; // Phase 2
     $: registrationBlocks =
-        deadlineBlock && $current_height
+        deadlineBlock
             ? Math.max(
                   0,
                   deadlineBlock -
-                      $current_height -
+                      current_height -
                       solvingBlocks -
                       lockdownBlocks,
               )
@@ -469,19 +469,26 @@
         }
     }
 
-    async function calculateBlockLimit(
-        value: number,
-        unit: "days" | "minutes",
-    ) {
+    $: {
+        if (showSummary) {
+            calculateBlockLimit();
+        }
+    }
+
+    async function calculateBlockLimit() {
+
+        const value = gameTimeValue;
+        const unit = gameTimeUnit;
+
         if (!platform || !value || value <= 0) {
             deadlineBlock = undefined;
             deadlineBlockDateText = "";
             return;
         }
+
         try {
-            // Ensure we have the latest height for accurate breakdown display
-            const latestHeight = await platform.get_current_height();
-            current_height.set(latestHeight);
+            // Refresh current height
+            current_height = await platform.get_current_height();
 
             // User enters registration time (Phase 1)
             // We add SEED_MARGIN and PARTICIPATION_TIME_WINDOW to get the total deadlin

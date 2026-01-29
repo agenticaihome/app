@@ -258,9 +258,6 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             ceremonyDeadline: Number(deadlineBlock) - getGameConstants().PARTICIPATION_TIME_WINDOW,
         };
 
-        console.log("REPUTATION OPINIONS")
-        console.log(gameActive.reputationOpinions)
-
         gameActive.reputation = calculate_reputation(gameActive);
 
         return gameActive;

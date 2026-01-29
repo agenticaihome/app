@@ -26,7 +26,6 @@ export interface Platform {
     time_per_block: number;  // milisegundos
     last_version: string;    // Versión del conjunto de contratos
 
-    connect(): Promise<void>;
     get_current_height(): Promise<number>;
     get_balance(id?: string): Promise<Map<string, number>>;
 

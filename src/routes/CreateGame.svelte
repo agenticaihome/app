@@ -1962,12 +1962,14 @@
                                             >
                                         </div>
                                         <div
-                                            class="grid grid-cols-2 gap-2 text-xs"
+                                            class="grid grid-cols-1 gap-2 text-xs"
                                         >
-                                            <div class="flex justify-between">
+                                            <div
+                                                class="flex justify-between border-b border-border/50 pb-1"
+                                            >
                                                 <span
                                                     class="text-muted-foreground"
-                                                    >Judges:</span
+                                                    >From Judges:</span
                                                 >
                                                 <span class="font-mono"
                                                     >{reputationBreakdown.judgesRep.toFixed(
@@ -1975,10 +1977,12 @@
                                                     )} ERG</span
                                                 >
                                             </div>
-                                            <div class="flex justify-between">
+                                            <div
+                                                class="flex justify-between border-b border-border/50 pb-1"
+                                            >
                                                 <span
                                                     class="text-muted-foreground"
-                                                    >Creator:</span
+                                                    >From Creator:</span
                                                 >
                                                 <span class="font-mono"
                                                     >{reputationBreakdown.creatorRep.toFixed(

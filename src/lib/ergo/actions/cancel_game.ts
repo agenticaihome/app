@@ -57,26 +57,11 @@ export async function cancel_game(
     // --- 2. Calcular valores para la nueva caja de cancelación y la penalización ---
     let stakePortionToClaim = game.resolverStakeAmount / BigInt(game.constants.STAKE_DENOMINATOR);
     const newValue = game.value - stakePortionToClaim;
-    let newResolverStake = game.resolverStakeAmount - stakePortionToClaim;
 
-    let gameValue = game.participationTokenId == "" ? newValue : BigInt(game.box.value);
-    const gameTokens = game.participationTokenId == "" ? [] : [{
+    const gameTokens = [{
         tokenId: game.participationTokenId,
         amount: newValue
     }];
-
-    if (gameValue < SAFE_MIN_BOX_VALUE) {
-        console.warn(`Ajuste de stake: El valor restante calculado (${gameValue}) es menor que SAFE_MIN_BOX_VALUE (${SAFE_MIN_BOX_VALUE}).`);
-        
-        // El stake para la nueva caja se fija en el mínimo seguro.
-        gameValue = SAFE_MIN_BOX_VALUE;  // Ajusta con (SAFE_MIN_BOX_VALUE - gameValue) mas tokens si es necesario
-
-        // La porción a reclamar es el resto, para que el total se conserve.
-        const amountAdded = SAFE_MIN_BOX_VALUE - newValue;
-        
-        stakePortionToClaim = maxBigInt(stakePortionToClaim - amountAdded, 0n);
-        newResolverStake = newResolverStake + amountAdded;
-    }
 
     // --- 3. Construir Salidas de la Transacción ---
     
@@ -86,7 +71,7 @@ export async function cancel_game(
 
     // SALIDA(0): La nueva caja de cancelación (`game_cancellation.es`)
     const cancellationBoxOutput = new OutputBuilder(
-        gameValue,
+        BigInt(game.box.value),
         cancellationContractErgoTree
     )
     .addTokens([gameBoxToSpend.assets[0], ...gameTokens]) // Preservar el NFT del juego
@@ -98,7 +83,7 @@ export async function cancel_game(
         // R6: El secreto 'S' revelado
         R6: SColl(SByte, secretS_bytes).toHex(),
         // R7: El stake restante del creador
-        R7: SLong(newResolverStake).toHex(),
+        R7: SLong(newValue).toHex(),
         // R8: Deadline original
         R8: SLong(BigInt(game.deadlineBlock)).toHex(),
         // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]

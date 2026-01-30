@@ -35,15 +35,9 @@ export async function drain_cancelled_game_stake(
         throw new Error(`The cooldown period has not ended. Draining is only possible after block ${game.unlockHeight}.`);
     }
 
-    const stakeToDrain = BigInt(game.currentStakeAmount);
+    const stakeToDrain = BigInt(game.resolverStakeAmount);
     const stakePortionToClaim = stakeToDrain / BigInt(game.constants.STAKE_DENOMINATOR);
     const remainingStake = stakeToDrain - stakePortionToClaim;
-    const isTokenGame = game.participationTokenId !== "";
-
-    // The contract prevents this action from running if not enough stake is left (only applies to ERG stake).
-    if (!isTokenGame && remainingStake < SAFE_MIN_BOX_VALUE) {
-        throw new Error(`The remaining stake (${remainingStake}) is too low to continue the drain. Cannot proceed.`);
-    }
 
     // --- 2. Build Outputs ---
     const cancellationContractErgoTree = getGopGameCancellationErgoTreeHex();
@@ -51,17 +45,15 @@ export async function drain_cancelled_game_stake(
     const revealedSecretBytes = hexToBytes(game.revealedS_Hex);
     if (!revealedSecretBytes) throw new Error("Could not convert revealed secret hex to bytes.");
 
-    // Calculate Values and Tokens based on whether it's an ERG game or Token game
-    const nextBoxValue = isTokenGame ? BigInt(game.box.value) : remainingStake;
     const nextBoxTokens = [game.box.assets[0]]; // Always preserve NFT
-    if (isTokenGame) nextBoxTokens.push({ tokenId: game.participationTokenId, amount: remainingStake });
+    nextBoxTokens.push({ tokenId: game.participationTokenId, amount: remainingStake });
 
-    const claimerValue = isTokenGame ? SAFE_MIN_BOX_VALUE : stakePortionToClaim;
-    const claimerTokens = isTokenGame ? [{ tokenId: game.participationTokenId, amount: stakePortionToClaim }] : [];
+    const claimerValue = SAFE_MIN_BOX_VALUE;
+    const claimerTokens = [{ tokenId: game.participationTokenId, amount: stakePortionToClaim }];
 
     // OUTPUT(0): The recreated cancellation box with updated values
     const recreatedCancellationBox = new OutputBuilder(
-        nextBoxValue,
+        BigInt(game.box.value),
         cancellationContractErgoTree
     )
         .addTokens(nextBoxTokens)

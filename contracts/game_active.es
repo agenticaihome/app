@@ -190,7 +190,7 @@
           }
 
           val resolutionBoxIsValid = {
-              box_value(resolutionBox) >= resolverStake &&
+              box_value(resolutionBox) >= box_value(SELF) &&
               resolutionBox.tokens.filter({ (token: (Coll[Byte], Long)) => token._1 == gameNftId }).size == 1 &&
               resolutionBox.R4[Int].get == 1 && // El estado del juego pasa a "Resuelto" (1)
               resolutionBox.R5[Coll[Byte]].get == gameSeed &&
@@ -226,20 +226,24 @@
 
       // Calcular los valores iniciales.
       val initialStakePortionToClaim = resolverStake / STAKE_DENOMINATOR
-      val remainingStake = resolverStake - initialStakePortionToClaim
+      val remainingValue = box_value(SELF) - initialStakePortionToClaim
 
       // --- Validar la caja de cancelación (OUTPUTS(0)) ---
       val cancellationBoxIsValid = {
           blake2b256(cancellationBox.propositionBytes) == GAME_CANCELLATION_SCRIPT_HASH &&
-          box_value(cancellationBox) >= remainingStake &&
+          box_value(cancellationBox) >= remainingValue &&
           cancellationBox.tokens.filter({ (token: (Coll[Byte], Long)) => token._1 == gameNftId && token._2 == 1}).size == 1 &&
           cancellationBox.R4[Int].get == 2 && // Game state is "Cancelled" (2)
           cancellationBox.R5[Long].get >= HEIGHT + COOLDOWN_IN_BLOCKS &&
           blake2b256(cancellationBox.R6[Coll[Byte]].get) == secretHash &&
-          cancellationBox.R7[Long].get == remainingStake &&
+          cancellationBox.R7[Long].get == remainingValue &&
           cancellationBox.R8[Long].get == deadline &&
           cancellationBox.R9[Coll[Coll[Byte]]].get == gameProvenance
       }
+
+      // R7 Pasa a ser el valor restante (el cual puede ser mayor al stake original si había donaciones).  La razón por la que nos se calcula el initialStakePortionToClaim en base al valor total aqui es para evitar que, en caso de que el valor total sea STAKE_DENOMINATOR veces mayor al stake original, el creador esté incentivado a cancelar el juego en lugar de proseguirlo.
+      
+      // Quien cancela el juego puede agregar mas valor del que reclama, lo cual creará una diferencia entre el valor del contrato y el valor R7, esto permitirá al siguiente reclamante obtener esa diferencia. Aunque esto no es un problema, ni tiene lógica desde el punto de vista de incentivos.
 
       cancellationBoxIsValid
 
@@ -260,7 +264,9 @@
   //   - Se mantiene todo igual salvo el registro R5 (la semilla actualizada)
   //   - updated_seed = blake2b256(old_seed ++ INPUTS(0).id)
   //   - El script de salida debe ser idéntico (SELF mismo script)
-  //   - El NFT y valores deben preservarse
+  //   - El NFT debe preservarse
+  //   - El valor de la caja debe mantenerse o aumentarse
+  //   - La cantidad de ERG no se controla, pues únicamente debe ser suficiente para pagar las tarifas de la red.
   //
   val action3_add_randomness = {
     // Usa ceremonyDeadline calculado
@@ -274,13 +280,9 @@
 
       // El NFT debe preservarse
       val sameNFT = out.tokens(0)._1 == gameNftId
-      val sameValue = out.value >= MIN_BOX_VALUE && out.value == SELF.value
-      val sameTokens = (out.tokens.size == SELF.tokens.size) &&
-        (out.tokens.slice(1, out.tokens.size).zip(SELF.tokens.slice(1, SELF.tokens.size)).forall({ (pair: ((Coll[Byte], Long), (Coll[Byte], Long))) =>
-          val outToken = pair._1
-          val selfToken = pair._2
-          outToken._1 == selfToken._1 && outToken._2 >= selfToken._2
-        }))
+
+      // El valor de la caja debe mantenerse o aumentarse - permitiendo donaciones siempre se continue agregando entropía al seed del juego.
+      val sameOrAddedValue = box_value(out) >= box_value(SELF)
 
       // Calculamos la nueva semilla (gameSeed es R5._1)
       val updated_seed = blake2b256(gameSeed ++ SELF.id)
@@ -297,7 +299,7 @@
       val sameR9 = out.R9[Coll[Coll[Byte]]].get == gameProvenance
     
       sameNFT &&
-      sameValue &&
+      sameOrAddedValue &&
       validUpdatedSeed &&
       sameR4 && sameR6 && sameR7 && sameR8 && sameR9 // Check R4, R6-R9
     } else {

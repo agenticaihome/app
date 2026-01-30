@@ -9,9 +9,6 @@
   // Período de enfriamiento en bloques entre cada acción de drenaje.
   val COOLDOWN_IN_BLOCKS = `+COOLDOWN_IN_BLOCKS+`L
 
-  // Valor mínimo en nanoErgs que debe tener una caja para ser válida.
-  val MinErg = 1000000L // 0.001 ERG
-
   // =================================================================
   // === DEFINICIONES DE REGISTROS (ESTADO DE CANCELACIÓN)
   // =================================================================
@@ -53,6 +50,8 @@
     
     val stakePortionToClaim = currentStake / STAKE_DENOMINATOR
     val remainingStake = currentStake - stakePortionToClaim
+
+    // En caso de que el valor en el contrato sea mayor a R7, el ejecutor puede quedarse la diferencia sin problema; en este caso ya no hay problema, pues ya no tiene porque ser el creador, si no, posiblemente, quien mine el bloque (si el minero es inteligente...).
 
     val cooldownIsOver = HEIGHT >= unlockHeight
 

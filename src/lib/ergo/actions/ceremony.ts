@@ -4,7 +4,7 @@ import {
     RECOMMENDED_MIN_FEE_VALUE,
     SAFE_MIN_BOX_VALUE
 } from '@fleet-sdk/core';
-import { SColl, SByte, SPair, SLong, SInt } from '@fleet-sdk/serializer';
+import { SColl, SByte, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox, uint8ArrayToHex } from '$lib/ergo/utils';
 import type { GameActive } from '$lib/common/game';
 import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";

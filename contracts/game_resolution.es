@@ -63,8 +63,6 @@
   val isAfterResolutionDeadline = HEIGHT >= resolutionDeadline
   val isBeforeResolutionDeadline = HEIGHT < resolutionDeadline
 
-  val min_value = 0L
-
   val box_value = { (box: Box) =>
     box.tokens.filter { (token: (Coll[Byte], Long)) => token._1 == participationTokenId }.fold(0L, { (acc: Long, token: (Coll[Byte], Long)) => acc + token._2 })
   }

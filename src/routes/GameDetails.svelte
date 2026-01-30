@@ -58,6 +58,7 @@
         Gavel,
         Check,
         CheckCircle,
+        Heart,
         Sparkles,
         Info,
         Trash2,
@@ -225,6 +226,12 @@
                     id: "open_ceremony",
                     label: "Add Seed Randomness",
                     icon: Sparkles,
+                    variant: "outline",
+                });
+                actions.push({
+                    id: "donate_ceremony",
+                    label: "Donate",
+                    icon: Heart,
                     variant: "outline",
                 });
             }
@@ -436,10 +443,15 @@
         | "open_ceremony"
         | "batch_participations"
         | "submit_creator_opinion"
+        | "donate_ceremony"
         | null = null;
 
     // Didactic Modal State
     let showDidacticModal = false;
+
+    // Donation State
+    let donationAmount = "";
+    let userParticipationTokenBalance = 0n;
     let didacticModalTitle = "";
     let didacticModalText = "";
 
@@ -1199,7 +1211,24 @@
         errorMessage = null;
         isSubmitting = true;
         try {
-            transactionId = await platform.contribute_to_ceremony(game);
+            let donation = 0n;
+            if (currentActionType === "donate_ceremony" && donationAmount) {
+                const decimals = tokenDecimals || 0;
+                // Parse simple decimal input
+                const parts = donationAmount.split(".");
+                let integerPart = parts[0];
+                let fractionalPart = parts[1] || "";
+                if (fractionalPart.length > decimals) {
+                    fractionalPart = fractionalPart.slice(0, decimals);
+                } else {
+                    fractionalPart = fractionalPart.padEnd(decimals, "0");
+                }
+                donation = BigInt(integerPart + fractionalPart);
+            }
+            transactionId = await platform.contribute_to_ceremony(
+                game,
+                donation,
+            );
         } catch (e: any) {
             errorMessage = e.message;
         } finally {
@@ -1554,16 +1583,22 @@
             // Obtener la participación con el score más alto
             const omittedParticipation = submittedParticipations.reduce(
                 (best, current) => {
-                    const bestEffective = game === null ? 0 : calculateEffectiveScore(
-                        game,
-                        best.score,
-                        best.solverIdBox?.creationHeight ?? 0,
-                    );
-                    const currentEffective = game === null ? 0 : calculateEffectiveScore(
-                        game,
-                        current.score,
-                        current.solverIdBox?.creationHeight ?? 0,
-                    );
+                    const bestEffective =
+                        game === null
+                            ? 0
+                            : calculateEffectiveScore(
+                                  game,
+                                  best.score,
+                                  best.solverIdBox?.creationHeight ?? 0,
+                              );
+                    const currentEffective =
+                        game === null
+                            ? 0
+                            : calculateEffectiveScore(
+                                  game,
+                                  current.score,
+                                  current.solverIdBox?.creationHeight ?? 0,
+                              );
 
                     if (currentEffective > bestEffective) return current;
                     if (
@@ -1730,10 +1765,11 @@
             judge_unavailable: `Judge Mark Unavailable`,
             include_omitted: `Include Omitted Participation`,
             accept_judge_nomination: "Accept Judge Nomination",
-            open_ceremony: "Add Seed Randomness",
+            open_ceremony: "Add Entropy",
             batch_participations: "Batch Participations",
             submit_creator_opinion: "Verify Competition (Creator Opinion)",
             remove_opinion: "Judge Mark Available",
+            donate_ceremony: "Donate & Add Entropy",
         };
         modalTitle = titles[type] || "Action";
         errorMessage = null;
@@ -1747,6 +1783,15 @@
         }
 
         showActionModal = true;
+
+        if (type === "donate_ceremony" && game?.participationTokenId) {
+            ergo.get_balance(game.participationTokenId).then((bal) => {
+                userParticipationTokenBalance = BigInt(bal);
+            });
+            fetch_token_details(game.participationTokenId).then((details) => {
+                if (details) tokenDecimals = details.decimals;
+            });
+        }
     }
 
     function closeModal() {
@@ -4020,7 +4065,8 @@
                                         ? calculateEffectiveScore(
                                               game,
                                               actualScoreForThisParticipation,
-                                              p.solverIdBox?.creationHeight ?? 0,
+                                              p.solverIdBox?.creationHeight ??
+                                                  0,
                                           )
                                         : null}
 
@@ -6183,6 +6229,66 @@
                                     {isSubmitting
                                         ? "Processing..."
                                         : "Confirm & Open Ceremony"}
+                                </Button>
+                            </div>
+                        {:else if currentActionType === "donate_ceremony"}
+                            <div class="space-y-4">
+                                <p
+                                    class="text-sm p-3 rounded-md {$mode ===
+                                    'dark'
+                                        ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                                        : 'bg-blue-100 text-blue-700 border border-blue-200'}"
+                                >
+                                    <strong>Action: Donate</strong><br />
+                                    You are contributing value to the game prize
+                                    pool while ensuring fairness by adding entropy.
+                                </p>
+                                <div>
+                                    <Label class="mb-2 block"
+                                        >Donation Amount ({game?.participationTokenId
+                                            ? "Token"
+                                            : "ERG"})</Label
+                                    >
+                                    <div class="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            placeholder="0.00"
+                                            bind:value={donationAmount}
+                                            min="0"
+                                            step="any"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            on:click={() =>
+                                                (donationAmount =
+                                                    formatTokenBigInt(
+                                                        userParticipationTokenBalance,
+                                                        tokenDecimals,
+                                                    ))}
+                                        >
+                                            Max
+                                        </Button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Balance: {formatTokenBigInt(
+                                            userParticipationTokenBalance,
+                                            tokenDecimals,
+                                        )}
+                                    </p>
+                                </div>
+                                <Button
+                                    on:click={handleOpenCeremony}
+                                    disabled={isSubmitting ||
+                                        !donationAmount ||
+                                        parseFloat(donationAmount) <= 0}
+                                    class="w-full md:w-auto md:min-w-[200px] mt-3 py-2.5 text-base {$mode ===
+                                    'dark'
+                                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                        : 'bg-blue-500 hover:bg-blue-600 text-white'} font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isSubmitting
+                                        ? "Processing..."
+                                        : "Confirm Donation"}
                                 </Button>
                             </div>
                         {/if}

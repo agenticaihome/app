@@ -25,10 +25,12 @@ declare const ergo: any;
  * @returns El ID de la transacción si tiene éxito.
  */
 export async function contribute_to_ceremony(
-    game: GameActive
+    game: GameActive,
+    donation: bigint = 0n
 ): Promise<string | null> {
 
     console.log(`Iniciando contribución a ceremonia para el juego: ${game.boxId}`);
+    if (donation > 0n) console.log(`Donación de: ${donation.toString()} para el token ${game.participationTokenId}`);
 
     const currentHeight = await ergo.get_current_height();
 
@@ -97,13 +99,26 @@ export async function contribute_to_ceremony(
     const r9Hex = SColl(SColl(SByte), r9).toHex()
 
     // 4. --- Construir la Caja de Salida ---
+
+    // Preparar tokens
+    const currentTokens = gameBoxToSpend.assets.map(a => ({ ...a }));
+    if (donation > 0n && game.participationTokenId) {
+        const index = currentTokens.findIndex(t => t.tokenId === game.participationTokenId);
+        if (index !== -1) {
+            currentTokens[index].amount = (BigInt(currentTokens[index].amount) + donation).toString();
+        } else {
+            // Should not happen, but just in case.
+            currentTokens.push({ tokenId: game.participationTokenId, amount: donation.toString() });
+        }
+    }
+
     const gameActiveErgoTree = getGopGameActiveErgoTreeHex();
 
     const ceremonyOutputBox = new OutputBuilder(
         BigInt(gameBoxToSpend.value),
         gameActiveErgoTree
     )
-        .addTokens(gameBoxToSpend.assets)
+        .addTokens(currentTokens)
         .setAdditionalRegisters({
             R4: r4Hex,
             R5: r5Hex,

@@ -402,13 +402,13 @@ export class ErgoPlatform implements Platform {
      * * @param game The GameActive object (box to be consumed).
      * @returns The transaction ID if successful.
      */
-    async contribute_to_ceremony(game: GameActive): Promise<string | null> {
+    async contribute_to_ceremony(game: GameActive, donation?: bigint): Promise<string | null> {
         if (!ergo) throw new Error("Wallet not connected.");
         if (game.status !== 'Active') {
             throw new Error("The game is not in an active state.");
         }
         try {
-            return await contribute_to_ceremony(game);
+            return await contribute_to_ceremony(game, donation);
         } catch (error) {
             console.error("Error in platform method contribute_to_ceremony:", error);
             if (error instanceof Error) throw new Error(`Failed to contribute to ceremony: ${error.message}`);

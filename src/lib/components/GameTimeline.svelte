@@ -37,6 +37,7 @@
     export let participations: AnyParticipation[] = [];
 
     let showBotEvents = false;
+    let isLoadingTimeline = false;
 
     // Helper to get a readable date and height from block height or timestamp
     async function getEventDetails(
@@ -93,9 +94,11 @@
     let filteredSteps: TimelineStep[] = [];
 
     $: if (currentGame || history.length > 0 || participations.length > 0) {
+        isLoadingTimeline = true;
         buildSteps(history, currentGame, currentHeight, participations).then(
             (s) => {
                 steps = s;
+                isLoadingTimeline = false;
             },
         );
     }
@@ -262,6 +265,40 @@
             );
 
             // Participation Event
+            // Calculate efficient score details if we have the necessary data
+            let efficientScoreDetails = {};
+            if (current && "constants" in current && p.solverIdBox) {
+                const timeWeight = Number(
+                    "timeWeight" in current ? current.timeWeight : 0,
+                );
+                const deadline = Number(current.deadlineBlock);
+                const createdAt = Number(
+                    current.createdAt || current.box.creationHeight,
+                );
+                const minTimeWeightMargin = Number(
+                    current.constants.MIN_TIME_WEIGHT_MARGIN || 0,
+                );
+
+                // Get bot box height
+                const botBoxHeight = Number(p.solverIdBox.creationHeight);
+                const effectiveBotHeight = Math.max(
+                    botBoxHeight,
+                    createdAt + minTimeWeightMargin,
+                );
+                const remainingBlocks = deadline - effectiveBotHeight;
+                const timeMultiplier = 1 + timeWeight * remainingBlocks;
+
+                efficientScoreDetails = {
+                    "Time Weight (ω)": timeWeight,
+                    "Bot Box Height (B_box)": botBoxHeight,
+                    "Effective Bot Height": effectiveBotHeight,
+                    "Deadline (B_deadline)": deadline,
+                    "Remaining Blocks": remainingBlocks,
+                    "Time Multiplier": `${timeMultiplier.toLocaleString()} (1 + ${timeWeight} × ${remainingBlocks})`,
+                    Formula: "S_efficient = S_raw × Time Multiplier",
+                };
+            }
+
             newSteps.push({
                 id: `part_${p.boxId}`,
                 label: "New Participation",
@@ -279,6 +316,7 @@
                     "Player PK": p.playerPK_Hex || "Unknown",
                     Commitment: p.commitmentC_Hex,
                     "Solver ID": p.solverId_RawBytesHex,
+                    ...efficientScoreDetails,
                 },
             });
 
@@ -747,108 +785,121 @@
         </button>
     </div>
 
-    <div class="relative pl-8 border-l-2 border-muted space-y-10">
-        {#each filteredSteps as step, i}
-            <div class="relative">
-                <!-- Dot Indicator -->
-                <div
-                    class="absolute -left-[45px] top-0 flex items-center justify-center w-8 h-8 rounded-full bg-background border-2
+    {#if isLoadingTimeline}
+        <div class="flex items-center justify-center py-12 space-x-3">
+            <div
+                class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+            ></div>
+            <p class="text-muted-foreground">Loading timeline...</p>
+        </div>
+    {:else}
+        <div class="relative pl-8 border-l-2 border-muted space-y-10">
+            {#each filteredSteps as step, i}
+                <div class="relative">
+                    <!-- Dot Indicator -->
+                    <div
+                        class="absolute -left-[45px] top-0 flex items-center justify-center w-8 h-8 rounded-full bg-background border-2
                     {step.status === 'completed'
-                        ? step.color
-                        : step.status === 'active'
-                          ? 'border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
-                          : step.status === 'cancelled'
-                            ? 'border-red-500 text-red-500'
-                            : 'border-muted text-muted-foreground'}"
-                >
-                    {#if step.icon}
-                        <svelte:component this={step.icon} class="w-4 h-4" />
-                    {:else}
-                        <Circle class="w-3 h-3 fill-current" />
-                    {/if}
-                </div>
-
-                <!-- Content -->
-                <div
-                    class="flex flex-col gap-1 bg-card/50 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors"
-                >
-                    <div class="flex items-center justify-between gap-2">
-                        <span
-                            class="font-bold text-lg {step.status === 'active'
-                                ? 'text-blue-500'
-                                : ''} {step.status === 'cancelled'
-                                ? 'text-red-500'
-                                : ''}"
-                        >
-                            {step.label}
-                        </span>
-                        <div class="flex items-center gap-2">
-                            {#if step.status === "active"}
-                                <span
-                                    class="text-[10px] uppercase tracking-wider font-bold bg-blue-500 text-white px-2 py-0.5 rounded animate-pulse"
-                                >
-                                    Active
-                                </span>
-                            {/if}
-                            {#if step.txId}
-                                <a
-                                    href="{$web_explorer_uri_tx}{step.txId}"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="text-muted-foreground hover:text-primary transition-colors"
-                                    title="View Transaction"
-                                >
-                                    <ExternalLink class="w-4 h-4" />
-                                </a>
-                            {/if}
-                            {#if step.details}
-                                <button
-                                    class="text-muted-foreground hover:text-primary transition-colors"
-                                    on:click={() => toggleStep(step.id)}
-                                    title="Show Details"
-                                >
-                                    <Info class="w-4 h-4" />
-                                </button>
-                            {/if}
-                        </div>
+                            ? step.color
+                            : step.status === 'active'
+                              ? 'border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                              : step.status === 'cancelled'
+                                ? 'border-red-500 text-red-500'
+                                : 'border-muted text-muted-foreground'}"
+                    >
+                        {#if step.icon}
+                            <svelte:component
+                                this={step.icon}
+                                class="w-4 h-4"
+                            />
+                        {:else}
+                            <Circle class="w-3 h-3 fill-current" />
+                        {/if}
                     </div>
-                    <p class="text-sm text-muted-foreground">
-                        {step.description}
-                    </p>
 
-                    {#if step.details && expandedSteps.has(step.id)}
-                        <div
-                            class="mt-3 p-3 rounded bg-muted/30 border border-border/50 text-xs font-mono space-y-1.5 overflow-x-auto"
-                        >
-                            {#each Object.entries(step.details) as [key, value]}
-                                <div class="flex gap-2">
+                    <!-- Content -->
+                    <div
+                        class="flex flex-col gap-1 bg-card/50 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <span
+                                class="font-bold text-lg {step.status ===
+                                'active'
+                                    ? 'text-blue-500'
+                                    : ''} {step.status === 'cancelled'
+                                    ? 'text-red-500'
+                                    : ''}"
+                            >
+                                {step.label}
+                            </span>
+                            <div class="flex items-center gap-2">
+                                {#if step.status === "active"}
                                     <span
-                                        class="text-muted-foreground whitespace-nowrap"
-                                        >{key}:</span
+                                        class="text-[10px] uppercase tracking-wider font-bold bg-blue-500 text-white px-2 py-0.5 rounded animate-pulse"
                                     >
-                                    <span class="text-foreground break-all"
-                                        >{value}</span
+                                        Active
+                                    </span>
+                                {/if}
+                                {#if step.txId}
+                                    <a
+                                        href="{$web_explorer_uri_tx}{step.txId}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-muted-foreground hover:text-primary transition-colors"
+                                        title="View Transaction"
                                     >
-                                </div>
-                            {/each}
+                                        <ExternalLink class="w-4 h-4" />
+                                    </a>
+                                {/if}
+                                {#if step.details}
+                                    <button
+                                        class="text-muted-foreground hover:text-primary transition-colors"
+                                        on:click={() => toggleStep(step.id)}
+                                        title="Show Details"
+                                    >
+                                        <Info class="w-4 h-4" />
+                                    </button>
+                                {/if}
+                            </div>
                         </div>
-                    {/if}
+                        <p class="text-sm text-muted-foreground">
+                            {step.description}
+                        </p>
 
-                    {#if step.date}
-                        <div
-                            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mt-2 pt-2 border-t border-border/30"
-                        >
-                            <Clock class="w-3.5 h-3.5" />
-                            <span>{step.date}</span>
-                            {#if step.height && step.status === "completed"}
-                                <span class="ml-auto opacity-60"
-                                    >Block: {step.height}</span
-                                >
-                            {/if}
-                        </div>
-                    {/if}
+                        {#if step.details && expandedSteps.has(step.id)}
+                            <div
+                                class="mt-3 p-3 rounded bg-muted/30 border border-border/50 text-xs font-mono space-y-1.5 overflow-x-auto"
+                            >
+                                {#each Object.entries(step.details) as [key, value]}
+                                    <div class="flex gap-2">
+                                        <span
+                                            class="text-muted-foreground whitespace-nowrap"
+                                            >{key}:</span
+                                        >
+                                        <span class="text-foreground break-all"
+                                            >{value}</span
+                                        >
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+
+                        {#if step.date}
+                            <div
+                                class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mt-2 pt-2 border-t border-border/30"
+                            >
+                                <Clock class="w-3.5 h-3.5" />
+                                <span>{step.date}</span>
+                                {#if step.height && step.status === "completed"}
+                                    <span class="ml-auto opacity-60"
+                                        >Block: {step.height}</span
+                                    >
+                                {/if}
+                            </div>
+                        {/if}
+                    </div>
                 </div>
-            </div>
-        {/each}
-    </div>
+            {/each}
+        </div>
+    {/if}
 </div>

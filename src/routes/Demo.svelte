@@ -70,7 +70,7 @@
         },
         value: 2000000000n,
         reputationOpinions: [],
-        reputation: 150,
+        reputation: 0.15,
         constants: {
             DEV_COMMISSION_PERCENTAGE: 2,
             STAKE_DENOMINATOR: 100n,
@@ -515,11 +515,11 @@
                                     Game Theory Tip:
                                 </p>
                                 <p class="text-xs italic">
-                                    The resolver is incentivized to pick the real
-                                    winner because if they pick a fake one, they
-                                    lose their stake. Judges are incentivized to
-                                    catch cheaters to earn a portion of the
-                                    slashed stake.
+                                    The resolver is incentivized to pick the
+                                    real winner because if they pick a fake one,
+                                    they lose their stake. Judges are
+                                    incentivized to catch cheaters to earn a
+                                    portion of the slashed stake.
                                 </p>
                             </div>
                         {:else if game.status === "Finalized"}
@@ -593,7 +593,7 @@
                         >
                             <Users class="w-5 h-5 mb-1 opacity-80" />
                             <span class="font-bold text-lg"
-                                >{game.reputation}</span
+                                >{game.reputation.toFixed(4)}</span
                             >
                             <span
                                 class="text-xs opacity-70 uppercase tracking-wide"

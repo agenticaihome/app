@@ -128,7 +128,7 @@ function calculate_reputation(game: AnyGame): number {
         const proof = get(judgesStore).data.get(game.content.creatorTokenId);
         reputation += (proof ? calculate_reputation_proof(proof) : 0);
     }
-    return reputation;
+    return reputation / 1e9;
 }
 
 /**

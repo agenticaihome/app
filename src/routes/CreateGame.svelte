@@ -40,7 +40,8 @@
     import * as Card from "$lib/components/ui/card";
     import { FileText, ArrowRight, BookOpen, Code2 } from "lucide-svelte";
 
-    import { reputation_proof } from "$lib/common/store";
+    import { reputation_proof, judges as judgesStore } from "$lib/common/store";
+    import { calculate_reputation as calculate_reputation_proof } from "reputation-system";
     import {
         FileSourceCreation,
         fetchFileSourcesByHash,
@@ -597,6 +598,51 @@
               ? { text: "Medium (< 5 judges)", color: "text-yellow-500" }
               : { text: "High (> 5 judges)", color: "text-green-500" };
 
+    // Calculate estimated reputation based on judges and creator token
+    $: estimatedReputation = (() => {
+        let reputation = 0;
+
+        // Add reputation from judges
+        const validJudges = judgesList; // Already filtered for non-empty values
+        reputation += validJudges.reduce((acc, tokenId) => {
+            const proof = $judgesStore.data.get(tokenId);
+            return acc + (proof ? calculate_reputation_proof(proof) : 0);
+        }, 0);
+
+        // Add reputation from creator token
+        if (creatorTokenId && creatorTokenId.trim()) {
+            const proof = $judgesStore.data.get(creatorTokenId);
+            reputation += proof ? calculate_reputation_proof(proof) : 0;
+        }
+
+        return reputation / 1e9;
+    })();
+
+    // Calculate breakdown for display
+    $: reputationBreakdown = (() => {
+        let judgesRep = 0;
+        let creatorRep = 0;
+
+        // Calculate judges reputation
+        const validJudges = judgesList;
+        judgesRep = validJudges.reduce((acc, tokenId) => {
+            const proof = $judgesStore.data.get(tokenId);
+            return acc + (proof ? calculate_reputation_proof(proof) : 0);
+        }, 0);
+
+        // Calculate creator reputation
+        if (creatorTokenId && creatorTokenId.trim()) {
+            const proof = $judgesStore.data.get(creatorTokenId);
+            creatorRep = proof ? calculate_reputation_proof(proof) : 0;
+        }
+
+        return {
+            judgesRep: judgesRep / 1e9,
+            creatorRep: creatorRep / 1e9,
+            total: (judgesRep + creatorRep) / 1e9,
+        };
+    })();
+
     async function handleSubmit() {
         isSubmitting = true;
         errorMessage = null;
@@ -1019,6 +1065,66 @@
                                             class="text-sm text-muted-foreground italic"
                                         >
                                             No judges invited.
+                                        </p>
+                                    {/if}
+                                </div>
+                            </div>
+                            <div class="md:col-span-2">
+                                <h4
+                                    class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2"
+                                >
+                                    Estimated Reputation
+                                </h4>
+                                <div class="bg-muted/30 p-4 rounded-md">
+                                    <div
+                                        class="flex items-center justify-between mb-3"
+                                    >
+                                        <span
+                                            class="text-2xl font-bold text-primary"
+                                        >
+                                            {estimatedReputation.toFixed(4)}
+                                        </span>
+                                        <span
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            Total Reputation (ERG)
+                                        </span>
+                                    </div>
+                                    <div class="space-y-2 text-sm">
+                                        <div
+                                            class="flex justify-between border-b border-border/50 pb-1"
+                                        >
+                                            <span>From Judges:</span>
+                                            <span class="font-mono"
+                                                >{reputationBreakdown.judgesRep.toFixed(
+                                                    4,
+                                                )} ERG</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="flex justify-between border-b border-border/50 pb-1"
+                                        >
+                                            <span>From Creator:</span>
+                                            <span class="font-mono"
+                                                >{reputationBreakdown.creatorRep.toFixed(
+                                                    4,
+                                                )} ERG</span
+                                            >
+                                        </div>
+                                    </div>
+                                    <p
+                                        class="text-[10px] text-muted-foreground mt-2 italic"
+                                    >
+                                        Amount of ERG sacrificed (burned) per
+                                        reputation proof.
+                                    </p>
+                                    {#if estimatedReputation === 0}
+                                        <p
+                                            class="text-xs text-muted-foreground italic mt-1"
+                                        >
+                                            No reputation tokens detected. Add
+                                            judges or a creator token to
+                                            increase game reputation.
                                         </p>
                                     {/if}
                                 </div>
@@ -1834,6 +1940,67 @@
                                                     {judgeValidationError}
                                                 </p>
                                             {/if}
+                                        {/if}
+                                    </div>
+
+                                    <!-- Reputation Indicator -->
+                                    <div
+                                        class="mt-4 p-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-lg border border-primary/20"
+                                    >
+                                        <div
+                                            class="flex items-center justify-between mb-2"
+                                        >
+                                            <span
+                                                class="text-sm font-semibold text-foreground"
+                                                >Estimated Game Reputation (ERG)</span
+                                            >
+                                            <span
+                                                class="text-xl font-bold text-primary"
+                                                >{estimatedReputation.toFixed(
+                                                    4,
+                                                )}</span
+                                            >
+                                        </div>
+                                        <div
+                                            class="grid grid-cols-2 gap-2 text-xs"
+                                        >
+                                            <div class="flex justify-between">
+                                                <span
+                                                    class="text-muted-foreground"
+                                                    >Judges:</span
+                                                >
+                                                <span class="font-mono"
+                                                    >{reputationBreakdown.judgesRep.toFixed(
+                                                        4,
+                                                    )} ERG</span
+                                                >
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span
+                                                    class="text-muted-foreground"
+                                                    >Creator:</span
+                                                >
+                                                <span class="font-mono"
+                                                    >{reputationBreakdown.creatorRep.toFixed(
+                                                        4,
+                                                    )} ERG</span
+                                                >
+                                            </div>
+                                        </div>
+                                        <p
+                                            class="text-[10px] text-muted-foreground mt-2 italic"
+                                        >
+                                            Amount of ERG sacrificed (burned)
+                                            per reputation proof.
+                                        </p>
+                                        {#if estimatedReputation === 0}
+                                            <p
+                                                class="text-xs text-muted-foreground italic mt-1"
+                                            >
+                                                Add judges or creator token with
+                                                reputation to increase game
+                                                reputation
+                                            </p>
                                         {/if}
                                     </div>
                                 </div>

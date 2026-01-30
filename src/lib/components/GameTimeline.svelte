@@ -491,6 +491,91 @@
         // Sort all completed steps by height
         newSteps.sort((a, b) => a.height - b.height);
 
+        // Add past deadlines as completed events
+        if (current) {
+            if ("ceremonyDeadline" in current && "constants" in current) {
+                const participationWindow =
+                    current.constants.PARTICIPATION_TIME_WINDOW;
+                const seedMargin = current.constants.SEED_MARGIN;
+                const deadline = current.deadlineBlock;
+
+                // Solver Hash Deadline (deadline - participation_window - seed_margin)
+                const solverHashDeadline =
+                    deadline - participationWindow - seedMargin;
+                if (height >= solverHashDeadline) {
+                    const deadlineTimestamp = await block_height_to_timestamp(
+                        solverHashDeadline,
+                        new ErgoPlatform(),
+                    );
+                    newSteps.push({
+                        id: `past_solver_hash_deadline`,
+                        label: "Solver Hash Deadline Passed",
+                        description: "Bot hash submission period ended.",
+                        status: "completed",
+                        date: new Date(deadlineTimestamp).toLocaleString(),
+                        icon: Bot,
+                        height: solverHashDeadline,
+                        color: "text-blue-400 border-blue-400",
+                        details: {
+                            "Deadline Type": "Solver Hash Submission",
+                            "Block Height": solverHashDeadline,
+                            Calculation: `deadline (${deadline}) - participation_window (${participationWindow}) - seed_margin (${seedMargin})`,
+                        },
+                    });
+                }
+
+                // Ceremony Seed Deadline (deadline - participation_window)
+                const ceremonySeedDeadline = deadline - participationWindow;
+                if (height >= ceremonySeedDeadline) {
+                    const deadlineTimestamp = await block_height_to_timestamp(
+                        ceremonySeedDeadline,
+                        new ErgoPlatform(),
+                    );
+                    newSteps.push({
+                        id: `past_ceremony_seed_deadline`,
+                        label: "Ceremony Seed Deadline Passed",
+                        description: "Randomness submission period ended.",
+                        status: "completed",
+                        date: new Date(deadlineTimestamp).toLocaleString(),
+                        icon: RefreshCw,
+                        height: ceremonySeedDeadline,
+                        color: "text-purple-400 border-purple-400",
+                        details: {
+                            "Deadline Type": "Ceremony Seed",
+                            "Block Height": ceremonySeedDeadline,
+                            Calculation: `deadline (${deadline}) - participation_window (${participationWindow})`,
+                        },
+                    });
+                }
+            }
+
+            // Participation Deadline (deadline)
+            const participationDeadline = current.deadlineBlock;
+            if (height >= participationDeadline) {
+                const deadlineTimestamp = await block_height_to_timestamp(
+                    participationDeadline,
+                    new ErgoPlatform(),
+                );
+                newSteps.push({
+                    id: `past_participation_deadline`,
+                    label: "Participation Deadline Passed",
+                    description: "Game execution period ended.",
+                    status: "completed",
+                    date: new Date(deadlineTimestamp).toLocaleString(),
+                    icon: Sparkles,
+                    height: participationDeadline,
+                    color: "text-emerald-400 border-emerald-400",
+                    details: {
+                        "Deadline Type": "Participation/Execution",
+                        "Block Height": participationDeadline,
+                    },
+                });
+            }
+        }
+
+        // Re-sort to include past deadlines in chronological order
+        newSteps.sort((a, b) => a.height - b.height);
+
         // 4. Future/Current Steps (only if game is not finalized/cancelled)
         if (current) {
             if (current.status === GameState.Active) {

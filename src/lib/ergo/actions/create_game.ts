@@ -17,15 +17,12 @@ import { getGameConstants } from '$lib/common/constants';
 import { estimateTotalBoxSizeFromInputs, MAX_BOX_SIZE, type GameBoxInputs } from '../utils/box-size-calculator';
 
 function randomSeed(): string {
-    // 64 bits = 16 hex characters
-    let hex = '';
-    while (hex.length < 16) {
-        // genera hasta 8 hex chars por vez (~32 bits)
-        hex += Math.floor(Math.random() * 0xffffffff)
-            .toString(16)
-            .padStart(8, '0');
-    }
-    return hex.slice(0, 16);
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+
+    return Array.from(array)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
 }
 
 /**

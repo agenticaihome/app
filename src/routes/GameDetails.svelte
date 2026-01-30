@@ -555,6 +555,7 @@
     let commitmentC_input = "";
     let solverId_input = "";
     let solverId_box_found = false;
+    let solverId_checked = false;
     let solverId_check_loading = false;
     let solverId_check_error: string | null = null;
     let hashLogs_input = "";
@@ -562,6 +563,8 @@
     let scores_list: number[] = [];
     let secret_S_input_resolve = "";
     let secret_S_input_cancel = "";
+
+    $: if (solverId_input) solverId_checked = false;
 
     let isAutoFilling = false;
 
@@ -740,6 +743,7 @@
             solverId_check_error = "Please enter a Solver ID.";
             return;
         }
+        solverId_checked = true;
         solverId_check_loading = true;
         solverId_check_error = null;
         try {
@@ -5117,7 +5121,8 @@
                                                 class="flex-1"
                                                 on:click={handlePublishSolverId}
                                                 disabled={isSubmitting ||
-                                                    solverId_box_found}
+                                                    solverId_box_found ||
+                                                    !solverId_checked}
                                             >
                                                 {#if isSubmitting}
                                                     Publishing...

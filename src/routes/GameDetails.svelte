@@ -58,6 +58,7 @@
         Gavel,
         Check,
         CheckCircle,
+        Code,
         Heart,
         Sparkles,
         Info,
@@ -116,6 +117,7 @@
     import { GAME, PARTICIPATION } from "$lib/ergo/reputation/types";
     import { Forum } from "forum-application";
     import ShareModal from "./ShareModal.svelte";
+    import SolverSourceModal from "./SolverSourceModal.svelte";
     import GameTimeline from "$lib/components/GameTimeline.svelte";
 
     const strictMode = true;
@@ -497,6 +499,12 @@
     let imageSources: any[] = [];
     let serviceSources: any[] = [];
     let paperSources: any[] = [];
+
+    // Solver source modal state
+    let showSolverModal = false;
+    let selectedSolverId: string | undefined = undefined;
+    let selectedSolverSources: any[] = [];
+
     let paperContent: string | null = null;
     let isPaperExpanded = false;
     let paperToc: { level: number; text: string; id: string }[] = [];
@@ -1209,6 +1217,21 @@
     }
 
     // --- Action Handlers ---
+
+    async function handleOpenSolverSource(participation: AnyParticipation) {
+        if (!participation.solverId_String) return;
+        selectedSolverId = participation.solverId_String;
+        selectedSolverSources = [];
+        showSolverModal = true;
+        try {
+            selectedSolverSources = await fetchFileSourcesByHash(
+                selectedSolverId,
+                get(explorer_uri),
+            );
+        } catch (e) {
+            console.error("Error fetching solver sources:", e);
+        }
+    }
 
     async function handleOpenCeremony() {
         if (game?.status !== "Active") return;
@@ -1996,6 +2019,16 @@
         description={game.content.description}
     />
 {/if}
+
+<SolverSourceModal
+    bind:open={showSolverModal}
+    solverId={selectedSolverId}
+    sources={selectedSolverSources}
+    profile={$reputation_proof}
+    explorerUri={$explorer_uri}
+    sourceExplorerUrl={$source_explorer_url}
+    webExplorerUriTkn={$web_explorer_uri_tkn}
+/>
 
 {#if game}
     <div
@@ -4240,22 +4273,40 @@
                                             <span class="info-label"
                                                 >Solver ID</span
                                             >
-                                            <span
-                                                class="info-value font-mono text-xs"
-                                                title={p.solverId_String ||
-                                                    p.solverId_RawBytesHex}
+                                            <div
+                                                class="flex items-center gap-2"
                                             >
+                                                <span
+                                                    class="info-value font-mono text-xs"
+                                                    title={p.solverId_String ||
+                                                        p.solverId_RawBytesHex}
+                                                >
+                                                    {#if p.solverId_String}
+                                                        {p.solverId_String.slice(
+                                                            0,
+                                                            10,
+                                                        )}...{p.solverId_String.slice(
+                                                            -4,
+                                                        )}
+                                                    {:else}
+                                                        N/A
+                                                    {/if}
+                                                </span>
                                                 {#if p.solverId_String}
-                                                    {p.solverId_String.slice(
-                                                        0,
-                                                        10,
-                                                    )}...{p.solverId_String.slice(
-                                                        -4,
-                                                    )}
-                                                {:else}
-                                                    N/A
+                                                    <button
+                                                        on:click={() =>
+                                                            handleOpenSolverSource(
+                                                                p,
+                                                            )}
+                                                        class="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+                                                        title="View Source"
+                                                    >
+                                                        <Code
+                                                            class="w-3 h-3 text-purple-500"
+                                                        />
+                                                    </button>
                                                 {/if}
-                                            </span>
+                                            </div>
                                         </div>
                                         <div class="info-block">
                                             <span class="info-label"

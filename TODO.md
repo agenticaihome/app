@@ -166,6 +166,8 @@ Teoricamente se permite un numero ilimitado de participaciones.
 
 [x] Time weight formula improved
 
+[x] Donation action during ceremony
+
 [] Static game data on Game Info Box. (use it as data input)
 
 -----

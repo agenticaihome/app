@@ -135,6 +135,7 @@ function ensureGameResolutionCompiled(): void {
         .replace(/`\+MAX_SCORE_LIST\+`/g, constants.MAX_SCORE_LIST.toString())
         .replace(/`\+PARTICIPATION_TIME_WINDOW\+`/g, constants.PARTICIPATION_TIME_WINDOW.toString())
         .replace(/`\+SEED_MARGIN\+`/g, constants.SEED_MARGIN.toString())
+        .replace(/`\+MIN_TIME_WEIGHT_MARGIN\+`/g, constants.MIN_TIME_WEIGHT_MARGIN.toString())
         .replace(/`\+FALSE_SCRIPT_HASH\+`/g, getGopFalseScriptHash())
         .replace(/`\+JUDGES_PAID_ERGOTREE\+`/g, judgesPaidErgoTree);
 

@@ -243,22 +243,41 @@ For a player to participate in a GoP game, they follow these steps:
 
 ## 4. Resolution and Rewards
 
-  * **Result Publication**
+* **Result Publication**
 
-      * Players publish their `ParticipationBox` (with `commitmentC` and other data) before the deadline.
+    * Players publish their `ParticipationBox` (containing their `commitmentC` and metadata) before the block deadline.
 
-  * **Collection and Comparison**
+* **Collection and Comparison**
 
-      * The winner is the solver with the **highest time-weighted score**, determined and validated on-chain during the **Resolution State (State 1)** using the secret `S` revealed by the creator and each participant's `commitmentC`.
-      * **Time Factor:** To incentivize early participation and prevent "last-minute sniping" or copycats, the protocol applies a time weight to the raw score. The formula is roughly `FinalScore = RawScore * (TimeWeight + RemainingDuration)`. This means that for the same raw score, a participation submitted earlier (when `RemainingDuration` is higher) will beat a later one. The `TimeWeight` parameter is set by the creator (e.g., "Balanced" gives a ~2x advantage to the first block vs the last block).
-      * In case of a tie in the final time-weighted score:
-          * The participation created at the earlier block height wins.
+    * The winner is the solver with the **highest time-weighted score**, determined and validated on-chain during the **Resolution State (State 1)** using the secret $S$ revealed by the creator and each participant's $commitmentC$.
+    * **Time Factor:** To incentivize early participation and mitigate "last-minute sniping" or plagiarism, the protocol introduces a temporal sensitivity weight. This mechanism ensures that, given identical raw performances, the participant who committed their solution earlier is prioritized.
+    * **Efficiency Scoring Model:** The $EfficientScore$ is derived by applying a linear multiplier based on the remaining blocks until the deadline. The effective commitment block is subject to a safety margin ($M$) to ensure a fair baseline for the earliest possible submissions.
 
-  * **Prize Distribution**
+    $$S_{efficient} = S_{raw} \times (1 + (\omega \cdot (B_{deadline} - \max(B_{box}, B_{start} + M))))$$
 
-      * During the **Normal Game Finalization** action (in State 1), the protocol distributes the accumulated funds (from participation fees) to the winner and the commission to the creator. The creator is incentivized to reveal the secret `S` (transitioning to State 1) to receive their commission and recover their `creatorStake`.
+    * **Where:**
+        * $S_{raw}$: The base score achieved by the solver.
+        * $\omega$: `TimeWeight` (an integer parameter defined by the creator).
+        * $B_{deadline}$: Block height at which the participation window closes.
+        * $B_{box}$: Block height where the user's `BOT_BOX_ID` hash was recorded.
+        * $B_{start} + M$: The game creation block plus the `MIN_TIME_WEIGHT_MARGIN`.
 
-    > A low stake by the creator means they might ultimately not want to resolve the game, so the lower the reputation or trust in the creator, the higher the necessary stake should be, although participating or not is the players' decision.
+| Scenario | Raw Score ($S_{raw}$) | Submission Block ($B_{box}$) | Remaining Blocks | Time Weight ($\omega$) | Final Efficient Score |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Early Participant** | 1,000 | 100 | 400 | 5 | **2,001,000** |
+| **Mid-Game** | 1,000 | 300 | 200 | 5 | **1,001,000** |
+| **Late Sniper** | **1,200** | 490 | 10 | 5 | **61,200** |
+
+
+
+* In case of a tie in the final $S_{efficient}$:
+    * The participation created at the earlier block height ($B_{box}$) wins.
+
+* **Prize Distribution**
+
+    * During the **Normal Game Finalization** action (in State 1), the protocol distributes the accumulated funds (from participation fees) to the winner and the commission to the creator. The creator is incentivized to reveal the secret $S$ (transitioning to State 1) to receive their commission and recover their `creatorStake`.
+
+> A low stake by the creator means they might ultimately not want to resolve the game; therefore, the lower the reputation or trust in the creator, the higher the necessary stake should be. Participation remains at the players' discretion.
 
 -----
 

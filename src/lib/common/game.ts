@@ -143,6 +143,7 @@ export interface GameCancellation {
     reputation: number;
     constants: GameConstants;
     createdAt?: number;
+    timeWeight?: bigint;
 }
 
 /**
@@ -374,20 +375,37 @@ export async function getGameTokenSymbol(game: AnyGame): Promise<string> {
 
 /**
  * Calculates the effective score based on the raw score and the submission height.
- * Formula: score = game_score * (TIME_WEIGHT + DEADLINE - HEIGHT)
+ * Formula: S_efficient = S_raw * (1 + (omega * (B_deadline - max(B_box, B_start + M))))
+ * 
+ * If submissionHeight is 0, then returns 0.
  */
 export function calculateEffectiveScore(
+    game: AnyGame,
     rawScore: bigint,
-    deadlineHeight: number,
     submissionHeight: number,
-    timeWeight: number
 ): bigint {
+    if (game.createdAt === undefined || game.timeWeight === undefined) {
+        // Cover GameCancell case, where dosn't have createdAt (could be fetch previous active boxes)
+        console.error("Game creation height is undefined.");
+        return 0n;
+    }
+    if (submissionHeight === 0) {
+        console.error("Submission height is zero.");
+        return 0n;
+    }
     try {
-        const heightDiff = BigInt(deadlineHeight - submissionHeight);
-        const timeFactor = BigInt(timeWeight) + heightDiff;
-        if (timeFactor <= 0n) {
-            return 0n; // Should not happen if validated correctly, but safe fallback
-        }
+        // Calculate the effective start block: max(B_box, B_start + M)
+        const effectiveStartBlock = Math.max(
+            submissionHeight, 
+            game.createdAt + game.constants.MIN_TIME_WEIGHT_MARGIN
+        );
+
+        // Calculate remaining duration: (B_deadline - effectiveStartBlock)
+        const remainingDuration = BigInt(Math.max(0, game.deadlineBlock - effectiveStartBlock));
+        
+        // Final Score: S_raw * (1 + (omega * remainingDuration))
+        const timeFactor = 1n + (BigInt(game.timeWeight) * remainingDuration);
+        
         return rawScore * timeFactor;
     }
     catch (error) {

@@ -11,6 +11,7 @@
   val MAX_SCORE_LIST = `+MAX_SCORE_LIST+`L
   val PARTICIPATION_TIME_WINDOW = `+PARTICIPATION_TIME_WINDOW+`L
   val SEED_MARGIN = `+SEED_MARGIN+`L
+  val MIN_TIME_WEIGHT_MARGIN = `+MIN_TIME_WEIGHT_MARGIN+`L
 
   val PARTICIPATION_SCRIPT_HASH = fromBase16("`+PARTICIPATION_SCRIPT_HASH+`") 
   val REPUTATION_PROOF_SCRIPT_HASH = fromBase16("`+REPUTATION_PROOF_SCRIPT_HASH+`")
@@ -96,9 +97,10 @@
         if (curr.creationInfo._1 < acc.creationInfo._1) curr else acc
       })
       val realHeight = oldestBox.creationInfo._1
-      if (realHeight.toLong < createdAt) createdAt else realHeight.toLong
+      val minimum = createdAt + MIN_TIME_WEIGHT_MARGIN
+      if (realHeight.toLong < minimum) minimum else realHeight.toLong
     } else {
-      deadline // Igual al deadline para fallar la validaciónu
+      deadline // Igual al deadline para fallar la validación
     }
   }
 
@@ -237,8 +239,8 @@
                   // Formula: score = game_score * (TIME_WEIGHT + DEADLINE - HEIGHT)
                   val newBotHeight = getBotBoxHeight(omittedWinnerBox)
                   val currentBotHeight = getBotBoxHeight(currentCandidateBox)
-                  val newScoreAdjusted = newScore * (timeWeight + deadline - newBotHeight)
-                  val currentScoreAdjusted = currentScore * (timeWeight + deadline - currentBotHeight)
+                  val newScoreAdjusted = newScore * (1L + (timeWeight * (deadline - newBotHeight)))
+                  val currentScoreAdjusted = currentScore * (1L + (timeWeight * (deadline - currentBotHeight)))
 
                   if (newScoreAdjusted > currentScoreAdjusted || (newScoreAdjusted == currentScoreAdjusted && newBotHeight < currentBotHeight)) {
                     omittedWinnerBox.R5[Coll[Byte]].get // El nuevo es mejor

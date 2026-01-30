@@ -105,7 +105,8 @@
     }
 
     // Time Factor (timeWeight) - affects how much early participation matters
-    let timeFactorOption: "low" | "balanced" | "high" | "extreme" = "balanced";
+    let timeFactorOption: "zero" | "low" | "balanced" | "high" | "extreme" =
+        "zero";
 
     let participationTokenId: string = ""; // "" para ERG
     let participationTokenDecimals: number = 9;
@@ -539,12 +540,14 @@
 
         switch (timeFactorOption) {
             case "low":
-                return gameDuration * 10n;
+                return 1n; // Un punto por bloque
             case "balanced":
-                return gameDuration;
+                return 5n; // Cinco puntos por bloque
             case "high":
-                return gameDuration / 2n;
+                return 20n; // Veinte puntos por bloquee
             case "extreme":
+                return 100n; // Cien puntos por bloque
+            case "zero":
             default:
                 return 0n;
         }
@@ -1727,19 +1730,20 @@
                                         bind:value={timeFactorOption}
                                         class="w-full p-2 border border-slate-500/20 rounded-md bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-slate-500/20"
                                     >
+                                        <option value="zero"
+                                            >Zero (Only score matters)</option
+                                        >
                                         <option value="low"
-                                            >Low (Time barely matters, ~10%
-                                            advantage for first)</option
+                                            >Low (1 point per block)</option
                                         >
                                         <option value="balanced"
-                                            >Balanced (Recommended, 2x advantage
-                                            for first)</option
+                                            >Balanced (5 points per block)</option
                                         >
                                         <option value="high"
-                                            >High (3x advantage for first)</option
+                                            >High (20 points per block)</option
                                         >
                                         <option value="extreme"
-                                            >Extreme (Time is critical)</option
+                                            >Extreme (100 points per block)</option
                                         >
                                     </select>
                                     <p

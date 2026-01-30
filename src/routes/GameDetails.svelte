@@ -1554,15 +1554,15 @@
             // Obtener la participación con el score más alto
             const omittedParticipation = submittedParticipations.reduce(
                 (best, current) => {
-                    const bestEffective = calculateEffectiveScore(
+                    const bestEffective = game === null ? 0 : calculateEffectiveScore(
+                        game,
                         best.score,
-                        game.deadlineBlock,
-                        best.creationHeight,
+                        best.solverIdBox?.creationHeight ?? 0,
                     );
-                    const currentEffective = calculateEffectiveScore(
+                    const currentEffective = game === null ? 0 : calculateEffectiveScore(
+                        game,
                         current.score,
-                        game.deadlineBlock,
-                        current.creationHeight,
+                        current.solverIdBox?.creationHeight ?? 0,
                     );
 
                     if (currentEffective > bestEffective) return current;
@@ -4018,10 +4018,9 @@
                                 {@const effectiveScore =
                                     actualScoreForThisParticipation !== null
                                         ? calculateEffectiveScore(
+                                              game,
                                               actualScoreForThisParticipation,
-                                              game.deadlineBlock,
-                                              p.creationHeight,
-                                              Number(game.timeWeight),
+                                              p.solverIdBox?.creationHeight ?? 0,
                                           )
                                         : null}
 
@@ -4377,11 +4376,13 @@
                                                                                 Formula:
                                                                                 Score
                                                                                 *
-                                                                                (TimeFactor
+                                                                                (1
                                                                                 +
-                                                                                Deadline
+                                                                                (TimeFactor
+                                                                                *
+                                                                                (Deadline
                                                                                 -
-                                                                                Submission)
+                                                                                Submission)))
                                                                             </div>
                                                                             <!-- Arrow -->
                                                                             <div

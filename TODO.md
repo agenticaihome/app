@@ -164,6 +164,10 @@ Teoricamente se permite un numero ilimitado de participaciones.
 [x] Agregar pantalla de guia para pasos off-chain - jueces.
     - Comprobar validez de una participación.  "nodo gop_validate_participation <commitment>"
 
+[x] Time weight formula improved
+
+[] Static game data on Game Info Box. (use it as data input)
+
 -----
 
 [x] Invalidación por no disponibilidad.

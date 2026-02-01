@@ -153,21 +153,46 @@
                     "seed" in g &&
                     g.seed !== lastSeed
                 ) {
+                    // Check if value/prize increased (Donation)
+                    const currentPrize = g.value;
+
+                    // access prevG safely
+                    const prevG_any = prevG as any;
+                    const prevPrize = prevG_any.value ?? 0n;
+
+                    const prizeDiff = currentPrize - prevPrize;
+                    const isDonation = prizeDiff > 0n;
+
+                    let label = "Seed Updated";
+                    let description = "Randomness was added to the game seed.";
+                    let icon = RefreshCw;
+                    let color = "text-purple-500 border-purple-500";
+
+                    if (isDonation) {
+                        label = "Prize Increased";
+                        description = `Someone added to the prize pool and updated the seed.`;
+                        icon = Trophy;
+                        color = "text-yellow-500 border-yellow-500";
+                    }
+
                     newSteps.push({
                         id: `seed_updated_${h}`,
-                        label: "Seed Updated",
-                        description: "Randomness was added to the game seed.",
+                        label: label,
+                        description: description,
                         status: "completed",
                         date: eventDate,
-                        icon: RefreshCw,
+                        icon: icon,
                         height: eventHeight,
-                        color: "text-purple-500 border-purple-500",
+                        color: color,
                         txId: txId,
                         details: {
                             "Box ID": g.boxId,
                             "Transaction ID": txId,
                             Height: eventHeight,
                             "New Seed": g.seed,
+                            ...(isDonation
+                                ? { "Added Amount": prizeDiff.toString() }
+                                : {}),
                         },
                     });
                     lastSeed = g.seed;

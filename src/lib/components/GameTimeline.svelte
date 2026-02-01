@@ -38,7 +38,7 @@
     export let currentHeight: number = 0;
     export let participations: AnyParticipation[] = [];
 
-    let showBotEvents = false;
+    let showBotEvents = true;
     let isLoadingTimeline = false;
 
     // Helper to get a readable date and height from block height or timestamp

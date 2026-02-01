@@ -17,6 +17,8 @@
         Eye,
         EyeOff,
         Info,
+        MessageSquareWarningIcon,
+        SendIcon,
     } from "lucide-svelte";
     import { formatDistanceToNow } from "date-fns";
     import { block_height_to_timestamp } from "$lib/common/countdown";
@@ -193,23 +195,65 @@
                     });
                 } else if (
                     g.status === GameState.Resolution &&
-                    prevG.status === GameState.Resolution
+                    g.isEndGame &&
+                    prevG.status === GameState.Resolution &&
+                    !prevG.isEndGame
+                ) {
+                    // Resolution -> End game transition
+                    let label = "Provisional endgame state.";
+                    let description =
+                        "The game moved into the provisional endgame state. Winner or resolver will have to spend all the participations and the funds will be distributed by the contract.";
+                    let icon = Gavel;
+                    let color = "text-lime-500 border-lime-500";
+                    let details = {
+                        "Box ID": g.boxId,
+                        "Transaction ID": txId,
+                        Height: eventHeight,
+                    };
+
+                    newSteps.push({
+                        id: `resolution_endgame_${h}`,
+                        label: label,
+                        description: description,
+                        status: "completed",
+                        date: eventDate,
+                        icon: SendIcon,
+                        height: eventHeight,
+                        color: color,
+                        txId: txId,
+                        details: details,
+                    });
+                } else if (
+                    g.status === GameState.Resolution &&
+                    !g.isEndGame &&
+                    prevG.status === GameState.Resolution &&
+                    !prevG.isEndGame
                 ) {
                     // Resolution -> Resolution transition
                     const prevCandidate = (prevG as any)
                         .winnerCandidateCommitment;
                     const newCandidate = (g as any).winnerCandidateCommitment;
+                    const prevResolverCommission = (prevG as any)
+                        .resolverCommission;
                     const resolverCommission = (g as any).resolverCommission;
+                    const prevResolver = (prevG as any).resolverScript_Hex;
+                    const resolver = (g as any).resolverScript_Hex;
 
                     let label = "Resolution Updated";
-                    let description = "The resolution state was updated.";
+                    let description =
+                        "The resolution state was updated (Unknown reason).";
                     let icon = Gavel;
                     let color = "text-orange-500 border-orange-500";
 
                     // Rule 1: Candidate Added -> Omitted Participation
-                    if (!prevCandidate && newCandidate) {
+                    if (prevCandidate !== newCandidate && newCandidate) {
                         label = "Candidate Selected";
                         description = `Resolver selected candidate ${newCandidate.slice(0, 8)}... (Omitted Participation logic applied).`;
+                        if (prevResolver !== resolver) {
+                            description += ` Resolver changed from ${prevResolver?.slice(0, 8)}... to ${resolver?.slice(0, 8)}...`;
+                        } else {
+                            description += ` Resolver remains the same.`;
+                        }
                         icon = User;
                         color = "text-blue-500 border-blue-500";
                     }
@@ -231,7 +275,16 @@
                     // Fallback for other changes (e.g. just commission change or candidate swap if possible)
                     else if (prevCandidate !== newCandidate) {
                         label = "Candidate Changed";
-                        description = `Candidate changed from ${prevCandidate?.slice(0, 8)}... to ${newCandidate?.slice(0, 8)}...`;
+                        description = `Candidate changed from ${prevCandidate?.slice(0, 8)}... to ${newCandidate?.slice(0, 8)}... (Unknown reason).`;
+                    } else if (prevResolverCommission !== resolverCommission) {
+                        label = "Resolver Commission Changed";
+                        description = `Resolver commission changed from ${prevResolverCommission} to ${resolverCommission} (Unknown reason).`;
+                    } else if (
+                        prevCandidate === newCandidate &&
+                        prevResolverCommission === resolverCommission
+                    ) {
+                        label = "Resolution Updated";
+                        description = `Resolution state was updated without changes (Unknown reason).`;
                     }
 
                     newSteps.push({
@@ -248,8 +301,43 @@
                             "Box ID": g.boxId,
                             "Transaction ID": txId,
                             Height: eventHeight,
-                            "Candidate Commitment": newCandidate || "None",
+                            "New Candidate Commitment": newCandidate || "N/A",
                             "Resolver Commission": resolverCommission,
+                            Resolver: resolver,
+                        },
+                    });
+                } else {
+                    // Unknown transition - provide all data.
+                    newSteps.push({
+                        id: `unknown_transition_${h}`,
+                        label: "Unknown transition",
+                        description:
+                            "The game state was updated (Unknown reason).",
+                        status: "completed",
+                        date: eventDate,
+                        icon: MessageSquareWarningIcon,
+                        height: eventHeight,
+                        color: "text-orange-500 border-orange-500",
+                        txId: txId,
+                        details: {
+                            // All the data
+                            "Box ID": g.boxId,
+                            "Transaction ID": txId,
+                            Height: eventHeight,
+                            "Previous Game State": prevG.status,
+                            "Previous Game Is End Game":
+                                prevG.status === GameState.Resolution
+                                    ? prevG.isEndGame
+                                        ? "Yes"
+                                        : "No"
+                                    : "N/A",
+                            "Current Game State": g.status,
+                            "Current Game Is End Game":
+                                g.status === GameState.Resolution
+                                    ? g.isEndGame
+                                        ? "Yes"
+                                        : "No"
+                                    : "N/A",
                         },
                     });
                 }

@@ -246,14 +246,10 @@
         }
 
         if (game.status === "Resolution" && isBeforeDeadline) {
-            actions.push({
-                id: "include_omitted",
-                label: "Include Omitted Participations",
-                icon: Users,
-                variant: "outline",
-            });
             // Only allow judge actions if there's a winner candidate
-            if (isJudge && game.winnerCandidateCommitment) {
+            // ANY user with a reputation proof can vote (reputation system is open),
+            // but only appointed judges count for the quorum.
+            if (reputationProof && game.winnerCandidateCommitment) {
                 actions.push({
                     id: "invalidate_winner",
                     label: "Invalidate Winner",
@@ -275,6 +271,13 @@
                     });
                 }
             }
+
+            actions.push({
+                id: "include_omitted",
+                label: "Include Omitted Participations",
+                icon: Users,
+                variant: "outline",
+            });
         }
 
         // Creator Verification
@@ -5936,12 +5939,37 @@
                                         <strong
                                             >Action: Judge Invalidation</strong
                                         ><br />
-                                        As a judge, you are voting to invalidate
-                                        the current winner candidate. This requires
                                         a majority of judges to perform the same
                                         action. If successful, the resolution deadline
                                         will be extended.
                                     </p>
+
+                                    {#if !isNominatedJudge}
+                                        <div
+                                            class="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-600 dark:text-yellow-400"
+                                        >
+                                            <AlertTriangle
+                                                class="w-5 h-5 mt-0.5 flex-shrink-0"
+                                            />
+                                            <div>
+                                                <p
+                                                    class="font-semibold text-sm"
+                                                >
+                                                    Quorum Warning
+                                                </p>
+                                                <p class="text-sm opacity-90">
+                                                    You are not an appointed
+                                                    judge for this game. While
+                                                    you can cast your vote on
+                                                    the reputation system, it
+                                                    will <span class="font-bold"
+                                                        >not affect the game's
+                                                        quorum</span
+                                                    > or outcome.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    {/if}
                                     <Button
                                         on:click={handleJudgesInvalidate}
                                         disabled={isSubmitting}
@@ -6118,6 +6146,33 @@
                                         action. Unlike invalidation, this does not
                                         penalize the creator.
                                     </p>
+
+                                    {#if !isNominatedJudge}
+                                        <div
+                                            class="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-600 dark:text-yellow-400"
+                                        >
+                                            <AlertTriangle
+                                                class="w-5 h-5 mt-0.5 flex-shrink-0"
+                                            />
+                                            <div>
+                                                <p
+                                                    class="font-semibold text-sm"
+                                                >
+                                                    Quorum Warning
+                                                </p>
+                                                <p class="text-sm opacity-90">
+                                                    You are not an appointed
+                                                    judge for this game. While
+                                                    you can cast your vote on
+                                                    the reputation system, it
+                                                    will <span class="font-bold"
+                                                        >not affect the game's
+                                                        quorum</span
+                                                    > or outcome.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    {/if}
                                     <Button
                                         on:click={handleJudgesInvalidateUnavailable}
                                         disabled={isSubmitting}

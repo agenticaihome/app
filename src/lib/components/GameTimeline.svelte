@@ -826,7 +826,9 @@
             // Resolution & Finalization
             if (
                 current.status === GameState.Resolution &&
-                currentHeight < current.resolutionDeadline
+                currentHeight < current.resolutionDeadline &&
+                "winnerCandidateCommitment" in current &&
+                current.winnerCandidateCommitment
             ) {
                 newSteps.push({
                     id: "future_resolution",

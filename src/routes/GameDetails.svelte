@@ -3158,7 +3158,7 @@
                         {/if}
                     </div>
 
-                    {#if !participationIsEnded && targetDate}
+                    {#if targetDate && (game.status === "Resolution" || !participationIsEnded)}
                         <div class="countdown-container mb-8">
                             <div class="timeleft">
                                 <span class="timeleft-label">

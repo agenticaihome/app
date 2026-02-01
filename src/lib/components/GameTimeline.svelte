@@ -788,7 +788,7 @@
                     description:
                         "After the deadline, judges will reproduce the winning robot to verify creator honesty.",
                     status: "pending",
-                    date: undefined,
+                    date: `Starts in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(current.deadlineBlock, new ErgoPlatform())))}`,
                     icon: Gavel,
                     height: 9999999,
                     color: "text-lime-500 border-lime-500",

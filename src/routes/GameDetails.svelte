@@ -2624,6 +2624,29 @@
                                         </span>
                                     </div>
 
+                                    {#if game.winnerCandidateCommitment}
+                                        <div class="info-block md:col-span-2">
+                                            <span class="info-label"
+                                                >Winner Candidate<button
+                                                    type="button"
+                                                    class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                    on:click|stopPropagation={() =>
+                                                        openDidacticModal(
+                                                            "Winner Candidate",
+                                                            "The commitment of the participation currently considered the winner candidate.",
+                                                        )}
+                                                >
+                                                    <Info class="w-3.5 h-3.5" />
+                                                </button></span
+                                            >
+                                            <span
+                                                class="info-value font-mono text-xs break-all"
+                                            >
+                                                {game.winnerCandidateCommitment}
+                                            </span>
+                                        </div>
+                                    {/if}
+
                                     {#if game.status === "Resolution" && game.revealedS_Hex}
                                         <div class="info-block md:col-span-2">
                                             <span class="info-label"
@@ -2643,6 +2666,29 @@
                                                 class="info-value font-mono text-xs break-all"
                                             >
                                                 {game.revealedS_Hex}
+                                            </span>
+                                        </div>
+                                    {/if}
+
+                                    {#if game.status === "Resolution"}
+                                        <div class="info-block md:col-span-2">
+                                            <span class="info-label"
+                                                >Resolver Script<button
+                                                    type="button"
+                                                    class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                    on:click|stopPropagation={() =>
+                                                        openDidacticModal(
+                                                            "Resolver Script",
+                                                            "The script that enforces the game rules during the resolution phase.",
+                                                        )}
+                                                >
+                                                    <Info class="w-3.5 h-3.5" />
+                                                </button></span
+                                            >
+                                            <span
+                                                class="info-value font-mono text-xs break-all"
+                                            >
+                                                {game.resolverScript_Hex}
                                             </span>
                                         </div>
                                     {/if}

@@ -2210,9 +2210,9 @@
 
                             <Button
                                 on:click={shareGame}
-                                class="w-full sm:w-auto text-base text-white bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 py-6 px-8 transition-all"
+                                class="w-full sm:w-auto text-sm text-white bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 py-2 px-4 transition-all"
                             >
-                                <Share2 class="mr-2 h-5 w-5" />
+                                <Share2 class="mr-2 h-4 w-4" />
                                 Share Game
                             </Button>
                         </div>

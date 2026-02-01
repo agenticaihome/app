@@ -215,14 +215,6 @@
         const actions = [];
 
         if (game.status === "Active") {
-            if (isNominatedJudge && !isJudge) {
-                actions.push({
-                    id: "accept_judge_nomination",
-                    label: "Accept Judge Nomination",
-                    icon: Gavel,
-                    variant: "outline",
-                });
-            }
             if (openCeremony) {
                 actions.push({
                     id: "open_ceremony",
@@ -243,6 +235,14 @@
                 icon: XCircle,
                 variant: "destructive",
             });
+            if (isNominatedJudge && !isJudge) {
+                actions.push({
+                    id: "accept_judge_nomination",
+                    label: "Accept Judge Nomination",
+                    icon: Gavel,
+                    variant: "outline",
+                });
+            }
         }
 
         if (game.status === "Resolution" && isBeforeDeadline) {

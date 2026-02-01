@@ -770,7 +770,7 @@
                         height >= current.ceremonyDeadline;
                     newSteps.push({
                         id: "future_exec",
-                        label: "Game Execution",
+                        label: "Participation submission",
                         description: isExecOpen
                             ? "Currently accepting game results."
                             : "Waiting for seed to submit results.",

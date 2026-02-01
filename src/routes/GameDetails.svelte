@@ -4084,12 +4084,6 @@
                     {#if participations && participations.length > 0}
                         <div class="flex flex-col gap-6">
                             {#each participations as p (p.boxId)}
-                                {@const isCurrentParticipationWinner =
-                                    (game.status === "Resolution" ||
-                                        game.status === "EndGame" ||
-                                        game.status === "Finalized") &&
-                                    game.winnerCandidateCommitment ===
-                                        p.commitmentC_Hex}
                                 {@const actualScoreForThisParticipation =
                                     game.status === "Resolution" ||
                                     game.status === "EndGame" ||
@@ -4100,6 +4094,13 @@
                                               game.seed,
                                           )
                                         : null}
+                                {@const isCurrentParticipationWinner =
+                                    (game.status === "Resolution" ||
+                                        game.status === "EndGame" ||
+                                        game.status === "Finalized") &&
+                                    game.winnerCandidateCommitment ===
+                                        p.commitmentC_Hex &&
+                                    actualScoreForThisParticipation !== null}
                                 {@const effectiveScore =
                                     actualScoreForThisParticipation !== null
                                         ? calculateEffectiveScore(

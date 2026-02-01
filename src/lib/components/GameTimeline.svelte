@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { type AnyGame, GameState } from "$lib/common/game";
+    import {
+        type AnyGame,
+        GameState,
+        resolve_participation_commitment,
+    } from "$lib/common/game";
     import { type Box, type Amount } from "@fleet-sdk/core";
     import {
         CheckCircle,
@@ -459,142 +463,166 @@
 
             // Judge Opinions on Participation
             if (p.reputationOpinions && current && "judges" in current) {
-                // Track vote counts to detect majority
-                const totalJudges = current.judges.length;
-                const majorityThreshold = Math.floor(totalJudges / 2) + 1;
-
-                // Count votes by type for this participation
-                let invalidVoteCount = 0;
-                let unavailableVoteCount = 0;
-
-                // First pass: count all votes
-                for (const opinion of p.reputationOpinions) {
-                    if (current.judges.includes(opinion.token_id)) {
-                        const isUnavailable =
-                            opinion.type.tokenId === PARTICIPATION_UNAVAILABLE;
-                        const isParticipation =
-                            opinion.type.tokenId === PARTICIPATION;
-
-                        if (isParticipation && opinion.polarization === false) {
-                            invalidVoteCount++;
-                        } else if (isUnavailable) {
-                            unavailableVoteCount++;
-                        }
-                    }
+                // Check if participation is locally determined as malformed (only possible in Resolution/Finalized)
+                let isMalformed = false;
+                if (
+                    (current.status === GameState.Resolution ||
+                        current.status === GameState.Finalized) &&
+                    "revealedS_Hex" in current &&
+                    "seed" in current
+                ) {
+                    const score = resolve_participation_commitment(
+                        p,
+                        current.revealedS_Hex,
+                        current.seed,
+                    );
+                    if (score === null) isMalformed = true;
                 }
 
-                // Second pass: create events and detect majority
-                let currentInvalidCount = 0;
-                let currentUnavailableCount = 0;
-                let majorityInvalidReached = false;
-                let majorityUnavailableReached = false;
+                if (!isMalformed) {
+                    // Track vote counts to detect majority
+                    const totalJudges = current.judges.length;
+                    const majorityThreshold = Math.floor(totalJudges / 2) + 1;
 
-                for (const opinion of p.reputationOpinions) {
-                    // Check if opinion is from a nominated judge
-                    if (current.judges.includes(opinion.token_id)) {
-                        const isUnavailable =
-                            opinion.type.tokenId === PARTICIPATION_UNAVAILABLE;
-                        const isParticipation =
-                            opinion.type.tokenId === PARTICIPATION;
+                    // Count votes by type for this participation
+                    let invalidVoteCount = 0;
+                    let unavailableVoteCount = 0;
 
-                        if (isParticipation || isUnavailable) {
-                            const { date: opDate, height: opHeight } =
-                                await getEventDetails(opinion.box);
+                    // First pass: count all votes
+                    for (const opinion of p.reputationOpinions) {
+                        if (current.judges.includes(opinion.token_id)) {
+                            const isUnavailable =
+                                opinion.type.tokenId ===
+                                PARTICIPATION_UNAVAILABLE;
+                            const isParticipation =
+                                opinion.type.tokenId === PARTICIPATION;
 
-                            let label = "Judge Voted";
-                            let description = `Judge ${opinion.token_id.slice(0, 8)}... voted on participation ${p.commitmentC_Hex.slice(0, 8)}...`;
-                            let icon = Gavel;
-                            let color = "text-blue-400 border-blue-400";
-
-                            const isInvalid =
-                                isParticipation &&
-                                opinion.polarization === false;
-
-                            if (isUnavailable) {
-                                label = "Participation Unavailable";
-                                description = `Judge ${opinion.token_id.slice(0, 8)}... marked participation ${p.commitmentC_Hex.slice(0, 8)}... as unavailable.`;
-                                icon = EyeOff;
-                                color = "text-orange-500 border-orange-500";
-                                currentUnavailableCount++;
-                            } else if (isInvalid) {
-                                label = "Participation Invalid";
-                                description = `Judge ${opinion.token_id.slice(0, 8)}... marked participation ${p.commitmentC_Hex.slice(0, 8)}... as invalid.`;
-                                icon = XCircle;
-                                color = "text-red-500 border-red-500";
-                                currentInvalidCount++;
-                            } else {
-                                label = "Participation Valid";
-                                description = `Judge ${opinion.token_id.slice(0, 8)}... marked participation ${p.commitmentC_Hex.slice(0, 8)}... as valid.`;
-                                icon = CheckCircle;
-                                color = "text-green-500 border-green-500";
-                            }
-
-                            newSteps.push({
-                                id: `op_part_${opinion.box_id}`,
-                                label: label,
-                                description: description,
-                                status: "completed",
-                                date: opDate,
-                                icon: icon,
-                                height: opHeight,
-                                color: color,
-                                txId: opinion.box_id,
-                                details: {
-                                    "Opinion Box ID": opinion.box_id,
-                                    "Judge Token": opinion.token_id,
-                                    Height: opHeight,
-                                    Polarization: opinion.polarization
-                                        ? "Positive"
-                                        : "Negative",
-                                    "Target Commitment": p.commitmentC_Hex,
-                                },
-                            });
-
-                            // Check if this vote triggered majority
                             if (
-                                isInvalid &&
-                                currentInvalidCount === majorityThreshold &&
-                                !majorityInvalidReached
+                                isParticipation &&
+                                opinion.polarization === false
                             ) {
-                                majorityInvalidReached = true;
+                                invalidVoteCount++;
+                            } else if (isUnavailable) {
+                                unavailableVoteCount++;
+                            }
+                        }
+                    }
+
+                    // Second pass: create events and detect majority
+                    let currentInvalidCount = 0;
+                    let currentUnavailableCount = 0;
+                    let majorityInvalidReached = false;
+                    let majorityUnavailableReached = false;
+
+                    for (const opinion of p.reputationOpinions) {
+                        // Check if opinion is from a nominated judge
+                        if (current.judges.includes(opinion.token_id)) {
+                            const isUnavailable =
+                                opinion.type.tokenId ===
+                                PARTICIPATION_UNAVAILABLE;
+                            const isParticipation =
+                                opinion.type.tokenId === PARTICIPATION;
+
+                            if (isParticipation || isUnavailable) {
+                                const { date: opDate, height: opHeight } =
+                                    await getEventDetails(opinion.box);
+
+                                let label = "Judge Voted";
+                                let description = `Judge ${opinion.token_id.slice(0, 8)}... voted on participation ${p.commitmentC_Hex.slice(0, 8)}...`;
+                                let icon = Gavel;
+                                let color = "text-blue-400 border-blue-400";
+
+                                const isInvalid =
+                                    isParticipation &&
+                                    opinion.polarization === false;
+
+                                if (isUnavailable) {
+                                    label = "Participation Unavailable";
+                                    description = `Judge ${opinion.token_id.slice(0, 8)}... marked participation ${p.commitmentC_Hex.slice(0, 8)}... as unavailable.`;
+                                    icon = EyeOff;
+                                    color = "text-orange-500 border-orange-500";
+                                    currentUnavailableCount++;
+                                } else if (isInvalid) {
+                                    label = "Participation Invalid";
+                                    description = `Judge ${opinion.token_id.slice(0, 8)}... marked participation ${p.commitmentC_Hex.slice(0, 8)}... as invalid.`;
+                                    icon = XCircle;
+                                    color = "text-red-500 border-red-500";
+                                    currentInvalidCount++;
+                                } else {
+                                    label = "Participation Valid";
+                                    description = `Judge ${opinion.token_id.slice(0, 8)}... marked participation ${p.commitmentC_Hex.slice(0, 8)}... as valid.`;
+                                    icon = CheckCircle;
+                                    color = "text-green-500 border-green-500";
+                                }
+
                                 newSteps.push({
-                                    id: `majority_invalid_${p.commitmentC_Hex}_${opHeight}`,
-                                    label: "Majority Reached - Invalid",
-                                    description: `Judges reached majority (${majorityThreshold}/${totalJudges}) to invalidate participation ${p.commitmentC_Hex.slice(0, 8)}...`,
+                                    id: `op_part_${opinion.box_id}`,
+                                    label: label,
+                                    description: description,
                                     status: "completed",
                                     date: opDate,
-                                    icon: Gavel,
+                                    icon: icon,
                                     height: opHeight,
-                                    color: "text-red-600 border-red-600",
+                                    color: color,
                                     txId: opinion.box_id,
                                     details: {
-                                        "Majority Type": "Invalidation",
-                                        "Votes Required": majorityThreshold,
-                                        "Total Judges": totalJudges,
+                                        "Opinion Box ID": opinion.box_id,
+                                        "Judge Token": opinion.token_id,
+                                        Height: opHeight,
+                                        Polarization: opinion.polarization
+                                            ? "Positive"
+                                            : "Negative",
+                                        "Target Commitment": p.commitmentC_Hex,
                                     },
                                 });
-                            } else if (
-                                isUnavailable &&
-                                currentUnavailableCount === majorityThreshold &&
-                                !majorityUnavailableReached
-                            ) {
-                                majorityUnavailableReached = true;
-                                newSteps.push({
-                                    id: `majority_unavailable_${p.commitmentC_Hex}_${opHeight}`,
-                                    label: "Majority Reached - Unavailable",
-                                    description: `Judges reached majority (${majorityThreshold}/${totalJudges}) to mark participation ${p.commitmentC_Hex.slice(0, 8)}... as unavailable.`,
-                                    status: "completed",
-                                    date: opDate,
-                                    icon: Gavel,
-                                    height: opHeight,
-                                    color: "text-orange-600 border-orange-600",
-                                    txId: opinion.box_id,
-                                    details: {
-                                        "Majority Type": "Unavailable",
-                                        "Votes Required": majorityThreshold,
-                                        "Total Judges": totalJudges,
-                                    },
-                                });
+
+                                // Check if this vote triggered majority
+                                if (
+                                    isInvalid &&
+                                    currentInvalidCount === majorityThreshold &&
+                                    !majorityInvalidReached
+                                ) {
+                                    majorityInvalidReached = true;
+                                    newSteps.push({
+                                        id: `majority_invalid_${p.commitmentC_Hex}_${opHeight}`,
+                                        label: "Majority Reached - Invalid",
+                                        description: `Judges reached majority (${majorityThreshold}/${totalJudges}) to invalidate participation ${p.commitmentC_Hex.slice(0, 8)}...`,
+                                        status: "completed",
+                                        date: opDate,
+                                        icon: Gavel,
+                                        height: opHeight,
+                                        color: "text-red-600 border-red-600",
+                                        txId: opinion.box_id,
+                                        details: {
+                                            "Majority Type": "Invalidation",
+                                            "Votes Required": majorityThreshold,
+                                            "Total Judges": totalJudges,
+                                        },
+                                    });
+                                } else if (
+                                    isUnavailable &&
+                                    currentUnavailableCount ===
+                                        majorityThreshold &&
+                                    !majorityUnavailableReached
+                                ) {
+                                    majorityUnavailableReached = true;
+                                    newSteps.push({
+                                        id: `majority_unavailable_${p.commitmentC_Hex}_${opHeight}`,
+                                        label: "Majority Reached - Unavailable",
+                                        description: `Judges reached majority (${majorityThreshold}/${totalJudges}) to mark participation ${p.commitmentC_Hex.slice(0, 8)}... as unavailable.`,
+                                        status: "completed",
+                                        date: opDate,
+                                        icon: Gavel,
+                                        height: opHeight,
+                                        color: "text-orange-600 border-orange-600",
+                                        txId: opinion.box_id,
+                                        details: {
+                                            "Majority Type": "Unavailable",
+                                            "Votes Required": majorityThreshold,
+                                            "Total Judges": totalJudges,
+                                        },
+                                    });
+                                }
                             }
                         }
                     }

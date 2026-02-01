@@ -20,15 +20,21 @@
 
 
   // =================================================================
-  // === DEFINICIONES DE REGISTROS
+  // === DEFINICIONES DE REGISTROS (RESOLUCIÓN)
   // =================================================================
 
   // R4: Integer                    - Game state (0: Active, 1: Resolved, 2: Cancelled).
   // R5: Coll[Byte]                 - Seed
   // R6: (Coll[Byte], Coll[Byte])   - (revealedSecretS, winnerCandidateCommitment): El secreto y el candidato a ganador.
-  // R7: Coll[Coll[Byte]]           - participatingJudges: Lista de IDs de tokens de reputación de los jueces.
-  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
-  // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, resolverErgoTree]
+  // R7: Coll[Long]                 - [resolutionDeadline, effectiveJudgeComm, effectiveResolverComm] (Dinámicos)
+  // R8: Coll[Byte]                 - resolverPK (Dinámico)
+  // R9: Coll[Byte]                 - configBoxId: Referencia a Config Box
+
+  // Config Box (Data Input con script false.es):
+  //   R4: Coll[Coll[Byte]] - invitedJudges (participatingJudges)
+  //   R5: Coll[Long]       - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+  //   R6: Coll[Coll[Byte]] - gameProvenance: [gameDetailsJsonHex, participationTokenId]
+  //   R7: Coll[Byte]       - secretHash
 
   // =================================================================
   // === EXTRACCIÓN DE VALORES
@@ -41,21 +47,36 @@
   val revealedS = r6Tuple._1
   val winnerCandidateCommitment = r6Tuple._2
   
-  val participatingJudges = SELF.R7[Coll[Coll[Byte]]].get
-  val numericalParams = SELF.R8[Coll[Long]].get
+  // Valores dinámicos de esta caja
+  val r7Params = SELF.R7[Coll[Long]].get
+  val resolutionDeadline = r7Params(0)
+  val perJudgeCommissionPercentage = r7Params(1)  // Comisión efectiva (puede cambiar por penalización)
+  val resolverCommissionPercentage = r7Params(2)  // Comisión efectiva (puede cambiar por penalización)
+  
+  val resolverPK = SELF.R8[Coll[Byte]].get
+  val configBoxId = SELF.R9[Coll[Byte]].get
+
+  // Buscar Config Box en dataInputs
+  val configBox = CONTEXT.dataInputs.filter({ (box: Box) =>
+    box.id == configBoxId &&
+    blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH
+  })(0)
+
+  // Leer datos estáticos desde Config Box
+  val participatingJudges = configBox.R4[Coll[Coll[Byte]]].get
+  val numericalParams = configBox.R5[Coll[Long]].get
+  val gameProvenance = configBox.R6[Coll[Coll[Byte]]].get
+
   val createdAt = numericalParams(0)
   val timeWeight = numericalParams(1)
   val deadline = numericalParams(2)
   val resolverStake = numericalParams(3)
   val participationFee = numericalParams(4)
-  val perJudgeCommissionPercentage = numericalParams(5)
-  val resolverCommissionPercentage = numericalParams(6)
-  val resolutionDeadline = numericalParams(7)
+  // Nota: numericalParams(5) y (6) son los valores ORIGINALES de comisiones,
+  // pero usamos los valores efectivos de R7 que pueden haber sido modificados por penalización.
 
-  val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   // gameProvenance(0) = gameDetailsJsonHex
   val participationTokenId = gameProvenance(1)
-  val resolverPK = gameProvenance(2)
   
   val gameNft = SELF.tokens(0)
   val gameNftId = gameNft._1
@@ -149,19 +170,15 @@
             recreatedGameBox.tokens(0)._1 == gameNftId &&
             recreatedGameBox.R4[Int].get == gameState && gameState == 1 &&
             recreatedGameBox.R5[Coll[Byte]].get == seed &&
-            recreatedGameBox.R7[Coll[Coll[Byte]]].get == participatingJudges &&
-            recreatedGameBox.R8[Coll[Long]].get(0) == createdAt &&
-            recreatedGameBox.R8[Coll[Long]].get(1) == timeWeight &&
-            recreatedGameBox.R8[Coll[Long]].get(2) == deadline &&
-            recreatedGameBox.R8[Coll[Long]].get(3) == resolverStake &&
-            recreatedGameBox.R8[Coll[Long]].get(4) == participationFee &&
-            recreatedGameBox.R8[Coll[Long]].get(5) == expectedJudgeComm &&
-            recreatedGameBox.R8[Coll[Long]].get(6) == expectedResolverComm &&
-            recreatedGameBox.R9[Coll[Coll[Byte]]].get == gameProvenance
+            recreatedGameBox.R7[Coll[Long]].get(0) >= HEIGHT + JUDGE_PERIOD && // resolutionDeadline extendido
+            recreatedGameBox.R7[Coll[Long]].get(1) == expectedJudgeComm && // Comisión de jueces actualizada
+            recreatedGameBox.R7[Coll[Long]].get(2) == expectedResolverComm && // Comisión de resolver actualizada
+            recreatedGameBox.R8[Coll[Byte]].get == resolverPK && // Mantener resolverPK
+            recreatedGameBox.R9[Coll[Byte]].get == configBoxId // Preservar Config Box ID
           }
           
           val fundsReturnedToPool = box_value(recreatedGameBox) >= box_value(SELF) + box_value(invalidatedCandidateBox)
-          val deadlineIsExtended = recreatedGameBox.R8[Coll[Long]].get(7) >= HEIGHT + JUDGE_PERIOD
+          val deadlineIsExtended = recreatedGameBox.R7[Coll[Long]].get(0) >= HEIGHT + JUDGE_PERIOD
           
           fundsReturnedToPool && deadlineIsExtended && gameBoxIsRecreatedCorrectly
         } else { false }
@@ -266,22 +283,14 @@
                 recreatedGameBox.R5[Coll[Byte]].get == seed &&
                 recreatedGameBox.R6[(Coll[Byte], Coll[Byte])].get._1 == revealedS &&
                 recreatedGameBox.R6[(Coll[Byte], Coll[Byte])].get._2 == newWinnerCandidate &&
-                recreatedGameBox.R7[Coll[Coll[Byte]]].get == participatingJudges &&
-                recreatedGameBox.R8[Coll[Long]].get(0) == createdAt &&
-                recreatedGameBox.R8[Coll[Long]].get(1) == timeWeight &&
-                recreatedGameBox.R8[Coll[Long]].get(2) == deadline &&
-                recreatedGameBox.R8[Coll[Long]].get(3) == resolverStake &&
-                recreatedGameBox.R8[Coll[Long]].get(4) == participationFee &&
-                recreatedGameBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
-                recreatedGameBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
-                recreatedGameBox.R8[Coll[Long]].get(7) == resolutionDeadline &&
-                recreatedGameBox.R9[Coll[Coll[Byte]]].get(0) == gameProvenance(0) &&
-                recreatedGameBox.R9[Coll[Coll[Byte]]].get(1) == gameProvenance(1) &&
+                recreatedGameBox.R7[Coll[Long]].get(0) == resolutionDeadline && // Mantener deadline
+                recreatedGameBox.R7[Coll[Long]].get(1) == perJudgeCommissionPercentage && // Mantener comisiones
+                recreatedGameBox.R7[Coll[Long]].get(2) == resolverCommissionPercentage &&
                 (
-                  recreatedGameBox.R9[Coll[Coll[Byte]]].get(2) == resolverPK ||  // Allow the resolver to set a new candidate after a judge invalidation action.
+                  recreatedGameBox.R8[Coll[Byte]].get == resolverPK ||  // Allow the resolver to set a new candidate after a judge invalidation action.
                   (resolutionDeadline - JUDGE_PERIOD) + RESOLVER_OMISSION_NO_PENALTY_PERIOD < HEIGHT  // New resolver can be set.
                 ) && 
-                recreatedGameBox.R9[Coll[Coll[Byte]]].get.size == 3
+                recreatedGameBox.R9[Coll[Byte]].get == configBoxId // Preservar Config Box ID
               }
               
               gameBoxIsRecreatedCorrectly && newScoreIsValid
@@ -313,16 +322,11 @@
           recreatedGameBox.R5[Coll[Byte]].get == seed &&
           recreatedGameBox.R6[(Coll[Byte], Coll[Byte])].get._1 == revealedS &&
           recreatedGameBox.R6[(Coll[Byte], Coll[Byte])].get._2 == winnerCandidateCommitment &&
-          recreatedGameBox.R7[Coll[Coll[Byte]]].get == participatingJudges &&
-          recreatedGameBox.R8[Coll[Long]].get(0) == createdAt &&
-          recreatedGameBox.R8[Coll[Long]].get(1) == timeWeight &&
-          recreatedGameBox.R8[Coll[Long]].get(2) == deadline &&
-          recreatedGameBox.R8[Coll[Long]].get(3) == resolverStake &&
-          recreatedGameBox.R8[Coll[Long]].get(4) == participationFee &&
-          recreatedGameBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
-          recreatedGameBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
-          recreatedGameBox.R8[Coll[Long]].get(7) == resolutionDeadline &&
-          recreatedGameBox.R9[Coll[Coll[Byte]]].get == gameProvenance
+          recreatedGameBox.R7[Coll[Long]].get(0) == resolutionDeadline && // Mantener deadline
+          recreatedGameBox.R7[Coll[Long]].get(1) == perJudgeCommissionPercentage && // Mantener comisiones
+          recreatedGameBox.R7[Coll[Long]].get(2) == resolverCommissionPercentage &&
+          recreatedGameBox.R8[Coll[Byte]].get == resolverPK &&
+          recreatedGameBox.R9[Coll[Byte]].get == configBoxId // Preservar Config Box ID
         }
 
         sigmaProp(gameBoxIsRecreatedCorrectly && box_value(recreatedGameBox) >= box_value(SELF))

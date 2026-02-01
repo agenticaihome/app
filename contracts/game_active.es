@@ -31,11 +31,13 @@
 
   // R4: Integer            - Game state (0: Active, 1: Resolved, 2: Cancelled).
   // R5: Coll[Byte]         - seed
-  // R6: Coll[Byte]         - secretHash: Hash del secreto 'S' (blake2b256(S)).
-  // R7: Coll[Coll[Byte]]   - invitedJudgesReputationProofs
-  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage].
-  // R9: Coll[Coll[Byte]]   - gameDetailsJsonHex, ParticipationTokenID
+  // R6: Coll[Byte]         - configBoxId: ID de la Config Box con datos estáticos.
 
+  // Config Box (Data Input con script false.es):
+  //   R4: Coll[Coll[Byte]] - invitedJudges
+  //   R5: Coll[Long]       - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+  //   R6: Coll[Coll[Byte]] - gameProvenance: [gameDetailsJsonHex, participationTokenId]
+  //   R7: Coll[Byte]       - secretHash
 
   // Note: The game seed that must be used to reproduce the random scenario for all participants is first added by the creator, and the action3_open_ceremony allows anyone to add entropy to it making updated_seed = blake2b256(old_seed ++ INPUTS(0).id).
 
@@ -48,14 +50,21 @@
   // R5: Seed
   val gameSeed = SELF.R5[Coll[Byte]].get
 
-  // R6: Hash del secreto 'S'
-  val secretHash = SELF.R6[Coll[Byte]].get
-  
-  // R7: Jueces invitados
-  val invitedJudges = SELF.R7[Coll[Coll[Byte]]].get
+  // R6: Config Box ID
+  val configBoxId = SELF.R6[Coll[Byte]].get
 
-  // R8: [deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
-  val numericalParams = SELF.R8[Coll[Long]].get
+  // Buscar Config Box en dataInputs
+  val configBox = CONTEXT.dataInputs.filter({ (box: Box) =>
+    box.id == configBoxId &&
+    blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH
+  })(0)
+
+  // Leer datos estáticos desde Config Box
+  val invitedJudges = configBox.R4[Coll[Coll[Byte]]].get
+  val numericalParams = configBox.R5[Coll[Long]].get
+  val gameProvenance = configBox.R6[Coll[Coll[Byte]]].get
+  val secretHash = configBox.R7[Coll[Byte]].get
+
   val createdAt = numericalParams(0)
   val timeWeight = numericalParams(1)
   val deadline = numericalParams(2)
@@ -66,8 +75,6 @@
 
   val ceremonyDeadline = deadline - PARTICIPATION_TIME_WINDOW
 
-  // R9: [gameDetailsJsonHex, ParticipationTokenID]
-  val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   val gameDetailsJsonHex = gameProvenance(0)
   val participationTokenId = gameProvenance(1)
   
@@ -194,18 +201,10 @@
               resolutionBox.tokens.filter({ (token: (Coll[Byte], Long)) => token._1 == gameNftId }).size == 1 &&
               resolutionBox.R4[Int].get == 1 && // El estado del juego pasa a "Resuelto" (1)
               resolutionBox.R5[Coll[Byte]].get == gameSeed &&
-              resolutionBox.R7[Coll[Coll[Byte]]].get == invitedJudges &&
-              resolutionBox.R8[Coll[Long]].get(0) == createdAt &&
-              resolutionBox.R8[Coll[Long]].get(1) == timeWeight &&
-              resolutionBox.R8[Coll[Long]].get(2) == deadline &&
-              resolutionBox.R8[Coll[Long]].get(3) == resolverStake &&
-              resolutionBox.R8[Coll[Long]].get(4) == participationFee &&
-              resolutionBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
-              resolutionBox.R8[Coll[Long]].get(6) >= resolverCommissionPercentage &&
-              resolutionBox.R8[Coll[Long]].get(7) >= HEIGHT + JUDGE_PERIOD &&
-              resolutionBox.R9[Coll[Coll[Byte]]].get(0) == gameDetailsJsonHex &&
-              resolutionBox.R9[Coll[Coll[Byte]]].get(1) == participationTokenId &&
-              resolutionBox.R9[Coll[Coll[Byte]]].get.size == 3
+              resolutionBox.R7[Coll[Long]].get(0) >= HEIGHT + JUDGE_PERIOD && // resolutionDeadline
+              resolutionBox.R7[Coll[Long]].get(1) == perJudgeCommissionPercentage && // Comisiones iniciales
+              resolutionBox.R7[Coll[Long]].get(2) >= resolverCommissionPercentage && // resolverComm puede ser >= original
+              resolutionBox.R9[Coll[Byte]].get == configBoxId // Preservar referencia a Config Box
             }
 
           resolutionBoxIsValid && allVotesAreUnique
@@ -238,7 +237,7 @@
           blake2b256(cancellationBox.R6[Coll[Byte]].get) == secretHash &&
           cancellationBox.R7[Long].get == remainingValue &&
           cancellationBox.R8[Long].get == deadline &&
-          cancellationBox.R9[Coll[Coll[Byte]]].get == gameProvenance
+          cancellationBox.R9[Coll[Byte]].get == configBoxId // Preservar referencia a Config Box
       }
 
       // R7 Pasa a ser el valor restante (el cual puede ser mayor al stake original si había donaciones).  La razón por la que nos se calcula el initialStakePortionToClaim en base al valor total aqui es para evitar que, en caso de que el valor total sea STAKE_DENOMINATOR veces mayor al stake original, el creador esté incentivado a cancelar el juego en lugar de proseguirlo.
@@ -291,17 +290,14 @@
       val outR5 = out.R5[Coll[Byte]].get
       val validUpdatedSeed = outR5 == updated_seed
 
-      // Todos los demás registros deben permanecer iguales
+      // Solo verificar preservación de R4 y R6 (Config Box ID)
       val sameR4 = out.R4[Int].get == gameState
-      val sameR6 = out.R6[Coll[Byte]].get == secretHash
-      val sameR7 = out.R7[Coll[Coll[Byte]]].get == invitedJudges
-      val sameR8 = out.R8[Coll[Long]].get == numericalParams
-      val sameR9 = out.R9[Coll[Coll[Byte]]].get == gameProvenance
+      val sameR6 = out.R6[Coll[Byte]].get == configBoxId
     
       sameNFT &&
       sameOrAddedValue &&
       validUpdatedSeed &&
-      sameR4 && sameR6 && sameR7 && sameR8 && sameR9 // Check R4, R6-R9
+      sameR4 && sameR6
     } else {
       false
     }

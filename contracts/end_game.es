@@ -15,17 +15,24 @@
   
   val P2PK_ERGOTREE_PREFIX = fromBase16("0008cd")
 
-
   // =================================================================
-  // === DEFINICIONES DE REGISTROS
+  // === DEFINICIONES DE REGISTROS (END GAME)
   // =================================================================
 
   // R4: Integer                    - Game state (0: Active, 1: Resolved, 2: Cancelled).
   // R5: Coll[Byte]                 - Seed
   // R6: (Coll[Byte], Coll[Byte])   - (revealedSecretS, winnerCandidateCommitment): El secreto y el candidato a ganador.
-  // R7: Coll[Coll[Byte]]           - participatingJudges: Lista de IDs de tokens de reputación de los jueces.
-  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
-  // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, resolverErgoTree]
+  // R7: Coll[Long]                 - [resolutionDeadline, effectiveJudgeComm, effectiveResolverComm] (Dinámicos)
+  // R8: Coll[Byte]                 - resolverPK (Dinámico)
+  // R9: Coll[Byte]                 - configBoxId: Referencia a Config Box
+
+  // Config Box (Data Input con script false.es):
+  //   R4: Coll[Coll[Byte]] - invitedJudges (participatingJudges)
+  //   R5: Coll[Long]       - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+  //   R6: Coll[Coll[Byte]] - gameProvenance: [gameDetailsJsonHex, participationTokenId]
+  //   R7: Coll[Byte]       - secretHash
+
+  val FALSE_SCRIPT_HASH = fromBase16("`+FALSE_SCRIPT_HASH+`")
 
   // =================================================================
   // === EXTRACCIÓN DE VALORES
@@ -38,21 +45,36 @@
   val revealedS = r6Tuple._1
   val winnerCandidateCommitment = r6Tuple._2
   
-  val participatingJudges = SELF.R7[Coll[Coll[Byte]]].get
-  val numericalParams = SELF.R8[Coll[Long]].get
+  // Valores dinámicos de esta caja
+  val r7Params = SELF.R7[Coll[Long]].get
+  val resolutionDeadline = r7Params(0)
+  val perJudgeCommissionPercentage = r7Params(1)  // Comisión efectiva (puede haber sido modificada)
+  val resolverCommissionPercentage = r7Params(2)  // Comisión efectiva (puede haber sido modificada)
+  
+  val resolverPK = SELF.R8[Coll[Byte]].get
+  val configBoxId = SELF.R9[Coll[Byte]].get
+
+  // Buscar Config Box en dataInputs
+  val configBox = CONTEXT.dataInputs.filter({ (box: Box) =>
+    box.id == configBoxId &&
+    blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH
+  })(0)
+
+  // Leer datos estáticos desde Config Box
+  val participatingJudges = configBox.R4[Coll[Coll[Byte]]].get
+  val numericalParams = configBox.R5[Coll[Long]].get
+  val gameProvenance = configBox.R6[Coll[Coll[Byte]]].get
+
   val createdAt = numericalParams(0)
   val timeWeight = numericalParams(1)
   val deadline = numericalParams(2)
   val resolverStake = numericalParams(3)
   val participationFee = numericalParams(4)
-  val perJudgeCommissionPercentage = numericalParams(5)
-  val resolverCommissionPercentage = numericalParams(6)
-  val resolutionDeadline = numericalParams(7)
+  // Nota: numericalParams(5) y (6) son las comisiones ORIGINALES, 
+  // pero usamos las comisiones efectivas de R7 que pueden haber sido modificadas.
 
-  val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   // gameProvenance(0) = gameDetailsJsonHex
   val participationTokenId = gameProvenance(1)
-  val resolverPK = gameProvenance(2)
   
   val gameNft = SELF.tokens(0)
   val gameNftId = gameNft._1

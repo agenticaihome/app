@@ -9,8 +9,10 @@
   // Período de enfriamiento en bloques entre cada acción de drenaje.
   val COOLDOWN_IN_BLOCKS = `+COOLDOWN_IN_BLOCKS+`L
 
+  val FALSE_SCRIPT_HASH = fromBase16("`+FALSE_SCRIPT_HASH+`")
+
   // =================================================================
-  // === DEFINICIONES DE REGISTROS (ESTADO DE CANCELACIÓN)
+  // === DEFINICIONES DE REGISTROS (ESTADO DE CANCELACIÓN - REFACTORIZADO)
   // =================================================================
 
   // R4: Integer           - Game state (0: Active, 1: Resolved, 2: Cancelled).
@@ -18,7 +20,13 @@
   // R6: Coll[Byte]        - revealedSecret: El secreto 'S' del juego, ya revelado.
   // R7: Long              - resolverStake: La cantidad actual (y decreciente) del stake del resolver.
   // R8  Long              - originalDeadline
-  // R9: Coll[Coll[Byte]]  - gameDetailsJsonHex, ParticipationTokenID
+  // R9: Coll[Byte]        - configBoxId: Referencia a Config Box
+
+  // Config Box (Data Input con script false.es):
+  //   R4: Coll[Coll[Byte]] - invitedJudges
+  //   R5: Coll[Long]       - numericalParameters
+  //   R6: Coll[Coll[Byte]] - gameProvenance: [gameDetailsJsonHex, participationTokenId]
+  //   R7: Coll[Byte]       - secretHash
 
   // =================================================================
   // === EXTRACCIÓN DE VALORES
@@ -29,8 +37,16 @@
   val revealedSecret = SELF.R6[Coll[Byte]].get
   val currentStake = SELF.R7[Long].get
   val originalDeadline = SELF.R8[Long].get
-  val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
-  val gameDetailsJsonHex = gameProvenance(0)
+  val configBoxId = SELF.R9[Coll[Byte]].get
+
+  // Buscar Config Box en dataInputs
+  val configBox = CONTEXT.dataInputs.filter({ (box: Box) =>
+    box.id == configBoxId &&
+    blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH
+  })(0)
+
+  // Leer datos estáticos desde Config Box
+  val gameProvenance = configBox.R6[Coll[Coll[Byte]]].get
   val participationTokenId = gameProvenance(1)
 
 
@@ -75,7 +91,7 @@
       recreatedCancellationBox.R6[Coll[Byte]].get == revealedSecret &&
       recreatedCancellationBox.R7[Long].get == remainingStake &&
       recreatedCancellationBox.R8[Long].get == originalDeadline &&
-      recreatedCancellationBox.R9[Coll[Coll[Byte]]].get == gameProvenance
+      recreatedCancellationBox.R9[Coll[Byte]].get == configBoxId // Preservar Config Box ID
     }
     
     cooldownIsOver && boxIsRecreatedCorrectly

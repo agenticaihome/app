@@ -118,6 +118,7 @@
         parts: AnyParticipation[],
     ) {
         const newSteps: TimelineStep[] = [];
+        const addedBotBoxes = new Set<string>();
         const explorerUrl = get(explorer_uri);
 
         // 1. State Changes from history
@@ -438,7 +439,8 @@
             });
 
             // Bot Box Event (if available)
-            if (p.solverIdBox) {
+            if (p.solverIdBox && !addedBotBoxes.has(p.solverIdBox.boxId)) {
+                addedBotBoxes.add(p.solverIdBox.boxId);
                 const { date: botDate, height: botHeight } =
                     await getEventDetails(p.solverIdBox);
                 newSteps.push({

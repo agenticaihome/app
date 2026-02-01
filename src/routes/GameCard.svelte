@@ -135,8 +135,7 @@
                     statusClasses =
                         "bg-amber-500/15 text-amber-400 border border-amber-500/30";
                 } else if (await isOpenSolverSubmit(game)) {
-                    statusLabel =
-                        `Play for ${formatTokenBigInt(game.participationFeeAmount, tokenDecimals)} ${tokenSymbol}`;
+                    statusLabel = `Play for ${formatTokenBigInt(game.participationFeeAmount, tokenDecimals)} ${tokenSymbol}`;
                     statusClasses =
                         "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
                 } else {
@@ -167,14 +166,30 @@
         }
     }
 
+    let timeLabel = "Closes in";
+
     async function tick() {
         if (!game || game.status !== GameState.Active || participationEnded) {
             cleanup();
             return;
         }
         try {
+            let targetBlock = game.deadlineBlock;
+            let label = "Closes in";
+
+            if (await isOpenSolverSubmit(game)) {
+                targetBlock =
+                    game.ceremonyDeadline - game.constants.SEED_MARGIN;
+                label = "Bot Upload in";
+            } else if (await isOpenCeremony(game)) {
+                targetBlock = game.ceremonyDeadline;
+                label = "Seed Deadline in";
+            }
+
+            timeLabel = label;
+
             remainingTime = await block_to_time_remaining(
-                game.deadlineBlock,
+                targetBlock,
                 game.platform,
             );
             const ended = await isGameParticipationEnded(game);
@@ -221,10 +236,18 @@
             game.status === GameState.Active ||
             game.status === GameState.Resolution
         ) {
+            let targetBlock = game.deadlineBlock;
+            if (game.status === GameState.Active) {
+                if (await isOpenSolverSubmit(game)) {
+                    targetBlock =
+                        game.ceremonyDeadline - game.constants.SEED_MARGIN;
+                } else if (await isOpenCeremony(game)) {
+                    targetBlock = game.ceremonyDeadline;
+                }
+            }
+
             deadlineTimestamp = await block_height_to_timestamp(
-                game.status === GameState.Active
-                    ? game.deadlineBlock
-                    : game.deadlineBlock,
+                targetBlock,
                 game.platform,
             );
         }
@@ -369,7 +392,7 @@
                         >
                             {game.status === GameState.Active &&
                             !participationEnded
-                                ? "Closes in"
+                                ? timeLabel
                                 : "Status Update"}
                         </div>
                         <div class="text-base font-semibold text-foreground">

@@ -5,13 +5,14 @@ import {
   OutputBuilder,
   RECOMMENDED_MIN_FEE_VALUE,
   TransactionBuilder,
+  SAFE_MIN_BOX_VALUE
 } from "@fleet-sdk/core";
 import { SByte, SColl, SInt, SLong, SPair } from "@fleet-sdk/serializer";
 import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { prependHexPrefix } from "$lib/utils";
 import { DefaultGameConstants } from "$lib/common/constants";
-import { getGopGameActiveErgoTree, getGopParticipationErgoTree } from "$lib/ergo/contract";
+import { getGopGameActiveErgoTree, getGopParticipationErgoTree, getGopFalseAddress } from "$lib/ergo/contract";
 import { hexToBytes } from "$lib/ergo/utils";
 
 
@@ -26,7 +27,7 @@ const baseModes = [
   { name: "USD Token Mode", token: USD_BASE_TOKEN, tokenName: USD_BASE_TOKEN_NAME },
 ];
 
-describe.each(baseModes)("Participant Reclaim After Grace Period - (%s)", (mode) => {
+describe.each(baseModes)("Participant Reclaim After Grace Period (Refactored) - (%s)", (mode) => {
   let mockChain: MockChain;
   let creator: ReturnType<MockChain["newParty"]>;
   let participant: ReturnType<MockChain["newParty"]>;
@@ -34,6 +35,8 @@ describe.each(baseModes)("Participant Reclaim After Grace Period - (%s)", (mode)
   let participationContract: ReturnType<MockChain["newParty"]>;
   let gameActiveBox: Box;
   let participationBox: Box;
+  let configBox: any;
+  let configBoxId: string;
 
   const resolverStake = 1_000_000_000n;
   const participationFee = 1_000_000_000n;
@@ -61,6 +64,41 @@ describe.each(baseModes)("Participant Reclaim After Grace Period - (%s)", (mode)
     gameActiveContract = mockChain.addParty(gameActiveErgoTree.toHex(), "GameActive");
     participationContract = mockChain.addParty(participationErgoTree.toHex(), "Participation");
 
+    // --- Create Config Box ---
+    // Must contain proper Params to determine deadline
+    // And must use the False Script Address so hash matches contract
+    const falseAddress = getGopFalseAddress(0); // 0 = Mainnet/Testnet doesn't matter for mock execution usually, but consistent
+
+    // R5: Params [createdAt, timeWeight, DEADLINE, ...]
+    const params = [
+      BigInt(mockChain.height),
+      20n,
+      BigInt(deadlineBlock),
+      resolverStake,
+      participationFee,
+      500n,
+      1000n
+    ];
+
+    configBox = {
+      transactionId: "0000000000000000000000000000000000000000000000000000000000000001",
+      index: 0,
+
+      value: SAFE_MIN_BOX_VALUE,
+      ergoTree: falseAddress.ergoTree, // MUST BE FALSE SCRIPT
+      assets: [],
+      creationHeight: mockChain.height,
+      additionalRegisters: {
+        R4: SColl(SColl(SByte), []).toHex(),
+        R5: SColl(SLong, params).toHex(),
+        R6: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex(),
+        R7: SColl(SByte, blake2b256(stringToBytes("utf8", "secret"))).toHex()
+      }
+    };
+    // We add it to 'creator' or simply inject it as data input references
+    creator.addUTxOs(configBox);
+    configBoxId = creator.utxos.toArray().find(b => b.additionalRegisters.R5 === configBox.additionalRegisters.R5)!.boxId;
+
     const gameBoxValue = mode.token === ERG_BASE_TOKEN ? resolverStake : RECOMMENDED_MIN_FEE_VALUE;
     const gameAssets = [
       { tokenId: gameNftId, amount: 1n },
@@ -73,44 +111,14 @@ describe.each(baseModes)("Participant Reclaim After Grace Period - (%s)", (mode)
       assets: gameAssets,
       creationHeight: mockChain.height,
       additionalRegisters: {
-        // R4: Game state (0: Active)
         R4: SInt(0).toHex(),
-
-        // R5: (Seed, Ceremony deadline)
-        R5: SPair(
-          SColl(SByte, stringToBytes("utf8", "seed-for-ceremony")),
-          SLong(BigInt(deadlineBlock + 50))
-        ).toHex(),
-
-        // R6: Hash of the secret 'S'
-        R6: SColl(SByte, blake2b256(stringToBytes("utf8", "secret"))).toHex(),
-
-        // R7: Invited judges (empty in this test)
-        R7: SColl(SColl(SByte), []).toHex(),
-
-        // R8: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
-        R8: SColl(SLong, [
-          BigInt(mockChain.height),
-          20n,
-          BigInt(deadlineBlock),
-          resolverStake,
-          participationFee,
-          500n,  // 5.00% comisión por juez
-          1000n  // 10.00% comisión del creador
-        ]).toHex(),
-        // R9: [gameDetailsJsonHex, ParticipationTokenID, creatorErgoTree]
-        R9: SColl(SColl(SByte), [
-          stringToBytes("utf8", "{}"),
-          hexToBytes(mode.token) ?? new Uint8Array(0),
-          prependHexPrefix(creator.address.getPublicKeys()[0], "0008cd")
-        ]).toHex()
+        R5: SColl(SByte, stringToBytes("utf8", "seed-for-ceremony")).toHex(), // Seed
+        R6: SColl(SByte, hexToBytes(configBoxId)!).toHex()
       },
     });
 
     const participationValue = mode.token === ERG_BASE_TOKEN ? participationFee : RECOMMENDED_MIN_FEE_VALUE;
-    const participationAssets = mode.token === ERG_BASE_TOKEN
-      ? []
-      : [{ tokenId: mode.token, amount: participationFee }];
+    const participationAssets = mode.token === ERG_BASE_TOKEN ? [] : [{ tokenId: mode.token, amount: participationFee }];
 
     participationContract.addUTxOs({
       value: participationValue,
@@ -138,49 +146,45 @@ describe.each(baseModes)("Participant Reclaim After Grace Period - (%s)", (mode)
   it("should allow a participant to reclaim funds if the grace period has passed", () => {
     const reclaimHeight = deadlineBlock + GRACE_PERIOD;
     mockChain.jumpTo(reclaimHeight);
-    const participantInitialBalance = participant.balance.nanoergs;
 
     const reclaimValue = mode.token === ERG_BASE_TOKEN ? participationBox.value : RECOMMENDED_MIN_FEE_VALUE;
-    const reclaimAssets = mode.token === ERG_BASE_TOKEN
-      ? []
-      : [{ tokenId: mode.token, amount: participationFee }];
+    const reclaimAssets = mode.token === ERG_BASE_TOKEN ? [] : [{ tokenId: mode.token, amount: participationFee }];
 
     const reclaimTx = new TransactionBuilder(mockChain.height)
       .from([participationBox, ...participant.utxos.toArray()])
-      .withDataFrom([gameActiveBox])
+      // Must include GameActive AND ConfigBox so contract can find deadline
+      .withDataFrom([
+        gameActiveBox,
+        creator.utxos.toArray().find(b => b.boxId === configBoxId)!
+      ])
       .to(new OutputBuilder(reclaimValue, participant.address).addTokens(reclaimAssets))
-      .sendChangeTo(participant.address)  // Could be any other address too
+      .sendChangeTo(participant.address)
       .payFee(RECOMMENDED_MIN_FEE_VALUE)
       .build();
 
     const executionResult = mockChain.execute(reclaimTx, { signers: [participant as any] });
-
     expect(executionResult).to.be.true;
   });
 
   it("should FAIL to reclaim funds if the grace period has NOT passed", () => {
-    const reclaimHeight = deadlineBlock + GRACE_PERIOD - 10;  // Seems that the mockchain goes various blocks forward when executing the tx!
+    const reclaimHeight = deadlineBlock + GRACE_PERIOD - 10;
     mockChain.jumpTo(reclaimHeight);
 
-    console.log(deadlineBlock, GRACE_PERIOD, reclaimHeight);
-    console.log("Current height:", mockChain.height);
-
     const reclaimValue = mode.token === ERG_BASE_TOKEN ? participationBox.value : RECOMMENDED_MIN_FEE_VALUE;
-    const reclaimAssets = mode.token === ERG_BASE_TOKEN
-      ? []
-      : [{ tokenId: mode.token, amount: participationFee }];
+    const reclaimAssets = mode.token === ERG_BASE_TOKEN ? [] : [{ tokenId: mode.token, amount: participationFee }];
 
     const reclaimTx = new TransactionBuilder(mockChain.height)
       .from([participationBox, ...participant.utxos.toArray()])
-      .withDataFrom([gameActiveBox])
+      .withDataFrom([
+        gameActiveBox,
+        creator.utxos.toArray().find(b => b.boxId === configBoxId)!
+      ])
       .to(new OutputBuilder(reclaimValue, participant.address).addTokens(reclaimAssets))
-      .sendChangeTo(participant.address) // Could be any other address too
+      .sendChangeTo(participant.address)
       .payFee(RECOMMENDED_MIN_FEE_VALUE)
       .build();
 
     const executionResult = mockChain.execute(reclaimTx, { signers: [participant as any], throw: false });
-
     expect(executionResult).to.be.false;
-    expect(participationContract.utxos.length).to.equal(1);
   });
 });

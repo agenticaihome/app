@@ -3,13 +3,28 @@ import {
     TransactionBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
     SAFE_MIN_BOX_VALUE,
+    type Box,
+    type Amount
 } from '@fleet-sdk/core';
 import { SColl, SByte } from '@fleet-sdk/serializer';
 import { getGopJudgesPaidErgoTreeHex } from '../contract';
 import { parseBox, pkHexToBase58Address, hexToBytes } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { calculatePayouts } from '../utils/payout_calculator';
+import { get } from 'svelte/store';
+import { explorer_uri } from '../envs';
 declare const ergo: any;
+
+async function fetchBox(boxId: string): Promise<Box<Amount> | null> {
+    try {
+        const res = await fetch(`${get(explorer_uri)}/api/v1/boxes/${boxId}`);
+        if (res.ok) return await res.json();
+        return null;
+    } catch (e) {
+        console.error("Error fetching box:", e);
+        return null;
+    }
+}
 
 export async function end_game(
     game: GameResolution,
@@ -18,6 +33,10 @@ export async function end_game(
 
     console.log(`[end_game] Participations: ${participations.length}`)
     console.log(`[end_game] Starting game finalization: ${game.boxId}`);
+
+    if (!game.configBoxId) throw new Error("Game is missing configBoxId");
+    const configBox = await fetchBox(game.configBoxId);
+    if (!configBox) throw new Error("Could not fetch Config Box");
 
     const currentHeight = await ergo.get_current_height();
     const userAddress = await ergo.get_change_address();
@@ -93,12 +112,14 @@ export async function end_game(
     // --- 6. Transacción ---
     const utxos = await ergo.get_utxos();
     const inputs = [parseBox(game.box), ...participations.map(p => parseBox(p.box)), ...utxos];
+    const dataInputs = [configBox]; // Add Config Box
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(inputs)
         .to(outputs)
         .sendChangeTo(userAddress)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
+        .withDataFrom(dataInputs)
         .build()
         .toEIP12Object();
 

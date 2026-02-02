@@ -3,21 +3,38 @@ import {
     TransactionBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
     SAFE_MIN_BOX_VALUE,
-    type Box
+    type Box,
+    type Amount
 } from '@fleet-sdk/core';
 import { SColl, SByte, SPair, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution } from '$lib/common/game';
 import { getGopEndGameErgoTreeHex } from '../contract';
-
+import { get } from 'svelte/store';
+import { explorer_uri } from '../envs';
 
 declare const ergo: any;
+
+async function fetchBox(boxId: string): Promise<Box<Amount> | null> {
+    try {
+        const res = await fetch(`${get(explorer_uri)}/api/v1/boxes/${boxId}`);
+        if (res.ok) return await res.json();
+        return null;
+    } catch (e) {
+        console.error("Error fetching box:", e);
+        return null;
+    }
+}
 
 export async function to_end_game(
     game: GameResolution
 ): Promise<string> {
 
     console.log(`[to_end_game] Starting transition to end game for: ${game.boxId}`);
+
+    if (!game.configBoxId) throw new Error("Game is missing configBoxId");
+    const configBox = await fetchBox(game.configBoxId);
+    if (!configBox) throw new Error("Could not fetch Config Box");
 
     const currentHeight = await ergo.get_current_height();
     const userAddress = await ergo.get_change_address();
@@ -28,31 +45,8 @@ export async function to_end_game(
 
     const endGameErgoTree = getGopEndGameErgoTreeHex();
 
-    const r4Hex = SInt(1).toHex();
-    const r5Hex = SColl(SByte, hexToBytes(game.seed)!).toHex();
-
-    const revealedSBytes = hexToBytes(game.revealedS_Hex)!;
-    const winnerCommitmentBytes = game.winnerCandidateCommitment ? hexToBytes(game.winnerCandidateCommitment)! : new Uint8Array();
-    const r6Hex = SPair(SColl(SByte, revealedSBytes), SColl(SByte, winnerCommitmentBytes)).toHex();
-
-    const judgesBytes = game.judges.map(j => hexToBytes(j)!);
-    const r7Hex = SColl(SColl(SByte), judgesBytes).toHex();
-
-
-    const inputR9 = game.box.additionalRegisters.R9;
-    if (!inputR9) throw new Error("Input box missing R9");
-
-    const r9HexFromInput = inputR9;
-
-    const registers = {
-        R4: game.box.additionalRegisters.R4,
-        R5: game.box.additionalRegisters.R5,
-        R6: game.box.additionalRegisters.R6,
-        R7: game.box.additionalRegisters.R7,
-        R8: game.box.additionalRegisters.R8,
-        R9: game.box.additionalRegisters.R9
-    };
-
+    // We copy registers from Resolution Box to End Game Box
+    // Structure matches: R4..R9
     const parsedInputBox = parseBox(game.box);
 
     const outputRegisters = {
@@ -74,9 +68,12 @@ export async function to_end_game(
     const utxos = await ergo.get_utxos();
     const inputs = [parsedInputBox, ...utxos];
 
+    const dataInputs = [configBox];
+
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(inputs)
         .to(endGameBoxOutput)
+        .withDataFrom(dataInputs)
         .sendChangeTo(userAddress)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
         .build()

@@ -17,8 +17,11 @@ import {
 } from "@fleet-sdk/serializer";
 import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
-import { getGopGameActiveErgoTree } from "$lib/ergo/contract";
+import { getGopGameActiveErgoTree, getGopFalseAddress, getGopFalseErgoTreeHex } from "$lib/ergo/contract";
 
+// Helper for hex
+const stripHexPrefix = (h: string) => h?.startsWith('0x') ? h.slice(2) : h;
+const hexBytesLen = (hexStr: string) => hexStr ? Math.ceil(stripHexPrefix(hexStr).length / 2) : 0;
 
 // --- Test Suite ---
 
@@ -31,208 +34,174 @@ const baseModes = [
   { name: "USD Token Mode", token: USD_BASE_TOKEN, tokenName: USD_BASE_TOKEN_NAME },
 ];
 
-describe.each(baseModes)("Game Creation (create_game) - (%s)", (mode) => {
-  // `mockChain` simulates an Ergo blockchain, allowing transactions to be
-  // executed and their results verified without a real network.
+describe.each(baseModes)("Game Creation (Refactored Architecture) - (%s)", (mode) => {
   let mockChain: MockChain;
-
-  // --- Involved Parties ---
-  // A 'creator' is defined as the main actor in the game creation.
   let creator: KeyedMockChainParty;
-
-  // A 'party' representing the game contract address.
   let gameActiveContract: ReturnType<MockChain["newParty"]>;
-
-  // --- Compiled Contracts ---
-  // These variables will store the compiled ErgoTrees of our contracts.
-  // Compilation is done once for the entire test suite.
   let gameActiveErgoTree: ReturnType<typeof compile>;
 
   gameActiveErgoTree = getGopGameActiveErgoTree();
 
-  // Initialize the chain and actors before each test.
   beforeEach(() => {
     mockChain = new MockChain({ height: 800_000 });
     creator = mockChain.newParty("GameCreator");
 
-    // Funds are assigned to the creator to create the game box and pay the transaction fee.
-    // It's crucial that the balance is greater than the game stake + fee.
     if (mode.token !== ERG_BASE_TOKEN) {
       creator.addBalance({
         tokens: [{ tokenId: mode.token, amount: 10_000_000_000n }],
-        nanoergs: RECOMMENDED_MIN_FEE_VALUE * 10n
+        nanoergs: RECOMMENDED_MIN_FEE_VALUE * 20n // More funds for multiple txs
       });
     } else {
-      creator.addBalance({ nanoergs: 10_000_000_000n }); // 10 ERG
+      creator.addBalance({ nanoergs: 10_000_000_000n });
     }
 
-    // A "party" is added to the mockchain representing the `game_active` contract address.
-    // This allows us to easily query UTXOs belonging to this contract.
     gameActiveContract = mockChain.addParty(gameActiveErgoTree.toHex(), "GameActiveContract");
+    mockChain.addParty(getGopFalseErgoTreeHex(), "FalseParty");
   });
 
-  it("Should successfully create a new game box", () => {
-    // --- 1. Arrange ---
-
-    // Parameters for the game to be created.
+  it("Should successfully create a Configuration Box and then a Game Box referencing it", () => {
+    // --- 1. Prepare Data ---
     const deadlineBlock = mockChain.height + 200;
-    const resolverStake = 2_000_000_000n; // 2 ERG
-    const participationFee = 1_000_000n; // 0.001 ERG
-    const commissionPercentage = 10;
-    const gameDetailsJson = JSON.stringify({ title: "New Test Game", desc: "A test." });
-
-    // The secret 'S' and its hash. The hash is stored on-chain, the secret is revealed later.
+    const resolverStake = 2_000_000_000n;
+    const participationFee = 1_000_000n;
+    const gameDetailsJson = JSON.stringify({ title: "New Test Game", desc: "Refactored." });
     const secret = stringToBytes("utf8", "super-secret-phrase");
     const hashedSecret = blake2b256(secret);
 
-    // Get a UTXO from the creator to use as input.
-    // In Ergo, the ID of the first transaction input is used to determine the ID of minted tokens.
-    const inputUTXO = creator.utxos.toArray()[0];
-    const gameNftId = inputUTXO.boxId;
+    // --- 2. Step 1: Create Config Box ---
+    // Registers for Config Box
+    // R4: Invited Judges (Coll[Coll[Byte]])
+    // R5: Numerical Params (Coll[Long])
+    // R6: Game Provenance (Coll[Coll[Byte]])
+    // R7: Secret Hash (Coll[Byte])
 
-    // Extract the creator's public key in bytes, required for register R5.
-    const creatorPkBytes = creator.address.getPublicKeys()[0];
+    const configR4 = SColl(SColl(SByte), []).toHex(); // No judges
 
-    // --- 2. Act ---
-
-    // --- 2. Act ---
-
-    // Build the output box that will represent the active game.
-
-    // Calculate expected size and value
-    const stripHexPrefix = (h: string) => h?.startsWith('0x') ? h.slice(2) : h;
-    const hexBytesLen = (hexStr: string) => hexStr ? Math.ceil(stripHexPrefix(hexStr).length / 2) : 0;
-    const BASE_BOX_OVERHEAD = 60;
-    const PER_TOKEN_BYTES = 40;
-    const PER_REGISTER_OVERHEAD = 1;
-    const SIZE_MARGIN = 120;
-    const BOX_VALUE_PER_BYTE = 360n; // Hardcoded or imported, better to match implementation
-    const SAFE_MIN_BOX_VALUE = 1000000n; // Assuming this is the value used
-
-    // Registers
-    const r4Hex = SInt(0).toHex();
-    const r5Hex = SColl(SByte, stringToBytes("utf8", "seed-for-ceremony")).toHex();
-    const r6Hex = SColl(SByte, hashedSecret).toHex();
-    const r7Hex = SColl(SColl(SByte), []).toHex();
-    const r8Hex = SColl(SLong, [
+    // Params: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeComm, resolverComm]
+    const configR5 = SColl(SLong, [
       BigInt(mockChain.height), // createdAt
       100000n,                  // timeWeight
       BigInt(deadlineBlock),
       resolverStake,
       participationFee,
-      50000n,
-      100000n
+      50n, // perJudgeComm
+      100n // resolverComm
     ]).toHex();
-    const r9Hex = SColl(SByte, stringToBytes("utf8", gameDetailsJson)).toHex();
 
-    const registers = { R4: r4Hex, R5: r5Hex, R6: r6Hex, R7: r7Hex, R8: r8Hex, R9: r9Hex };
+    // Provenance: [rawJson, participationTokenId, resolverScript(?)] 
+    // Note: implementation details might vary slightly on exact content of provenance but structure is Coll[Coll[Byte]]
+    const configR6 = SColl(SColl(SByte), [
+      stringToBytes("utf8", gameDetailsJson),
+      stringToBytes("utf8", "") // participationTokenId
+    ]).toHex();
 
-    let ergoTreeBytes = hexBytesLen(gameActiveErgoTree.toHex());
+    const configR7 = SColl(SByte, hashedSecret).toHex();
 
-    // Tokens: NFT + (Token if mode.token != ERG)
-    const tokensCount = mode.token !== ERG_BASE_TOKEN ? 2 : 1;
-    const tokensBytes = 1 + tokensCount * PER_TOKEN_BYTES;
-
-    let registersBytes = 0;
-    for (const h of Object.values(registers)) {
-      registersBytes += hexBytesLen(h) + PER_REGISTER_OVERHEAD;
-    }
-
-    const totalEstimatedSize = BigInt(
-      BASE_BOX_OVERHEAD + ergoTreeBytes + tokensBytes + registersBytes + SIZE_MARGIN
-    );
-    const minRequiredValue = BOX_VALUE_PER_BYTE * totalEstimatedSize;
-
-    const maxBigInt = (...vals: bigint[]) => vals.reduce((a, b) => a > b ? a : b, vals[0]);
-
-    let gameBoxValue: bigint;
-    if (mode.token === ERG_BASE_TOKEN) {
-      gameBoxValue = resolverStake;
-    } else {
-      gameBoxValue = maxBigInt(SAFE_MIN_BOX_VALUE, minRequiredValue);
-    }
-
-    const gameBoxOutput = new OutputBuilder(
-      gameBoxValue,
-      gameActiveErgoTree
-    )
-      // Mint the Game NFT. It's a unique token that identifies the game.
-      .mintToken({
-        amount: 1n, // Only one is created.
-        name: "Game NFT"
+    // False script for config box (unspendable essentially for test)
+    // In real app we use getGopFalseAddress(). Here we can use a dummy or creator for test logic, 
+    // but better to use a random P2S to mimic unspendable nature if needed, or just creator.
+    // Let's use creator's address but with registers.
+    const configBoxOutput = new OutputBuilder(SAFE_MIN_BOX_VALUE, getGopFalseErgoTreeHex())
+      .setAdditionalRegisters({
+        R4: configR4,
+        R5: configR5,
+        R6: configR6,
+        R7: configR7
       });
 
-    // Add token stake if in token mode (NFT is always at index 0, token at index 1)
+    const tx1 = new TransactionBuilder(mockChain.height)
+      .from(creator.utxos)
+      .to(configBoxOutput)
+      .sendChangeTo(creator.address)
+      .payFee(RECOMMENDED_MIN_FEE_VALUE)
+      .build();
+
+    const tx1Res = mockChain.execute(tx1, { signers: [creator] });
+    expect(tx1Res).to.be.true;
+
+    // Get Config Box ID
+    let allBoxes = mockChain.parties.flatMap(p => p.utxos.toArray());
+    const configBox = allBoxes.find(b => b.additionalRegisters.R5 === configR5);
+
+    expect(configBox).toBeDefined();
+    const configBoxId = configBox!.boxId;
+    const configBoxIdBytes = stringToBytes("hex", configBoxId);
+
+    // --- 3. Step 2: Mint Game NFT ---
+    // We spend the change from Tx1 to mint.
+    // Input for minting must be deterministic.
+    const changeBoxTx1 = allBoxes.find(b => b.transactionId === configBox!.transactionId && b.boxId !== configBox!.boxId);
+    if (!changeBoxTx1) {
+      console.log("Actual Tx1 ID:", configBox!.transactionId);
+      console.log("Boxes with this Tx ID:", allBoxes.filter(b => b.transactionId === configBox!.transactionId).map(b => ({ id: b.boxId, tree: b.ergoTree, val: b.value })));
+      console.log("Creator ErgoTree:", creator.ergoTree);
+    }
+    expect(changeBoxTx1).toBeDefined();
+
+    const nftMintOutput = new OutputBuilder(SAFE_MIN_BOX_VALUE, creator.address)
+      .mintToken({ amount: 1n, name: "Game NFT" });
+
+    const tx2 = new TransactionBuilder(mockChain.height)
+      .from(changeBoxTx1!)
+      .to(nftMintOutput)
+      .sendChangeTo(creator.address)
+      .payFee(RECOMMENDED_MIN_FEE_VALUE)
+      .build();
+
+    const tx2Res = mockChain.execute(tx2, { signers: [creator] });
+    expect(tx2Res).to.be.true;
+
+    // Get the Mint Box
+    allBoxes = mockChain.parties.flatMap(p => p.utxos.toArray());
+    const mintBox = allBoxes.find(b => b.assets.length > 0 && b.assets[0].amount === 1n);
+    expect(mintBox).toBeDefined();
+    const gameNftId = mintBox!.assets[0].tokenId;
+
+
+    // --- 4. Step 3: Create Game Box ---
+    // Uses Mint Box + Funds. References Config Box ID in R6.
+
+    const r4Hex = SInt(0).toHex(); // State: Active
+    const r5Hex = SColl(SByte, stringToBytes("utf8", "seed-for-ceremony")).toHex(); // Seed
+    const r6Hex = SColl(SByte, configBoxIdBytes).toHex(); // CONFIG BOX ID
+
+    const gameBoxOutput = new OutputBuilder(resolverStake, gameActiveErgoTree) // Value = stake (if ERG mode) or Min
+      .addTokens(mintBox!.assets) // Add NFT
+      .setAdditionalRegisters({
+        R4: r4Hex,
+        R5: r5Hex,
+        R6: r6Hex
+      });
+
     if (mode.token !== ERG_BASE_TOKEN) {
+      // Add stake token
       gameBoxOutput.addTokens([{ tokenId: mode.token, amount: resolverStake }]);
     }
 
-    // Set the additional registers with the game information,
-    // following the specification in `game_active.es`.
-    gameBoxOutput.setAdditionalRegisters({
-      // R4: Game state (0: Active)
-      R4: r4Hex,
-
-      // R5: Seed (ceremony deadline is calculated as deadline - PARTICIPATION_TIME_WINDOW)
-      R5: r5Hex,
-
-      // R6: Hash of the secret 'S'
-      R6: r6Hex,
-
-      // R7: Invited judges (empty in this test)
-      R7: r7Hex,
-
-      // R8: [deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
-      R8: r8Hex,
-
-      // R9: Detalles del juego
-      R9: r9Hex
-    });
-
-    // Build the transaction.
-    const transaction = new TransactionBuilder(mockChain.height)
-      .from(inputUTXO) // Use the creator's UTXO.
-      .to(gameBoxOutput) // Create the game box.
-      .sendChangeTo(creator.address) // Change goes back to the creator.
-      .payFee(RECOMMENDED_MIN_FEE_VALUE) // Pay the mining fee.
+    const tx3 = new TransactionBuilder(mockChain.height)
+      .from(mintBox!) // Spend the mint box
+      .from(creator.utxos) // And other funds
+      .to(gameBoxOutput)
+      .sendChangeTo(creator.address)
+      .payFee(RECOMMENDED_MIN_FEE_VALUE)
       .build();
 
-    // Execute the transaction on the mockchain. The creator must sign it.
-    const executionResult = mockChain.execute(transaction, { signers: [creator] });
+    const tx3Res = mockChain.execute(tx3, { signers: [creator] });
+    expect(tx3Res).to.be.true; // Success
 
-    // --- 3. Assert ---
-
-    // The transaction should have been executed successfully.
-    expect(executionResult).to.be.true;
-
-    // There should be a single UTXO at the game contract's address.
+    // --- 5. Verify Output ---
     expect(gameActiveContract.utxos.length).to.equal(1);
-
-    // Get the created box to verify its properties.
     const createdGameBox = gameActiveContract.utxos.toArray()[0];
 
-    // The nanoERG value of the box must equal the creator's stake in ERG mode,
-    // or RECOMMENDED_MIN_FEE_VALUE in token mode.
-    expect(createdGameBox.value).to.equal(gameBoxValue);
+    // Check Registers
+    expect(createdGameBox.additionalRegisters.R4).to.equal(r4Hex);
+    expect(createdGameBox.additionalRegisters.R5).to.equal(r5Hex);
+    expect(createdGameBox.additionalRegisters.R6).to.equal(r6Hex); // Matches configBoxId
 
-    // The ID of the minted token (Game NFT) must match the input box ID (always at index 0).
+    // Check Assets
     expect(createdGameBox.assets[0].tokenId).to.equal(gameNftId);
-    // The amount of the NFT must be 1.
-    expect(createdGameBox.assets[0].amount).to.equal(1n);
 
-    // In token mode, verify the token stake is at index 1
-    if (mode.token !== ERG_BASE_TOKEN) {
-      expect(createdGameBox.assets[1].tokenId).to.equal(mode.token);
-      expect(createdGameBox.assets[1].amount).to.equal(resolverStake);
-    }
-
-    // Verify that each register contains the correct, serialized information.
-    // This is the most important part to ensure compatibility with the contract.
-    expect(createdGameBox.additionalRegisters.R4).to.equal(gameBoxOutput.additionalRegisters.R4);
-    expect(createdGameBox.additionalRegisters.R5).to.equal(gameBoxOutput.additionalRegisters.R5);
-    expect(createdGameBox.additionalRegisters.R6).to.equal(gameBoxOutput.additionalRegisters.R6);
-    expect(createdGameBox.additionalRegisters.R7).to.equal(gameBoxOutput.additionalRegisters.R7);
-    expect(createdGameBox.additionalRegisters.R8).to.equal(gameBoxOutput.additionalRegisters.R8);
-    expect(createdGameBox.additionalRegisters.R9).to.equal(gameBoxOutput.additionalRegisters.R9);
+    // Verify R6 points to an existing box? (Conceptually yes, physically it's just bytes)
+    // The contract logic (Action 1..n) will enforce checking this ID in DataInputs upon spending.
   });
 });

@@ -2,7 +2,8 @@ import {
     OutputBuilder,
     TransactionBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
-    type Box
+    type Box,
+    type Amount
 } from '@fleet-sdk/core';
 import { SColl, SByte, SPair, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox, pkHexToBase58Address } from '$lib/ergo/utils';
@@ -10,18 +11,25 @@ import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { prependHexPrefix } from '$lib/utils';
 import { stringToBytes } from '@scure/base';
+import { get } from 'svelte/store';
+import { explorer_uri } from '../envs';
 
 declare const ergo: any;
+
+async function fetchBox(boxId: string): Promise<Box<Amount> | null> {
+    try {
+        const res = await fetch(`${get(explorer_uri)}/api/v1/boxes/${boxId}`);
+        if (res.ok) return await res.json();
+        return null;
+    } catch (e) {
+        console.error("Error fetching box:", e);
+        return null;
+    }
+}
 
 /**
  * Permite a cualquier usuario incluir una participación que fue omitida
  * durante la transición inicial a la fase de Resolución.
- *
- * @param game El objeto GameResolution actual.
- * @param omittedParticipation La participación en estado "Submitted" a incluir.
- * @param currentWinnerParticipation La participación ya resuelta del ganador actual.
- * @param newResolverPkHex La clave pública hexadecimal del usuario que ejecuta la acción, quien se convertirá en el nuevo resolver.
- * @returns Una promesa que se resuelve con el ID de la transacción si tiene éxito.
  */
 export async function include_omitted_participation(
     game: GameResolution,
@@ -32,17 +40,26 @@ export async function include_omitted_participation(
 
     console.log(`Intentando incluir la participación omitida ${omittedParticipation.boxId} en el juego: ${game.boxId}`);
 
+    if (!game.configBoxId) throw new Error("Game is missing configBoxId");
+    const configBox = await fetchBox(game.configBoxId);
+    if (!configBox) throw new Error("Could not fetch Config Box");
+
     // --- 1. Verificaciones preliminares ---
     const currentHeight = await ergo.get_current_height();
     if (currentHeight >= game.resolutionDeadline) {
         throw new Error("No se pueden incluir participaciones después de que finalice el período de los jueces.");
     }
 
-    const resolverErgoTree = (((game.resolutionDeadline - game.constants.JUDGE_PERIOD) + game.constants.RESOLVER_OMISSION_NO_PENALTY_PERIOD) < currentHeight) ? prependHexPrefix(hexToBytes(newResolverPkHex)!) : hexToBytes(game.resolverScript_Hex)!;
+    // Check penalization
+    const penalizationThreshold = game.resolutionDeadline - game.constants.JUDGE_PERIOD + game.constants.RESOLVER_OMISSION_NO_PENALTY_PERIOD;
+    const isPenalized = currentHeight > penalizationThreshold;
+    const activeResolverPkBytes = (isPenalized && newResolverPkHex) ? hexToBytes(newResolverPkHex)! : hexToBytes(game.resolverPK_Hex)!;
+
+    if (!activeResolverPkBytes) throw new Error("Could not determine active resolver PK bytes");
 
     // --- 3. Construir las Salidas de la Transacción ---
 
-    const resolutionErgoTree = getGopGameResolutionErgoTreeHex();;
+    const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
 
     const recreatedGameBox = new OutputBuilder(
         BigInt(game.box.value),
@@ -52,6 +69,7 @@ export async function include_omitted_participation(
         .setAdditionalRegisters({
             R4: SInt(1).toHex(), // Preservar estado (1: Resolved)
 
+            // R5: Seed
             R5: SColl(SByte, hexToBytes(game.seed)!).toHex(),
 
             // --- R6: (revealedSecretS, winnerCandidateCommitment) ---
@@ -60,23 +78,18 @@ export async function include_omitted_participation(
                 SColl(SByte, hexToBytes(omittedParticipation.commitmentC_Hex)!)
             ).toHex(),
 
-            // --- R7: participatingJudges: Coll[Coll[Byte]] ---
-            R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
-
-            // --- R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline] ---
-            R8: SColl(SLong, [
-                BigInt(game.createdAt),
-                BigInt(game.timeWeight),
-                BigInt(game.deadlineBlock),
-                BigInt(game.resolverStakeAmount),
-                BigInt(game.participationFeeAmount),
+            // --- R7: [resolutionDeadline, perJudgeCommission, resolverCommission] ---
+            R7: SColl(SLong, [
+                BigInt(game.resolutionDeadline),
                 BigInt(game.perJudgeCommissionPercentage),
-                BigInt(game.resolverCommission),
-                BigInt(game.resolutionDeadline)
+                BigInt(game.resolverCommission)
             ]).toHex(),
 
-            // --- R9: gameProvenance: Coll[Coll[Byte]] (Detalles del juego en JSON/Hex, Participation token id, Script de gasto del resolvedor) ---
-            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.resolverScript_Hex)!]).toHex()
+            // --- R8: resolverPK ---
+            R8: SColl(SByte, activeResolverPkBytes).toHex(),
+
+            // --- R9: configBoxId ---
+            R9: SColl(SByte, hexToBytes(game.configBoxId)!).toHex()
         });
 
     const pBox = parseBox(omittedParticipation.box);
@@ -91,7 +104,10 @@ export async function include_omitted_participation(
     }
     const solverIdBox = omittedParticipation.solverIdBox;
 
-    const dataInputs = currentWinnerParticipation ? [parseBox(currentWinnerParticipation.box), pBox, solverIdBox] : [pBox, solverIdBox];
+    const dataInputs = [configBox, pBox, solverIdBox];
+    if (currentWinnerParticipation) {
+        dataInputs.push(parseBox(currentWinnerParticipation.box));
+    }
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(inputs)

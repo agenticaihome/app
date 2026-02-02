@@ -57,10 +57,12 @@ isDevMode.subscribe(() => {
 function ensureParticipationBatchCompiled(): void {
     if (_participationBatch.ergoTree) return;
     ensureParticipationCompiled();
+    ensureFalseCompiled();
 
     const participationHash = getGopParticipationScriptHash();
     const finalBatchSource = PARTICIPATION_BATCH_SOURCE
-        .replace(/`\+PARTICIPATION_SCRIPT_HASH\+`/g, participationHash);
+        .replace(/`\+PARTICIPATION_SCRIPT_HASH\+`/g, participationHash)
+        .replace(/`\+FALSE_SCRIPT_HASH\+`/g, getGopFalseScriptHash());
 
     _participationBatch.ergoTree = compile(finalBatchSource, { version: ergoTreeVersion });
 }
@@ -70,6 +72,7 @@ function ensureEndGameCompiled(): void {
     ensureParticipationCompiled();
     ensureParticipationBatchCompiled();
     ensureJudgesPaidCompiled();
+    ensureFalseCompiled();
 
     const participationHash = getGopParticipationScriptHash();
     const participationBatchHash = getGopParticipationBatchScriptHash();
@@ -83,7 +86,8 @@ function ensureEndGameCompiled(): void {
         .replace(/`\+JUDGES_PAID_ERGOTREE\+`/g, judgesPaidErgoTree)
         .replace(/`\+MAX_SCORE_LIST\+`/g, constants.MAX_SCORE_LIST.toString())
         .replace(/`\+PARTICIPATION_SCRIPT_HASH\+`/g, participationHash)
-        .replace(/`\+PARTICIPATION_BATCH_SCRIPT_HASH\+`/g, participationBatchHash);
+        .replace(/`\+PARTICIPATION_BATCH_SCRIPT_HASH\+`/g, participationBatchHash)
+        .replace(/`\+FALSE_SCRIPT_HASH\+`/g, getGopFalseScriptHash());
 
     _endGame.ergoTree = compile(source, { version: ergoTreeVersion });
 }
@@ -91,9 +95,11 @@ function ensureEndGameCompiled(): void {
 function ensureParticipationCompiled(): void {
     if (_participation.ergoTree) return;
     const constants = getGameConstants();
+    ensureFalseCompiled();
 
     const finalSource = PARTICIPATION_SOURCE
-        .replace(/`\+GRACE_PERIOD\+`/g, constants.PARTICIPATION_GRACE_PERIOD.toString());
+        .replace(/`\+GRACE_PERIOD\+`/g, constants.PARTICIPATION_GRACE_PERIOD.toString())
+        .replace(/`\+FALSE_SCRIPT_HASH\+`/g, getGopFalseScriptHash());
 
     _participation.ergoTree = compile(finalSource, { version: ergoTreeVersion });
 }
@@ -101,10 +107,12 @@ function ensureParticipationCompiled(): void {
 function ensureGameCancellationCompiled(): void {
     if (_gameCancellation.ergoTree) return;
     const constants = getGameConstants();
+    ensureFalseCompiled();
 
     let source = GAME_CANCELLATION_SOURCE
         .replace(/`\+COOLDOWN_IN_BLOCKS\+`/g, constants.COOLDOWN_IN_BLOCKS.toString())
-        .replace(/`\+STAKE_DENOMINATOR\+`/g, constants.STAKE_DENOMINATOR.toString());
+        .replace(/`\+STAKE_DENOMINATOR\+`/g, constants.STAKE_DENOMINATOR.toString())
+        .replace(/`\+FALSE_SCRIPT_HASH\+`/g, getGopFalseScriptHash());
 
     _gameCancellation.ergoTree = compile(source, { version: ergoTreeVersion });
 }

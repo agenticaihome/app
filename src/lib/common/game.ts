@@ -84,6 +84,7 @@ export interface GameActive {
     reputation: number;
     constants: GameConstants;
     createdAt: number;
+    configBoxId?: string;
 }
 
 /**
@@ -117,6 +118,7 @@ export interface GameResolution {
     constants: GameConstants;
     isEndGame: boolean;
     createdAt: number;
+    configBoxId?: string;
 }
 
 
@@ -144,6 +146,7 @@ export interface GameCancellation {
     constants: GameConstants;
     createdAt?: number;
     timeWeight?: bigint;
+    configBoxId?: string;
 }
 
 /**
@@ -396,16 +399,16 @@ export function calculateEffectiveScore(
     try {
         // Calculate the effective start block: max(B_box, B_start + M)
         const effectiveStartBlock = Math.max(
-            submissionHeight, 
+            submissionHeight,
             game.createdAt + game.constants.MIN_TIME_WEIGHT_MARGIN
         );
 
         // Calculate remaining duration: (B_deadline - effectiveStartBlock)
         const remainingDuration = BigInt(Math.max(0, game.deadlineBlock - effectiveStartBlock));
-        
+
         // Final Score: S_raw * (1 + (omega * remainingDuration))
         const timeFactor = 1n + (BigInt(game.timeWeight) * remainingDuration);
-        
+
         return rawScore * timeFactor;
     }
     catch (error) {

@@ -86,8 +86,10 @@
                     val winnerAuth = {
                         if (winnerCandidateCommitment.size > 0) {
                             val winnerBoxes = CONTEXT.dataInputs.filter({(b:Box) => 
-                                val r5Opt = b.R5[Coll[Byte]]
-                                if (r5Opt.isDefined) r5Opt.get == winnerCandidateCommitment else false
+                                if (b.id != configBoxId) {
+                                    val r5Opt = b.R5[Coll[Byte]]
+                                    if (r5Opt.isDefined) r5Opt.get == winnerCandidateCommitment else false
+                                } else { false }
                             })
                             
                             if (winnerBoxes.size > 0) {

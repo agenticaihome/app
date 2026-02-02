@@ -9,21 +9,27 @@ import { SColl, SByte, SPair, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
-import { stringToBytes } from '@scure/base';
+import { get } from 'svelte/store';
+import { explorer_uri } from '../envs';
+declare const ergo: any;
 
 const JUDGE_PERIOD_MARGIN = 10;
 
-declare const ergo: any;
+async function fetchBox(boxId: string): Promise<Box<Amount> | null> {
+    try {
+        const res = await fetch(`${get(explorer_uri)}/api/v1/boxes/${boxId}`);
+        if (res.ok) return await res.json();
+        return null;
+    } catch (e) {
+        console.error("Error fetching box:", e);
+        return null;
+    }
+}
 
 /**
  * Allows a judge (or group of judges) to invalidate the current winner.
  * This simplified version consumes the invalidated candidate's box, returns their funds
  * to the game pool, and extends the deadline for a new winner to be determined in a subsequent action.
- *
- * @param game The current GameResolution object.
- * @param invalidatedParticipation The participation box of the candidate to be invalidated.
- * @param judgeVoteDataInputs The judges' "vote" boxes, to be used as data-inputs.
- * @returns A promise that resolves with the transaction ID if successful.
  */
 export async function judges_invalidate(
     game: GameResolution,
@@ -32,6 +38,12 @@ export async function judges_invalidate(
 ): Promise<string | null> {
 
     console.log(`Initiating candidate invalidation for the game: ${game.boxId}`);
+
+    if (!game.configBoxId) throw new Error("Game is missing configBoxId");
+
+    // Fetch Config Box
+    const configBox = await fetchBox(game.configBoxId);
+    if (!configBox) throw new Error("Could not fetch Config Box");
 
     // --- 1. Preliminary checks ---
     const currentHeight = await ergo.get_current_height();
@@ -45,6 +57,9 @@ export async function judges_invalidate(
     }
 
     // Check all judge votes
+    // We could check strict validity here against configBox.R4 (judges) if we decoded it, 
+    // but the contract will enforce it.
+    // The previous code checked R4, R5, R6, R8 of the vote box strictly.
     for (const p of judgeVoteDataInputs) {
         const reg = p.additionalRegisters;
 
@@ -54,9 +69,8 @@ export async function judges_invalidate(
             reg.R8 === "false";
 
         if (!valid) {
-            throw new Error("Invalid judge vote [basic].")
+            throw new Error("Invalid judge vote [bad registers].")
         }
-
     }
 
     const requiredVotes = Math.floor(game.judges.length / 2) + 1;
@@ -66,8 +80,10 @@ export async function judges_invalidate(
 
     // --- 3. Prepare data for the new resolution box ---
 
+    // Data Inputs: Config Box + Judge Votes
     const dataInputs = [
-        ...judgeVoteDataInputs.map(e => e)
+        configBox,
+        ...judgeVoteDataInputs
     ];
 
     // Calculate new Value (ERG) and Tokens
@@ -75,7 +91,7 @@ export async function judges_invalidate(
     const newGameBoxValue = BigInt(game.box.value) + BigInt(invalidatedParticipation.box.value);
 
     // Calculate new Token Balances if applicable
-    const gameTokens = [game.box.assets[0]]; // NFT
+    const gameTokens = [game.box.assets[0]]; // NFT (copy structure)
     if (game.participationTokenId !== "") {
         const currentAmount = BigInt(game.box.assets.find(t => t.tokenId === game.participationTokenId)?.amount || 0n);
         const invalidatedAmount = BigInt(invalidatedParticipation.box.assets.find(t => t.tokenId === game.participationTokenId)?.amount || 0n);
@@ -85,46 +101,50 @@ export async function judges_invalidate(
     const newDeadline = BigInt(currentHeight + game.constants.JUDGE_PERIOD + JUDGE_PERIOD_MARGIN);
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
 
+    // Slashing logic
+    const newJudgeComm = BigInt(game.perJudgeCommissionPercentage) + BigInt(game.resolverCommission);
+    const newResolverComm = 0n;
+
     // --- 4. Build the new resolution box ---
     const recreatedGameBox = new OutputBuilder(newGameBoxValue, resolutionErgoTree)
         .addTokens(gameTokens) // Updated tokens list
         .setAdditionalRegisters({
-            // R4
+            // R4: State (1: Resolved)
             R4: SInt(1).toHex(),
 
             // R5: Seed (Coll[Byte])
             R5: SColl(SByte, hexToBytes(game.seed)!).toHex(),
 
             // R6: (revealedSecretS, winnerCandidateCommitment)
+            // Winner is invalidated, so second element is empty/null which typically resets it or contract logic handles "empty"
+            // The contract usually expects an Option[Coll[Byte]] or similar for the commitment.
+            // If we reset to empty, we go back to "no candidate" state within resolution?
+            // The contract logic says R6._2 needs to be a Coll[Byte]. 
+            // In the original code it was set to `SColl(SByte, [])`.
             R6: SPair(
                 SColl(SByte, hexToBytes(game.revealedS_Hex)!),
                 SColl(SByte, [])
             ).toHex(),
 
-            // --- R7: participatingJudges: Coll[Coll[Byte]] ---
-            R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
-
-            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
-            R8: SColl(SLong, [
-                BigInt(game.createdAt),
-                BigInt(game.timeWeight),
-                BigInt(game.deadlineBlock),
-                BigInt(game.resolverStakeAmount),
-                BigInt(game.participationFeeAmount),
-                BigInt(game.perJudgeCommissionPercentage) + BigInt(game.resolverCommission),
-                0n,  // resolver commision goes to judges
-                BigInt(newDeadline)
+            // R7: [resolutionDeadline, effectiveJudgeComm, effectiveResolverComm]
+            R7: SColl(SLong, [
+                newDeadline,
+                newJudgeComm,
+                newResolverComm
             ]).toHex(),
 
-            // R9: gameProvenance: Coll[Coll[Byte]] -> [ rawJsonBytes, participationTokenId, resolverScriptBytes ]
-            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.resolverScript_Hex)!]).toHex(),
+            // R8: resolverPK
+            R8: SColl(SByte, hexToBytes(game.resolverPK_Hex)!).toHex(),
+
+            // R9: configBoxId
+            R9: SColl(SByte, hexToBytes(game.configBoxId)!).toHex(),
         });
 
     // --- 5. Build and Submit the Transaction ---
     const userAddress = await ergo.get_change_address();
-    const utxos: InputBox[] = await ergo.get_utxos();
+    const utxos: Box<Amount>[] = await ergo.get_utxos();
 
-    // Inputs: the resolution box, the invalidated participant's box, and the judge's UTXOs
+    // Inputs: the resolution box, the invalidated participant's box
     const inputs = [parseBox(game.box), parseBox(invalidatedParticipation.box), ...utxos];
 
     try {

@@ -8,13 +8,13 @@ import {
     type Box,
     type Amount
 } from '@fleet-sdk/core';
-import { SColl, SLong, SInt, SByte, SPair } from '@fleet-sdk/serializer';
+import { SColl, SLong, SInt, SByte, SPair, serializeBox } from '@fleet-sdk/serializer';
 declare const ergo: any;
-import { hexToBytes } from '$lib/ergo/utils';
-import { getGopGameActiveErgoTreeHex, getGopMintIdtAddress } from '../contract';
+import { hexToBytes, uint8ArrayToHex } from '$lib/ergo/utils';
+import { getGopGameActiveErgoTreeHex, getGopMintIdtAddress, getGopFalseAddress } from '../contract';
 import { stringToBytes } from '@scure/base';
 import { getGameConstants } from '$lib/common/constants';
-import { estimateTotalBoxSizeFromInputs, MAX_BOX_SIZE, type GameBoxInputs } from '../utils/box-size-calculator';
+import { MAX_BOX_SIZE } from '../utils/box-size-calculator';
 
 function randomSeed(): string {
     const array = new Uint8Array(32);
@@ -26,17 +26,7 @@ function randomSeed(): string {
 }
 
 /**
- * Creates a transaction to generate a game box in the "GameActive" state.
- * @param gameServiceId - Service ID
- * @param hashedSecret - The Blake2b256 hash of the secret 'S'.
- * @param deadlineBlock - The block height at which the game ends.
- * @param resolverStakeAmount - The amount of ERG the resolver stakes.
- * @param participationFeeAmount - The fee for players to participate.
- * @param commissionPercentage - The commission percentage for the creator
- * @param judges - An array of reputation token IDs for invited judges.
- * @param gameDetailsJson - A JSON string with game details.
- * @param perJudgeCommissionPercentage - The commission percentage for each judge.
- * @returns The ID of the submitted transaction.
+ * Creates transactions to generate a game with Config Box architecture.
  */
 export async function create_game(
     gameServiceId: string,
@@ -65,105 +55,38 @@ export async function create_game(
         console.warn("Failed to parse game details JSON", e);
     }
 
-    console.log("Attempting to create a game:", {
+    console.log("Attempting to create a game (Refactored):", {
         hashedSecret: hashedSecret.substring(0, 10) + "...",
         deadlineBlock,
         resolverStakeAmount: resolverStakeAmount.toString(),
         judges,
-        gameDetailsJsonBrief: gameDetailsJson.substring(0, 100) + "...",
-        seedHex: seedHex.substring(0, 10) + "...",
     });
 
-    // --- 1. Data and Address Preparation ---
+    // --- 1. Address and Inputs ---
     const creatorAddressString = await ergo.get_change_address();
-    if (!creatorAddressString) {
-        throw new Error("Could not get the creator's address from the wallet.");
-    }
-    const creatorP2PKAddress = ErgoAddress.fromBase58(creatorAddressString);
-    const creatorPkBytes = creatorP2PKAddress.getPublicKeys()[0];
-    if (!creatorPkBytes) {
-        throw new Error(`Could not extract the public key from the address ${creatorAddressString}.`);
-    }
+    if (!creatorAddressString) throw new Error("Could not get creator address.");
 
     const inputs: Box<Amount>[] = await ergo.get_utxos();
-    if (!inputs || inputs.length === 0) {
-        throw new Error("No UTXOs found in the wallet to create the game.");
-    }
+    if (!inputs || inputs.length === 0) throw new Error("No UTXOs found.");
 
-    // Ensure deterministic token ID by using the first input
-    const issuanceBox = inputs[0];
-    const mintInputs = [issuanceBox, ...inputs.filter((b: any) => b.boxId !== issuanceBox.boxId)];
-    const gameTokenId = issuanceBox.boxId;
+    const creationHeight = await ergo.get_current_height();
 
-    // --- 2. Game Box Construction ---
-
-    const activeGameErgoTree = getGopGameActiveErgoTreeHex();
+    // --- 2. Prepare Data ---
     const hashedSecretBytes = hexToBytes(hashedSecret);
-    if (!hashedSecretBytes) throw new Error("Failed to convert the hashedSecret to bytes.");
+    if (!hashedSecretBytes) throw new Error("Invalid hashedSecret bytes");
 
     const seedBytes = hexToBytes(seedHex);
-    if (!seedBytes) throw new Error("Failed to convert the seedHex to bytes.");
-
-    const ceremonyDeadlineBlock = deadlineBlock - getGameConstants().PARTICIPATION_TIME_WINDOW;
-    const currentHeight = await ergo.get_current_height();
-
-    if (currentHeight >= ceremonyDeadlineBlock) {
-        throw new Error(`Current height (${currentHeight}) is past the ceremony deadline (${ceremonyDeadlineBlock}). Increase the deadline or reduce the participation time window.`)
-    }
+    if (!seedBytes) throw new Error("Invalid seed bytes");
 
     const gameDetailsBytes = stringToBytes("utf8", gameDetailsJson);
-
-    const judgesColl = judges
-        .map(judgeId => {
-            const bytes = hexToBytes(judgeId);
-            return bytes ? [...bytes] : null;
-        })
-        .filter((item): item is number[] => item !== null);
-
     const participationTokenIdBytes = participationTokenId ? hexToBytes(participationTokenId)! : new Uint8Array(0);
-    if (participationTokenId && !participationTokenIdBytes) throw new Error("Failed to convert participationTokenId to bytes.");
 
-    // --- Box Size Validation using centralized calculator ---
-    const boxSizeInputs: GameBoxInputs = {
-        seedBytes: seedBytes,
-        ceremonyDeadlineBlock: ceremonyDeadlineBlock,
-        hashedSecretBytes: hashedSecretBytes,
-        judgesColl: judgesColl,
-        deadlineBlock: deadlineBlock,
-        resolverStakeAmount: resolverStakeAmount,
-        participationFeeAmount: participationFeeAmount,
-        perJudgeCommissionPercentage: Math.round(perJudgeCommissionPercentage * 10000),
-        commissionPercentage: Math.round(commissionPercentage * 10000),
-        gameDetailsBytes: gameDetailsBytes,
-        participationTokenIdBytes: participationTokenIdBytes
-    };
+    const judgesColl = judges.map(j => hexToBytes(j)!).filter(b => b !== null);
 
-    const sizeResult = estimateTotalBoxSizeFromInputs(boxSizeInputs);
-    if (!sizeResult) {
-        throw new Error("Failed to calculate box sizes. The box might be too large or contain invalid data.");
-    }
-
-    console.log("Box sizes calculated:", {
-        activeSize: sizeResult.activeSize,
-        resolutionSize: sizeResult.resolutionSize,
-        cancelledSize: sizeResult.cancelledSize,
-        maxSize: sizeResult.maxSize
-    });
-
-    if (sizeResult.maxSize > MAX_BOX_SIZE) {
-        throw new Error(
-            `The maximum box size (${sizeResult.maxSize} bytes) exceeds the limit of ${MAX_BOX_SIZE} bytes. ` +
-            `Active: ${sizeResult.activeSize}, Resolution: ${sizeResult.resolutionSize}, Cancelled: ${sizeResult.cancelledSize} bytes.`
-        );
-    }
-
-    // Registers preparation (using the same data as the calculator)
-    const creationHeight = await ergo.get_current_height();
-    const r4Hex = SInt(0).toHex();
-    const r5Hex = SColl(SByte, seedBytes).toHex();
-    const r6Hex = SColl(SByte, hashedSecretBytes).toHex();
-    const r7Hex = SColl(SColl(SByte), judgesColl).toHex();
-    const r8Hex = SColl(SLong, [
+    // --- 3. Build Config Box (Tx 1) ---
+    // R4: judges, R5: params, R6: provenance, R7: secretHash
+    const configR4 = SColl(SColl(SByte), judgesColl).toHex();
+    const configR5 = SColl(SLong, [
         BigInt(creationHeight),
         timeWeight,
         BigInt(deadlineBlock),
@@ -172,38 +95,60 @@ export async function create_game(
         BigInt(Math.round(perJudgeCommissionPercentage * 10000)),
         BigInt(Math.round(commissionPercentage * 10000))
     ]).toHex();
-    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes]).toHex();
+    const configR6 = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes]).toHex();
+    const configR7 = SColl(SByte, hashedSecretBytes).toHex();
 
-    const registers = {
-        R4: r4Hex,
-        R5: r5Hex,
-        R6: r6Hex,
-        R7: r7Hex,
-        R8: r8Hex,
-        R9: r9Hex
+    const configFalseAddress = getGopFalseAddress();
+    const configErgoTreeHex = configFalseAddress.ergoTree;
+
+    // Calculate mimimum value for Config Box
+    const dummyConfigBox = {
+        value: safeMinBoxValue(0), // Placeholder
+        ergoTree: configErgoTreeHex,
+        creationHeight: creationHeight,
+        assets: [],
+        additionalRegisters: {
+            R4: configR4, R5: configR5, R6: configR6, R7: configR7
+        }
     };
+    const configBoxSize = serializeBox(dummyConfigBox).length;
+    const configBoxValue = BigInt(configBoxSize) * BOX_VALUE_PER_BYTE + SAFE_MIN_BOX_VALUE; // Add margin
 
+    const configBoxOutput = new OutputBuilder(configBoxValue, configFalseAddress)
+        .setAdditionalRegisters({
+            R4: configR4, R5: configR5, R6: configR6, R7: configR7
+        });
 
+    // Build Tx 1 (Config)
+    // We use all inputs, send change to creator. The change box will be input for Tx 2.
+    const unsignedTxConfig = new TransactionBuilder(creationHeight)
+        .from(inputs)
+        .to(configBoxOutput)
+        .sendChangeTo(creatorAddressString)
+        .payFee(RECOMMENDED_MIN_FEE_VALUE)
+        .build();
 
-    const gameTokens = [{
-        tokenId: participationTokenId,
-        amount: resolverStakeAmount
-    }];
+    const configBoxId = unsignedTxConfig.outputs[0].boxId;
+    const configBoxIdBytes = hexToBytes(configBoxId);
+    if (!configBoxIdBytes) throw new Error("Failed to get Config Box ID bytes");
 
-    // Use the maximum size to determine the safe minimum value
-    const minRequiredValue = BigInt(sizeResult.maxSize) * BOX_VALUE_PER_BYTE;
+    console.log("Planned Config Box ID:", configBoxId);
 
-    // Token Mode
-    const maxBigInt = (...vals: bigint[]) => vals.reduce((a, b) => a > b ? a : b, vals[0]);
-    const gameValue = maxBigInt(SAFE_MIN_BOX_VALUE, minRequiredValue);
+    // --- 4. Build Mint & Game Transactions (Chained) ---
+    // Tx 2 (Mint) consumes Tx 1 Change.
+    // Tx 3 (Game) consumes Tx 2 Mint Output.
 
-    // --- Tx A Output: Mint Box locked by mint_idt.es ---
-    const mintIdtAddress = getGopMintIdtAddress();
+    // 1. Config Tx (Already built: unsignedTxConfig)
 
-    const mintOutput = new OutputBuilder(
-        SAFE_MIN_BOX_VALUE,
-        mintIdtAddress
-    )
+    // 2. Mint Tx
+    // We need to verify that Tx 1 produced a change box with the creator's ergoTree
+    const creatorErgoTree = ErgoAddress.fromBase58(creatorAddressString).ergoTree;
+    const tx1ChangeBox = unsignedTxConfig.outputs.find(o => o.ergoTree === creatorErgoTree);
+
+    if (!tx1ChangeBox) throw new Error("Tx 1 did not produce a change output to fund Tx 2. Try adding more inputs.");
+    const mintTokenId = tx1ChangeBox.boxId; // The ID of the input box for Mint Tx
+
+    const mintOutput = new OutputBuilder(SAFE_MIN_BOX_VALUE, getGopMintIdtAddress())
         .mintToken({
             amount: 1n,
             name: gameTitle,
@@ -211,54 +156,63 @@ export async function create_game(
             description: gameDescription
         });
 
-    // --- Tx B Output: Game Box ---
-    const gameBoxOutput = new OutputBuilder(
-        gameValue,
-        activeGameErgoTree
-    )
-        .addTokens([
-            { tokenId: gameTokenId, amount: 1n }, // The minted NFT
-            ...gameTokens // Participation tokens
-        ])
-        .setAdditionalRegisters(registers);
-
-    // --- 3. Transaction Construction and Submission ---
-    // Build a chained bundle (Tx A -> Tx B). Wallet signs once.
-    const unsignedTransactions = await new TransactionBuilder(creationHeight)
-        // CRITICAL: force issuanceBox to be INPUTS(0) so minted token id is deterministic.
-        .from(mintInputs)
+    const unsignedTxMint = new TransactionBuilder(creationHeight)
+        .from(tx1ChangeBox)
         .to(mintOutput)
-        .sendChangeTo(creatorAddressString)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
-        .build()
-        .chain(function (builder, parent) {
+        .sendChangeTo(creatorAddressString)
+        .build();
 
-            console.log("Chaining game creation transaction...")
-            console.log("Parent ", parent)
+    // 3. Game Tx
+    const activeGameErgoTree = getGopGameActiveErgoTreeHex();
 
-            return builder
-                .from(parent.outputs[0]) // Spend the mint output
-                // CRITICAL: `mint_idt.es` requires the game box to be OUTPUTS(0) of Tx B.
-                .to(gameBoxOutput)
-                .payFee(RECOMMENDED_MIN_FEE_VALUE)
-                .sendChangeTo(creatorAddressString)
-                .build()
-        }
-        )
-        .toEIP12Object();
+    // Game Box Registers
+    const gameR4 = SInt(0).toHex();
+    const gameR5 = SColl(SByte, seedBytes).toHex();
+    const gameR6 = SColl(SByte, configBoxIdBytes).toHex();
 
-    console.log("Unsigned chained transactions: ", unsignedTransactions);
+    // Calculate Game Box Size/Value
+    const dummyGameBox = {
+        value: safeMinBoxValue(0),
+        ergoTree: activeGameErgoTree,
+        creationHeight,
+        assets: [{ tokenId: "00".repeat(32), amount: 1n }, { tokenId: participationTokenId, amount: resolverStakeAmount }],
+        additionalRegisters: { R4: gameR4, R5: gameR5, R6: gameR6 }
+    };
+    const gameBoxSize = serializeBox(dummyGameBox).length;
+    const gameBoxValue = BigInt(gameBoxSize) * BOX_VALUE_PER_BYTE + SAFE_MIN_BOX_VALUE;
 
-    const transactionIds: string[] = [];
+    const mintBox = unsignedTxMint.outputs[0];
+    const gameBoxOutput = new OutputBuilder(gameBoxValue, activeGameErgoTree)
+        .addTokens([
+            { tokenId: mintTokenId, amount: 1n },
+            { tokenId: participationTokenId, amount: resolverStakeAmount }
+        ])
+        .setAdditionalRegisters({ R4: gameR4, R5: gameR5, R6: gameR6 });
 
-    // Sign and submit sequentially
-    for (const tx of unsignedTransactions) {
-        const signed = await ergo.sign_tx(tx);
+    const unsignedTxGame = new TransactionBuilder(creationHeight)
+        .from(mintBox)
+        .to(gameBoxOutput)
+        .payFee(RECOMMENDED_MIN_FEE_VALUE)
+        .sendChangeTo(creatorAddressString)
+        .build();
+
+    // Sign and Submit All
+    const unsignedTxs = [unsignedTxConfig, unsignedTxMint, unsignedTxGame];
+    const txIds: string[] = [];
+
+    console.log("Submitting chain of 3 transactions...");
+
+    for (const unsignedTx of unsignedTxs.map(t => t.toEIP12Object())) {
+        const signed = await ergo.sign_tx(unsignedTx);
         const txId = await ergo.submit_tx(signed);
-        transactionIds.push(txId);
-        console.log("Submitted transaction id -> ", txId);
+        console.log(`Submitted Tx: ${txId}`);
+        txIds.push(txId);
     }
 
-    console.log(`Game creation transactions submitted successfully. IDs: ${transactionIds.join(", ")}`);
-    return transactionIds;
+    return txIds;
+}
+
+function safeMinBoxValue(size: number): bigint {
+    return BigInt(Math.max(Number(SAFE_MIN_BOX_VALUE), size * Number(BOX_VALUE_PER_BYTE)));
 }

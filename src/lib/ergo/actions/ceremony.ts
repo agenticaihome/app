@@ -15,14 +15,6 @@ declare const ergo: any;
 
 /**
  * Ejecuta la acción "Open Ceremony" (action3_openCeremony) para un juego activo.
- * * Esta acción permite a cualquiera "re-gastar" la caja del juego antes del
- * 'ceremonyDeadline' para actualizar la semilla del juego (gameSeed), 
- * añadiendo así entropía.
- * * La nueva semilla se calcula como:
- * updated_seed = blake2b256(old_seed ++ INPUTS(0).id)
- * * Todos los demás registros y valores de la caja se preservan.
- * * @param game El objeto GameActive (caja a consumir).
- * @returns El ID de la transacción si tiene éxito.
  */
 export async function contribute_to_ceremony(
     game: GameActive,
@@ -44,6 +36,8 @@ export async function contribute_to_ceremony(
         throw new Error(`La caja del juego tiene un valor (${gameBoxToSpend.value}) inferior al mínimo seguro (${SAFE_MIN_BOX_VALUE}).`);
     }
 
+    if (!game.configBoxId) throw new Error("Game is missing configBoxId");
+
     // 2. --- Calcular el nuevo estado ---
 
     const oldSeedBytes = hexToBytes(game.seed);
@@ -53,7 +47,6 @@ export async function contribute_to_ceremony(
     if (!inputBoxIdBytes) throw new Error("Box ID del juego inválido.");
 
     // Calcular: updated_seed = blake2b256(old_seed ++ INPUTS(0).id)
-    // INPUTS(0).id es game.boxId
     const combinedBytes = new Uint8Array(oldSeedBytes.length + inputBoxIdBytes.length);
     combinedBytes.set(oldSeedBytes);
     combinedBytes.set(inputBoxIdBytes, oldSeedBytes.length);
@@ -64,46 +57,21 @@ export async function contribute_to_ceremony(
     console.log(`Seed nuevo: ${uint8ArrayToHex(updatedSeedBytes)}`);
 
     // 3. --- Reconstruir Registros ---
-    // Todos los registros deben ser idénticos, excepto R5._1
-
     // R4: Sigue en estado 0 (Activo)
     const r4Hex = SInt(0).toHex();
 
     // R5: updated_seed (Coll[Byte])
     const r5Hex = SColl(SByte, updatedSeedBytes).toHex();
 
-    // R6: secretHash (se mantiene)
-    const r6Hex = SColl(SByte, hexToBytes(game.secretHash)!).toHex();
-
-    // R7: invitedJudges (se mantiene)
-    const r7Hex = SColl(
-        SColl(SByte),
-        game.judges.map(tokenId => hexToBytes(tokenId)!)
-    ).toHex();
-
-    // R8: numericalParameters (se mantiene)
-    const numericalParams = [
-        BigInt(game.createdAt),
-        game.timeWeight,
-        BigInt(game.deadlineBlock),
-        game.resolverStakeAmount,
-        game.participationFeeAmount,
-        game.perJudgeCommissionPercentage,
-        BigInt(game.commissionPercentage)
-    ];
-    const r8Hex = SColl(SLong, numericalParams).toHex();
-
-    const r9 = [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? ""];
-    console.log(`R9 values (bytes):`, r9);
-    // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
-    const r9Hex = SColl(SColl(SByte), r9).toHex()
+    // R6: configBoxId (Coll[Byte])
+    const r6Hex = SColl(SByte, hexToBytes(game.configBoxId)!).toHex();
 
     // 4. --- Construir la Caja de Salida ---
 
     // Preparar tokens
-    const currentTokens = gameBoxToSpend.assets.map(a => ({ ...a }));
+    const currentTokens = gameBoxToSpend.assets.map((a: any) => ({ ...a }));
     if (donation > 0n && game.participationTokenId) {
-        const index = currentTokens.findIndex(t => t.tokenId === game.participationTokenId);
+        const index = currentTokens.findIndex((t: any) => t.tokenId === game.participationTokenId);
         if (index !== -1) {
             currentTokens[index].amount = (BigInt(currentTokens[index].amount) + donation).toString();
         } else {
@@ -122,10 +90,7 @@ export async function contribute_to_ceremony(
         .setAdditionalRegisters({
             R4: r4Hex,
             R5: r5Hex,
-            R6: r6Hex,
-            R7: r7Hex,
-            R8: r8Hex,
-            R9: r9Hex
+            R6: r6Hex
         });
 
     // 5. --- Construir y Enviar la Transacción ---

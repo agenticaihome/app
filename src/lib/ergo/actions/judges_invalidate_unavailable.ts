@@ -9,21 +9,25 @@ import { SColl, SByte, SPair, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
-import { stringToBytes } from '@scure/base';
-
+import { get } from 'svelte/store';
+import { explorer_uri } from '../envs';
+declare const ergo: any;
 const JUDGE_PERIOD_MARGIN = 10;
 
-declare const ergo: any;
+async function fetchBox(boxId: string): Promise<Box<Amount> | null> {
+    try {
+        const res = await fetch(`${get(explorer_uri)}/api/v1/boxes/${boxId}`);
+        if (res.ok) return await res.json();
+        return null;
+    } catch (e) {
+        console.error("Error fetching box:", e);
+        return null;
+    }
+}
 
 /**
  * Allows a judge (or group of judges) to mark the current winner as unavailable.
  * This is similar to invalidation but does not penalize the resolver.
- * The participation is invalidated but the resolver's stake is not affected.
- *
- * @param game The current GameResolution object.
- * @param invalidatedParticipation The participation box of the candidate to be marked as unavailable.
- * @param judgeVoteDataInputs The judges' "vote" boxes, to be used as data-inputs.
- * @returns A promise that resolves with the transaction ID if successful.
  */
 export async function judges_invalidate_unavailable(
     game: GameResolution,
@@ -32,6 +36,10 @@ export async function judges_invalidate_unavailable(
 ): Promise<string | null> {
 
     console.log(`Initiating candidate unavailable marking for the game: ${game.boxId}`);
+
+    if (!game.configBoxId) throw new Error("Game is missing configBoxId");
+    const configBox = await fetchBox(game.configBoxId);
+    if (!configBox) throw new Error("Could not fetch Config Box");
 
     // --- 1. Preliminary checks ---
     const currentHeight = await ergo.get_current_height();
@@ -47,10 +55,6 @@ export async function judges_invalidate_unavailable(
     // Check all judge votes - they should be for PARTICIPATION_UNAVAILABLE_TYPE_ID
     for (const p of judgeVoteDataInputs) {
         const reg = p.additionalRegisters;
-
-        console.log("Regs ", reg)
-
-        // TODO CHECK.
         const valid = reg.R4 === "0e20" + game.constants.PARTICIPATION_UNAVAILABLE_TYPE_ID &&
             reg.R5 === "0e20" + game.winnerCandidateCommitment;
 
@@ -59,7 +63,6 @@ export async function judges_invalidate_unavailable(
             console.log(reg.R5)
             throw new Error("Invalid judge vote for unavailable marking.")
         }
-
     }
 
     const requiredVotes = Math.floor(game.judges.length / 2) + 1;
@@ -70,11 +73,10 @@ export async function judges_invalidate_unavailable(
     // --- 3. Prepare data for the new resolution box ---
 
     const dataInputs = [
-        ...judgeVoteDataInputs.map(e => e)
+        configBox,
+        ...judgeVoteDataInputs
     ];
 
-    // Calculate new Value (ERG) and Tokens
-    // We sum the raw box values (nanoErgs) to preserve safe mins.
     const newGameBoxValue = BigInt(game.box.value) + BigInt(invalidatedParticipation.box.value);
 
     // Calculate new Token Balances if applicable
@@ -88,50 +90,36 @@ export async function judges_invalidate_unavailable(
     const newDeadline = BigInt(currentHeight + game.constants.JUDGE_PERIOD + JUDGE_PERIOD_MARGIN);
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
 
+    // R7 values (No penalty)
+    const newJudgeComm = BigInt(game.perJudgeCommissionPercentage);
+    const newResolverComm = BigInt(game.resolverCommission);
+
     // --- 4. Build the new resolution box ---
     const recreatedGameBox = new OutputBuilder(newGameBoxValue, resolutionErgoTree)
         .addTokens(gameTokens) // Updated tokens list
         .setAdditionalRegisters({
-            // R4
             R4: SInt(1).toHex(),
-
-            // R5: Seed (Coll[Byte])
             R5: SColl(SByte, hexToBytes(game.seed)!).toHex(),
-
-            // R6: (revealedSecretS, winnerCandidateCommitment)
             R6: SPair(
                 SColl(SByte, hexToBytes(game.revealedS_Hex)!),
-                SColl(SByte, [])
+                SColl(SByte, []) // Empty commitment
             ).toHex(),
-
-            // --- R7: participatingJudges: Coll[Coll[Byte]] ---
-            R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
-
-            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
-            R8: SColl(SLong, [
-                BigInt(game.createdAt),
-                BigInt(game.timeWeight),
-                BigInt(game.deadlineBlock),
-                BigInt(game.resolverStakeAmount),
-                BigInt(game.participationFeeAmount),
-                BigInt(game.perJudgeCommissionPercentage),
-                BigInt(game.resolverCommission),  // Resolver commission is NOT penalized in unavailable case
-                BigInt(newDeadline)
+            R7: SColl(SLong, [
+                newDeadline,
+                newJudgeComm,
+                newResolverComm
             ]).toHex(),
-
-            // R9: gameProvenance: Coll[Coll[Byte]] -> [ rawJsonBytes, participationTokenId, resolverScriptBytes ]
-            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.resolverScript_Hex)!]).toHex(),
+            R8: SColl(SByte, hexToBytes(game.resolverPK_Hex)!).toHex(),
+            R9: SColl(SByte, hexToBytes(game.configBoxId)!).toHex(),
         });
 
     // --- 5. Build and Submit the Transaction ---
     const userAddress = await ergo.get_change_address();
-    const utxos: InputBox[] = await ergo.get_utxos();
+    const utxos: Box<Amount>[] = await ergo.get_utxos();
 
-    // Inputs: the resolution box, the invalidated participant's box, and the judge's UTXOs
     const inputs = [parseBox(game.box), parseBox(invalidatedParticipation.box), ...utxos];
 
     try {
-
         const unsignedTransaction = new TransactionBuilder(currentHeight)
             .from(inputs)
             .to(recreatedGameBox)

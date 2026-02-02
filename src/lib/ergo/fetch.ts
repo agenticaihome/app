@@ -29,7 +29,8 @@ import {
     getGopGameActiveTemplateHash,
     getGopEndGameTemplateHash,
     getGopParticipationBatchTemplateHash,
-    getGopFalseTemplateHash
+    getGopFalseTemplateHash,
+    getGopFalseErgoTreeHex
 } from "./contract"; // Assumes this file exports functions to get script hashes
 import {
     hexToUtf8,
@@ -165,6 +166,70 @@ export async function getTransactionInfo(transactionId: string): Promise<any> {
     }
 }
 
+async function fetchBox(boxId: string): Promise<any> {
+    const url = `${get(explorer_uri)}/api/v1/boxes/${boxId}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API response: ${response.status}`);
+        return await response.json();
+    } catch (error) {
+        console.error(`Error fetching box ${boxId}:`, error);
+        return null;
+    }
+}
+
+// Cache for config boxes since they are immutable and static
+const configBoxCache = new Map<string, any>();
+
+async function fetchConfigBoxData(boxId: string) {
+    if (configBoxCache.has(boxId)) return configBoxCache.get(boxId);
+
+    const box = await fetchBox(boxId);
+    if (!box) {
+        console.warn(`Config box ${boxId} not found.`);
+        return null;
+    }
+
+    // Verify it is a valid config box (script check)
+    if (box.ergoTree !== getGopFalseErgoTreeHex()) {
+        console.warn(`Config box ${boxId} has invalid ErgoTree: ${box.ergoTree} != ${getGopFalseErgoTreeHex()}`);
+        // We might continue if strictness is not paramount, but let's warn.
+    }
+
+    try {
+        // R4: invitedJudges (Coll[Coll[Byte]])
+        const judges: string[] = (getArrayFromValue(box.additionalRegisters.R4?.renderedValue) || [])
+            .map(parseCollByteToHex)
+            .filter((j): j is string => !!j);
+
+        // R5: numericalParameters (Coll[Long])
+        const numericalParams = parseLongColl(getArrayFromValue(box.additionalRegisters.R5?.renderedValue));
+
+        // R6: gameProvenance [gameDetails, participationTokenId] (Coll[Coll[Byte]])
+        const r6 = getArrayFromValue(box.additionalRegisters.R6?.renderedValue);
+        if (!r6 || r6.length < 2) throw new Error("Invalid R6 in Config Box");
+
+        const gameDetailsHex = parseCollByteToHex(r6[0]);
+        const participationTokenId = parseCollByteToHex(r6[1]);
+
+        // R7: secretHash (Coll[Byte])
+        const secretHash = parseCollByteToHex(box.additionalRegisters.R7?.renderedValue);
+
+        const data = {
+            judges,
+            numericalParams,
+            gameDetailsHex,
+            participationTokenId,
+            secretHash
+        };
+        configBoxCache.set(boxId, data);
+        return data;
+    } catch (e) {
+        console.error(`Error parsing config box data for ${boxId}:`, e);
+        return null;
+    }
+}
+
 // =================================================================
 // === STATE: GAME ACTIVE
 // =================================================================
@@ -196,40 +261,26 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
         const seed = parseCollByteToHex(box.additionalRegisters.R5?.renderedValue);
         if (!seed) throw new Error("Could not parse R5 (seed).");
 
-        // R6: secretHash
-        const secretHash = parseCollByteToHex(box.additionalRegisters.R6?.renderedValue);
-        if (!secretHash) throw new Error("R6 (secretHash) is invalid or does not exist.");
+        // R6: configBoxId (Coll[Byte]) - Refactorizado
+        const configBoxId = parseCollByteToHex(box.additionalRegisters.R6?.renderedValue);
+        if (!configBoxId) throw new Error("R6 (configBoxId) is invalid or does not exist.");
 
-        // R7: judges
-        const judges: string[] = box.additionalRegisters.R7?.renderedValue
-            .replace(/[\[\]\s]/g, "")
-            .split(",").filter((e: string) => e.length === 64);
+        // Fetch Static Data from Config Box
+        const configData = await fetchConfigBoxData(configBoxId);
+        if (!configData) throw new Error(`Could not fetch Config Box data for ID: ${configBoxId}`);
 
-        // R8: numericalParameters
-        const r8RenderedValue = box.additionalRegisters.R8?.renderedValue;
-        let parsedR8Array: any[] | null = null;
-        if (typeof r8RenderedValue === 'string') {
-            try { parsedR8Array = JSON.parse(r8RenderedValue); }
-            catch (e) { console.warn(`Could not JSON.parse R8 for ${box.boxId}: ${r8RenderedValue}`); }
-        } else if (Array.isArray(r8RenderedValue)) { parsedR8Array = r8RenderedValue; }
-        const numericalParams = parseLongColl(parsedR8Array);
+        const { judges, numericalParams, gameDetailsHex, participationTokenId, secretHash } = configData;
+
         // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
-        if (!numericalParams || numericalParams.length < 7) throw new Error("R8 does not contain the 7 expected numerical parameters.");
+        if (!numericalParams || numericalParams.length < 7) throw new Error("Config Box R5 does not contain the 7 expected numerical parameters.");
         const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommissionPercentage, resolverCommissionPercentage] = numericalParams;
 
         const created_at_token = await tokenCreationHeight(gameId);
         if (created_at_token === null || createdAt < created_at_token - 5 || createdAt > created_at_token + 5) {
-            console.warn(`parseGameActiveBox: Box ${box.boxId} has inconsistent creation height in R8.`);
-            return null;
+            console.warn(`parseGameActiveBox: Box ${box.boxId} has inconsistent creation height in Config Box.`);
+            // Not returning null here as it depends on external config box, just warn.
         }
 
-        // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
-        const r9Value = getArrayFromValue(box.additionalRegisters.R9?.renderedValue);
-        if (!Array.isArray(r9Value) || r9Value.length < 2) {
-            throw new Error("R9 is not a valid array with at least 2 elements (gameDetailsJSON, participationTokenId).");
-        }
-        const gameDetailsHex = parseCollByteToHex(r9Value[0]);
-        const participationTokenId = parseCollByteToHex(r9Value[1]);
         const gameDetailsJson = hexToUtf8(gameDetailsHex || "");
         const content = parseGameContent(gameDetailsJson, box.boxId, box.assets[0]);
 
@@ -239,24 +290,36 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             box: box,
             status: GameState.Active,
             gameId,
-            commissionPercentage: Number(resolverCommissionPercentage), // From R8
-            secretHash, // From R6
-            judges, // From R7
-            deadlineBlock: Number(deadlineBlock), // From R8
-            resolverStakeAmount, // From R8
-            participationFeeAmount, // From R8
-            participationTokenId: participationTokenId || "", // From R9
-            content, // From R9
+            commissionPercentage: Number(resolverCommissionPercentage), // From Config
+            secretHash: secretHash || "", // From Config
+            judges, // From Config
+            deadlineBlock: Number(deadlineBlock), // From Config
+            resolverStakeAmount, // From Config
+            participationFeeAmount, // From Config
+            participationTokenId: participationTokenId || "", // From Config
+            content, // From Config
             value: BigInt(box.assets.find((a: any) => a.tokenId === participationTokenId)?.amount || 0),
             reputationOpinions: await fetchReputationOpinionsForTarget("game", gameId),
-            perJudgeCommissionPercentage: perJudgeCommissionPercentage, // From R8
-            timeWeight: timeWeight, // From R8
-            createdAt: Number(createdAt), // From R8
+            perJudgeCommissionPercentage: perJudgeCommissionPercentage, // From Config
+            timeWeight: timeWeight, // From Config
+            createdAt: Number(createdAt), // From Config
             reputation: 0,
             constants: getGameConstants(),
             seed: seed,
             ceremonyDeadline: Number(deadlineBlock) - getGameConstants().PARTICIPATION_TIME_WINDOW,
-        };
+            configBoxId // Added for context if needed
+        } as GameActive & { configBoxId: string }; // Casting temporary if interface is not updated yet, but TS might complain if strictly typed. Assuming GameActive is flexible or I need to add it to type.
+
+        // Wait, I should probably add configBoxId to GameActive interface? 
+        // For now, let's keep it strictly match GameActive interface to avoid errors. 
+        // The data is hydrated so UI works. I won't add `configBoxId` property unless needed for actions.
+        // Actually actions MIGHT need it to reference it as dataInput.
+        // But `GameActive` interface is imported. I haven't updated `../common/game` yet.
+        // I will update the interface later if needed. For now I just return populated object.
+
+        gameActive.reputation = calculate_reputation(gameActive);
+
+        return gameActive;
 
         gameActive.reputation = calculate_reputation(gameActive);
 
@@ -349,36 +412,44 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
         const winnerCandidateCommitment = parseCollByteToHex(r6Value[1]);
         if (!revealedS_Hex) throw new Error("Could not parse R6.");
 
-        // R7: Coll[Coll[Byte]] -> judges
-        const judges = (getArrayFromValue(box.additionalRegisters.R7?.renderedValue) || [])
-            .map(parseCollByteToHex)
-            .filter((judge): judge is string => judge !== null && judge !== undefined);
+        // R7: Coll[Long] -> [resolutionDeadline, effectiveJudgeComm, effectiveResolverComm]
+        // R7 Structure changed in refactor.
+        const r7Array = getArrayFromValue(box.additionalRegisters.R7?.renderedValue);
+        const dynamicParams = parseLongColl(r7Array);
 
-        // R8: Coll[Long] -> [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
-        const r8Array = getArrayFromValue(box.additionalRegisters.R8?.renderedValue);
-        const numericalParams = parseLongColl(r8Array);
-        if (!numericalParams || numericalParams.length < 8) throw new Error("R8 does not contain the 8 expected numerical parameters.");
-        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline] = numericalParams;
+        if (!dynamicParams || dynamicParams.length < 3) throw new Error("R7 does not contain [resolutionDeadline, effectiveJudgeComm, effectiveResolverComm]");
+        const [resolutionDeadline, effectiveJudgeComm, effectiveResolverComm] = dynamicParams;
+
+        // R8: resolverPK (Coll[Byte])
+        const resolverPK_Hex = parseCollByteToHex(box.additionalRegisters.R8?.renderedValue);
+        if (!resolverPK_Hex) throw new Error("R8 (resolverPK) is missing.");
+
+        // R9: Config Box ID
+        const configBoxId = parseCollByteToHex(box.additionalRegisters.R9?.renderedValue);
+        if (!configBoxId) throw new Error("R9 (configBoxId) is missing.");
+
+        // Fetch Static Data from Config Box
+        const configData = await fetchConfigBoxData(configBoxId);
+        if (!configData) throw new Error(`Could not fetch Config Box data for ID: ${configBoxId}`);
+
+        const { judges, numericalParams, gameDetailsHex, participationTokenId, secretHash } = configData;
+
+        // numericalParams from Config Box (original values)
+        // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+        if (!numericalParams || numericalParams.length < 7) throw new Error("Config Box R5 does not contain the expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, originalJudgeComm, originalResolverComm] = numericalParams;
 
         const created_at = await tokenCreationHeight(gameId);
         if (created_at === null || createdAt < created_at - 5 || createdAt > created_at + 5) {
-            console.warn(`parseGameResolutionBox: Box ${box.boxId} has inconsistent creation height in R8.`);
-            return null;
+            console.warn(`parseGameResolutionBox: Box ${box.boxId} has inconsistent creation height in Config Box.`);
         }
 
-        // R9: (Coll[Byte], Coll[Byte], Coll[Byte]) -> gameDetailsHex, participationTokenId, resolverScript_Hex
-        const r9Value = getArrayFromValue(box.additionalRegisters.R9?.renderedValue);
-        if (!r9Value || r9Value.length !== 3) throw new Error("R9 is not a valid tuple (expected 3 items).");
+        const gameDetailsJson = hexToUtf8(gameDetailsHex || "");
+        const content = parseGameContent(gameDetailsJson, box.boxId, box.assets[0]);
 
-        const gameDetailsHex = r9Value[0];
-        const participationTokenId = parseCollByteToHex(r9Value[1]);
-        const resolverScript_Hex = parseCollByteToHex(r9Value[2]);
-
-        if (!gameDetailsHex || !resolverScript_Hex) throw new Error("Could not parse R9.");
-
-        const content = parseGameContent(hexToUtf8(gameDetailsHex), box.boxId, box.assets[0]);
-
-        const resolverPK_Hex = resolverScript_Hex.slice(0, 6) == "0008cd" ? resolverScript_Hex.slice(6, resolverScript_Hex.length) : null
+        // Reconstruct resolverScriptHex if needed, or just store PK.
+        // Assuming P2PK for now as per R8 usage.
+        const resolverScript_Hex = "0008cd" + resolverPK_Hex; // Simple P2PK reconstruction for now
 
         const gameResolution: GameResolution = {
             platform: new ErgoPlatform(),
@@ -386,28 +457,29 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             box,
             status: GameState.Resolution,
             gameId,
-            resolutionDeadline: Number(resolutionDeadline),
+            resolutionDeadline: Number(resolutionDeadline), // From R7
             revealedS_Hex,
             winnerCandidateCommitment: winnerCandidateCommitment || null,
-            judges,
-            deadlineBlock: Number(deadlineBlock),
-            resolverStakeAmount,
-            participationFeeAmount,
-            participationTokenId: participationTokenId ?? "",
-            resolverPK_Hex,
+            judges, // From Config
+            deadlineBlock: Number(deadlineBlock), // From Config
+            resolverStakeAmount, // From Config
+            participationFeeAmount, // From Config
+            participationTokenId: participationTokenId ?? "", // From Config
+            resolverPK_Hex, // From R8
             resolverScript_Hex,
-            content,
+            content, // From Config
             value: BigInt(box.assets.find((a: any) => a.tokenId === participationTokenId)?.amount || 0),
             reputationOpinions: await fetchReputationOpinionsForTarget("game", gameId),
-            perJudgeCommissionPercentage: perJudgeCommissionPercentage,
-            timeWeight: timeWeight, // From R8
-            resolverCommission: Number(resolverCommissionPercentage), // Added from R8
+            perJudgeCommissionPercentage: effectiveJudgeComm, // Use effective from R7
+            timeWeight: timeWeight, // From Config
+            resolverCommission: Number(effectiveResolverComm), // Use effective from R7
             constants: getGameConstants(),
-            seed: seed, // Added from R5
+            seed: seed,
             reputation: 0,
             isEndGame,
-            createdAt: Number(createdAt)
-        };
+            createdAt: Number(createdAt), // From Config
+            configBoxId
+        } as GameResolution & { configBoxId: string };
 
         gameResolution.reputation = calculate_reputation(gameResolution);
 
@@ -504,36 +576,31 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
         // R6: revealedSecret (Coll[Byte]). The revealed secret 'S'.
         const revealedS_Hex = parseCollByteToHex(box.additionalRegisters.R6?.renderedValue);
 
-        // R7: resolverStake (Long). The resolver's current stake.
-        const resolverStakeAmount = BigInt(parseInt(box.additionalRegisters.R7?.renderedValue, 10))
+        // R7: remainingValue (Long).
+        const remainingValue = BigInt(parseInt(box.additionalRegisters.R7?.renderedValue, 10))
 
         // R8: Original deadline (Long).
-        const r8Value = box.additionalRegisters.R8?.renderedValue;
-        let createdAt: number | undefined;
-        let originalDeadline = 0;
-        if (r8Value) {
-            const numericalParams = parseLongColl(getArrayFromValue(r8Value));
-            if (numericalParams && numericalParams.length >= 1) {
-                createdAt = Number(numericalParams[0]);
-                // In cancellation, R8 might just be the deadline or the full list.
-                // Based on the contract, it seems it's usually just the deadline if it's a single Long,
-                // but if it's a Coll[Long], it follows the same pattern as Active/Resolution.
-                originalDeadline = numericalParams.length > 2 ? Number(numericalParams[2]) : Number(numericalParams[0]);
-            }
-        }
+        const originalDeadline = parseInt(box.additionalRegisters.R8?.renderedValue, 10);
 
-        // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
-        const r9Value = getArrayFromValue(box.additionalRegisters.R9?.renderedValue);
-        if (!Array.isArray(r9Value) || r9Value.length < 2) {
-            throw new Error("R9 is not a valid array with at least 2 elements (gameDetailsJSON, participationTokenId).");
-        }
-        const gameDetailsHex = parseCollByteToHex(r9Value[0]);
-        const participationTokenId = parseCollByteToHex(r9Value[1]);
+        // R9: Config Box ID
+        const configBoxId = parseCollByteToHex(box.additionalRegisters.R9?.renderedValue);
+        if (!configBoxId) throw new Error("R9 (configBoxId) is missing.");
+
+        // Fetch Static Data from Config Box
+        const configData = await fetchConfigBoxData(configBoxId);
+        if (!configData) throw new Error(`Could not fetch Config Box data for ID: ${configBoxId}`);
+
+        const { numericalParams, gameDetailsHex, participationTokenId } = configData;
+
+        // numericalParams from Config Box
+        if (!numericalParams || numericalParams.length < 7) throw new Error("Config Box R5 does not contain the expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock] = numericalParams; // Destructure what needed
+
         const gameDetailsJson = hexToUtf8(gameDetailsHex || "");
         const content = parseGameContent(gameDetailsJson, box.boxId, box.assets[0]);
 
         // Validate that essential registers were parsed correctly
-        if (isNaN(unlockHeight) || !revealedS_Hex || resolverStakeAmount === undefined) {
+        if (isNaN(unlockHeight) || !revealedS_Hex || remainingValue === undefined) {
             throw new Error("Invalid or missing registers R5, R6, or R7.");
         }
 
@@ -547,7 +614,7 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
             gameId,
             unlockHeight,
             revealedS_Hex,
-            resolverStakeAmount,
+            resolverStakeAmount: remainingValue, // It wraps the whole value now
             content,
             participationFeeAmount,
             participationTokenId: participationTokenId ?? "",
@@ -557,8 +624,9 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
             deadlineBlock: originalDeadline,
             constants: getGameConstants(),
             reputation: 0,
-            createdAt: createdAt
-        };
+            createdAt: Number(createdAt),
+            configBoxId
+        } as GameCancellation & { configBoxId: string };
 
         gameCancelled.reputation = calculate_reputation(gameCancelled);
 

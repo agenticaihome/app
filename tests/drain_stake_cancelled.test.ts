@@ -5,17 +5,20 @@ import {
     ErgoTree,
     OutputBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
-    TransactionBuilder
+    TransactionBuilder,
+    SAFE_MIN_BOX_VALUE
 } from "@fleet-sdk/core";
 import {
     SByte,
     SColl,
     SInt,
-    SLong
+    SLong,
+    SConstant
 } from "@fleet-sdk/serializer";
 import { stringToBytes } from "@scure/base";
-import { getGopGameCancellationErgoTree } from "$lib/ergo/contract";
+import { getGopGameCancellationErgoTree, getGopFalseAddress } from "$lib/ergo/contract";
 import { hexToBytes } from "$lib/ergo/utils";
+import { blake2b256 } from "@fleet-sdk/crypto";
 
 const ERG_BASE_TOKEN = "";
 const ERG_BASE_TOKEN_NAME = "ERG";
@@ -28,7 +31,7 @@ const baseModes = [
     { name: "USD Token Mode", token: USD_BASE_TOKEN, tokenName: USD_BASE_TOKEN_NAME },
 ];
 
-describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (mode) => {
+describe.each(baseModes)("Game Stake Draining (Refactored) - (%s)", (mode) => {
     let mockChain: MockChain;
     let creator: ReturnType<MockChain["newParty"]>;
     let claimer: ReturnType<MockChain["newParty"]>;
@@ -41,6 +44,8 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
     const originalDeadline = 600_000;
 
     let cancelledGameBox: Box;
+    let configBox: any;
+    let configBoxId: string;
 
     beforeEach(() => {
         mockChain = new MockChain({ height: 800_000 });
@@ -51,6 +56,29 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
         gameCancellationContract = mockChain.addParty(gameCancellationErgoTree.toHex(), "GameCancellationContract");
 
         const unlockHeight = mockChain.height - 1;
+
+        // --- Create Config Box (Refactored) ---
+        // Params: [createdAt, timeWeight, originalDeadline, resolverStake, participationFee, perJudgeComm, resolverComm]
+        // Example values matching previous contexts
+        const params = [1n, 20n, BigInt(originalDeadline), initialCancelledStake, 1000000n, 500n, 1000n];
+        const falseAddress = getGopFalseAddress();
+        configBox = {
+            transactionId: "0000000000000000000000000000000000000000000000000000000000000001",
+            index: 0,
+
+            value: SAFE_MIN_BOX_VALUE,
+            ergoTree: falseAddress.ergoTree,
+            assets: [],
+            creationHeight: mockChain.height,
+            additionalRegisters: {
+                R4: SColl(SColl(SByte), []).toHex(),
+                R5: SColl(SLong, params).toHex(),
+                R6: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex(),
+                R7: SColl(SByte, blake2b256(stringToBytes("utf8", "secret"))).toHex()
+            }
+        };
+        creator.addUTxOs(configBox);
+        configBoxId = creator.utxos.toArray().find(b => b.additionalRegisters.R5 === configBox.additionalRegisters.R5)!.boxId;
 
         const gameBoxValue = mode.token === ERG_BASE_TOKEN ? initialCancelledStake : SAFE_BOX_VALUE;
 
@@ -70,7 +98,8 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
                 R6: SColl(SByte, revealedSecret).toHex(),
                 R7: SLong(initialCancelledStake).toHex(),
                 R8: SLong(BigInt(originalDeadline)).toHex(),
-                R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex(),
+                // R9: Config Box ID
+                R9: SColl(SByte, hexToBytes(configBoxId)!).toHex()
             }
         });
 
@@ -83,7 +112,8 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
 
     it("should successfully drain a portion of the stake after the cooldown period", () => {
         const claimerInitialBalance = claimer.balance.nanoergs;
-        const unlockHeightFromRegister = parseInt(cancelledGameBox.additionalRegisters.R5.substring(4), 16);
+        // Fix: Use SConstant to properly decode the SLong Hex string, avoiding substring hacks.
+        const unlockHeightFromRegister = Number(SConstant.from(cancelledGameBox.additionalRegisters.R5).data);
         expect(mockChain.height).to.be.greaterThan(unlockHeightFromRegister);
 
         const stakePortionToClaim = initialCancelledStake / 5n;
@@ -105,6 +135,8 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
 
         const transaction = new TransactionBuilder(mockChain.height)
             .from([cancelledGameBox, ...claimer.utxos.toArray()])
+            // Include Config Box
+            .withDataFrom([creator.utxos.toArray().find(b => b.boxId === configBoxId)!])
             .to([
                 new OutputBuilder(newCancellationBoxValue, gameCancellationErgoTree)
                     .addTokens(newCancellationAssets)
@@ -114,7 +146,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
                         R6: SColl(SByte, revealedSecret).toHex(),
                         R7: SLong(remainingStake).toHex(),
                         R8: SLong(BigInt(originalDeadline)).toHex(),
-                        R9: cancelledGameBox.additionalRegisters.R9,
+                        R9: cancelledGameBox.additionalRegisters.R9, // Keep ConfigID
                     }),
                 new OutputBuilder(claimValue, claimer.address).addTokens(claimAssets)
             ])
@@ -174,7 +206,8 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
                 R6: SColl(SByte, revealedSecret).toHex(),
                 R7: SLong(initialCancelledStake).toHex(),
                 R8: SLong(BigInt(originalDeadline)).toHex(),
-                R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex()
+                // R9: Config Box ID
+                R9: SColl(SByte, hexToBytes(configBoxId)!).toHex()
             }
         });
         const futureLockedBox = gameCancellationContract.utxos.toArray()[0];
@@ -184,8 +217,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
         // --- Act ---
         const transaction = new TransactionBuilder(mockChain.height)
             .from([futureLockedBox, ...claimer.utxos.toArray()])
-            // FIX: Reducir la cantidad de salida para tener suficiente para la fee.
-            // Tenías 1_000_000_000n (Todo el balance) + Fee > Balance.
+            .withDataFrom([creator.utxos.toArray().find(b => b.boxId === configBoxId)!])
             .to([new OutputBuilder(100_000_000n, claimer.address)])
             .sendChangeTo(claimer.address)
             .payFee(RECOMMENDED_MIN_FEE_VALUE)

@@ -4,7 +4,8 @@ import {
     ErgoTree,
     OutputBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
-    TransactionBuilder
+    TransactionBuilder,
+    SAFE_MIN_BOX_VALUE
 } from "@fleet-sdk/core";
 import {
     SByte,
@@ -13,26 +14,27 @@ import {
     SLong,
     SPair
 } from "@fleet-sdk/serializer";
-import { randomBytes } from "@fleet-sdk/crypto";
+import { randomBytes, blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { prependHexPrefix } from "$lib/utils";
 import { hexToBytes } from "$lib/ergo/utils";
 import {
     getGopParticipationErgoTree,
     getGopParticipationBatchErgoTree,
-    getGopGameResolutionErgoTree
+    getGopGameResolutionErgoTree,
+    getGopFalseAddress
 } from "$lib/ergo/contract";
 import { DefaultGameConstants } from "$lib/common/constants";
 
 const ERG_BASE_TOKEN = "";
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
-const USD_BASE_TOKEN_NAME = "USD"; // Added to support the new tokenName property in baseModes
+const USD_BASE_TOKEN_NAME = "USD";
 
 const baseModes = [
     { name: "USD Token Mode", token: USD_BASE_TOKEN, tokenName: USD_BASE_TOKEN_NAME },
 ];
 
-describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
+describe.each(baseModes)("Participation Batching (Refactored) - (%s)", (mode) => {
     const mockChain = new MockChain({ height: 800_000 });
 
     const participationErgoTree: ErgoTree = getGopParticipationErgoTree();
@@ -53,6 +55,9 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
     let batchContract: NonKeyedMockChainParty;
     let gameResolutionContract: NonKeyedMockChainParty;
 
+    let configBox: any;
+    let configBoxId: string;
+
     beforeEach(() => {
         mockChain.reset({ clearParties: true });
         resolver = mockChain.newParty("Resolver");
@@ -68,7 +73,28 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
         batchContract = mockChain.addParty(batchErgoTree.toHex(), "BatchContract");
         gameResolutionContract = mockChain.addParty(gameResolutionErgoTree.toHex(), "GameResolutionContract");
 
-        // Setup Game Box in Resolution state
+        // --- Create Config Box (Refactored) ---
+        const params = [1n, 20n, BigInt(mockChain.height + 500), 2_000_000_000n, participationFee, 10000n, 200000n];
+        const falseAddress = getGopFalseAddress();
+        configBox = {
+            transactionId: "0000000000000000000000000000000000000000000000000000000000000001",
+            index: 0,
+
+            value: SAFE_MIN_BOX_VALUE,
+            ergoTree: falseAddress.ergoTree,
+            assets: [],
+            creationHeight: mockChain.height,
+            additionalRegisters: {
+                R4: SColl(SColl(SByte), []).toHex(),
+                R5: SColl(SLong, params).toHex(), // Params
+                R6: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex(),
+                R7: SColl(SByte, blake2b256(secret)).toHex()
+            }
+        };
+        creator.addUTxOs(configBox);
+        configBoxId = creator.utxos.toArray().find(b => b.additionalRegisters.R5 === configBox.additionalRegisters.R5)!.boxId;
+
+        // Setup Game Box in Resolution state (Refactored)
         const gameAssets = [
             { tokenId: gameNftId, amount: 1n },
             ...(mode.token !== ERG_BASE_TOKEN ? [{ tokenId: mode.token, amount: 1000000n }] : [])
@@ -83,14 +109,14 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
             additionalRegisters: {
                 R4: SInt(1).toHex(), // Resolution state
                 R5: SColl(SByte, hexToBytes(seed) || new Uint8Array(0)).toHex(),
-                R6: SPair(SColl(SByte, secret), SColl(SByte, new Uint8Array(32))).toHex(), // No winner candidate yet
-                R7: SColl(SColl(SByte), []).toHex(),
-                R8: SColl(SLong, [1n, 20n, BigInt(mockChain.height + 500), 2_000_000_000n, participationFee, 10000n, 200000n, BigInt(mockChain.height + 1000)]).toHex(),
-                R9: SColl(SColl(SByte), [
-                    stringToBytes('utf8', "{}"),
-                    mode.token !== ERG_BASE_TOKEN ? (hexToBytes(mode.token) || new Uint8Array(0)) : new Uint8Array(0),
-                    prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")
-                ]).toHex()
+                R6: SPair(SColl(SByte, secret), SColl(SByte, new Uint8Array(32))).toHex(),
+                // R7: [resolutionDeadline, perJudge, resolverComm]
+                // resolutionDeadline = mockChain.height + 1000
+                R7: SColl(SLong, [BigInt(mockChain.height + 1000), 10000n, 200000n]).toHex(),
+                // R8: Resolver PK
+                R8: SColl(SByte, prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")).toHex(),
+                // R9: Config Box ID
+                R9: SColl(SByte, hexToBytes(configBoxId)!).toHex()
             }
         });
     });
@@ -146,7 +172,11 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([...pBoxes, ...resolver.utxos.toArray()])
-            .withDataFrom([gameBox])
+            // Include Config Box in Data Inputs just in case context checks it
+            .withDataFrom([
+                gameBox,
+                creator.utxos.toArray().find(b => b.boxId === configBoxId)!
+            ])
             .to([
                 new OutputBuilder(outputValue, batchContract.address)
                     .addTokens(outputAssets)
@@ -179,7 +209,10 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([bBox, pBox, ...resolver.utxos.toArray()])
-            .withDataFrom([gameBox])
+            .withDataFrom([
+                gameBox,
+                creator.utxos.toArray().find(b => b.boxId === configBoxId)!
+            ])
             .to([
                 new OutputBuilder(outputValue, batchContract.address)
                     .addTokens(outputAssets)
@@ -207,7 +240,10 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([...pBoxes, ...resolver.utxos.toArray()])
-            .withDataFrom([gameBox])
+            .withDataFrom([
+                gameBox,
+                creator.utxos.toArray().find(b => b.boxId === configBoxId)!
+            ])
             .to([
                 new OutputBuilder(participationFee, batchContract.address)
                     .setAdditionalRegisters({
@@ -242,7 +278,10 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([...pBoxes, ...resolver.utxos.toArray()])
-            .withDataFrom([gameBox])
+            .withDataFrom([
+                gameBox,
+                creator.utxos.toArray().find(b => b.boxId === configBoxId)!
+            ])
             .to([
                 new OutputBuilder(outputValue, batchContract.address)
                     .addTokens(outputAssets)

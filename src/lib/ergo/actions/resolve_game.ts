@@ -18,21 +18,24 @@ import { GAME } from '../reputation/types';
 import { fetchJudges } from '../reputation/fetch';
 import { prependHexPrefix } from '$lib/utils';
 import { getGameConstants } from '$lib/common/constants';
+import { get } from 'svelte/store';
+import { explorer_uri } from '../envs';
 
 declare const ergo: any;
 
-// Constante del contrato game_resolution.es
-// Moved inside function to be dynamic
+async function fetchBox(boxId: string): Promise<Box<Amount> | null> {
+    try {
+        const res = await fetch(`${get(explorer_uri)}/api/v1/boxes/${boxId}`);
+        if (res.ok) return await res.json();
+        return null;
+    } catch (e) {
+        console.error("Error fetching box:", e);
+        return null;
+    }
+}
 
 /**
- * Inicia la transición de un juego del estado Activo al de Resolución.
- * Esta acción consume la caja del juego y todas las participaciones válidas,
- * y crea una nueva caja 'GameResolution' y cajas 'Participation'.
- * @param game El objeto GameActive a resolver.
- * @param participations Un array de todas las participaciones enviadas (Participation).
- * @param secretS_hex El secreto 'S' en formato hexadecimal para revelar al ganador.
- * @param judgeProofBoxes Un array de las cajas de prueba de reputación de los jueces, que se usarán como dataInputs.
- * @returns El ID de la transacción si tiene éxito.
+ * Inicia la transición de un juego del estado Activo al de Resolución (Refactorizado).
  */
 export async function resolve_game(
     game: GameActive,
@@ -44,6 +47,13 @@ export async function resolve_game(
     const JUDGE_PERIOD = getGameConstants().JUDGE_PERIOD + 10;
 
     console.log(`Iniciando transición a resolución para el juego: ${game.boxId}`);
+
+    // Fetch Config Box to verify and use as DataInput
+    if (!game.configBoxId) {
+        throw new Error("Game Active Box does not have a configBoxId. Is it using the old contract?");
+    }
+    const configBox = await fetchBox(game.configBoxId);
+    if (!configBox) throw new Error(`Could not fetch Config Box: ${game.configBoxId}`);
 
     const dataMap = await fetchJudges();
     const judgeProofBoxes: Box<Amount>[] = judgeProofs.flatMap(key => {
@@ -70,23 +80,34 @@ export async function resolve_game(
     }
 
     const resolverAddressString = await ergo.get_change_address();
-    const resolverPkBytes = ErgoAddress.fromBase58(resolverAddressString).getPublicKeys()[0];
+    const resolverP2pk = ErgoAddress.fromBase58(resolverAddressString);
+    const resolverPkBytes = resolverP2pk.getPublicKeys()[0];
 
-    if (!Array.isArray(judgeProofBoxes)) {
-        throw new Error("El listado de cajas de prueba de los jueces es inválido.");
-    }
-    if (game.judges.length !== judgeProofBoxes.length) {
-        throw new Error(`Se esperaba ${game.judges.length} prueba(s) de juez, pero se recibieron ${judgeProofBoxes.length}.`);
-    }
-
+    // Verify Judges Tokens (Check against Config Box or Game Object which is hydrated)
     const invitedJudgesTokens = [...game.judges].sort();
     const participatingJudgesTokens = judgeProofBoxes.map(box => box.assets[0].tokenId).sort();
 
+    // Note: If judge proofs are not required/checked by contract in this step, strictly optional.
+    // The contract requires R7 to contain the judge tokens. 
+    // And actually, this action DOES NOT require dataInputs for judges in the transition from Active -> Resolution?
+    // Let's check `game_active.es`.
+    // It checks `resolutionBox.R7` matches `invitedJudges`.
+    // It DOES NOT check judge inputs relative to active box spending.
+    // BUT `resolve_game` seems to fetch them to include them as DataInputs?
+    // In `game_active.es`, there is no validation of DataInputs for judges.
+    // The previous code included them. Maybe for context or consistency.
+    // I will keep logic but if `participatingJudgesTokens` is empty, it's fine if the game has no judges?
+    // `game.judges` comes from config.
+
     if (JSON.stringify(invitedJudgesTokens) !== JSON.stringify(participatingJudgesTokens)) {
+        // This check forces the resolver to provide proofs for ALL invited judges.
+        // If this is desired behavior, keep it. If not (e.g. judges can be absent?), remove strict equality.
+        // Assuming strict for now as per original code.
         throw new Error("Los tokens de prueba de los jueces no coinciden con los jueces invitados en el contrato.");
     }
 
     // --- 2. Determinar el ganador y filtrar participaciones (lógica off-chain) ---
+    // ... (This logic remains largely checking participation validity)
     let maxScore = -1n;
     let winnerCandidateCommitment: string | null = null;
     let winnerCandidateBox: Box<Amount> | null = null;
@@ -94,40 +115,18 @@ export async function resolve_game(
 
     const participationErgoTree = getGopParticipationErgoTreeHex();
     const participationErgoTreeBytes = hexToBytes(participationErgoTree);
-    if (!participationErgoTreeBytes) {
-        throw new Error("El ErgoTree del script de participación es inválido.");
-    }
-    const participationScriptHash = uint8ArrayToHex(fleetBlake2b256(participationErgoTreeBytes));
+    if (!participationErgoTreeBytes) throw new Error("El ErgoTree del script de participación es inválido.");
 
+    const participationScriptHash = uint8ArrayToHex(fleetBlake2b256(participationErgoTreeBytes));
 
     for (const p of participations) {
         const pBox = parseBox(p.box);
+        if (uint8ArrayToHex(fleetBlake2b256(hexToBytes(pBox.ergoTree) ?? "")) !== participationScriptHash) continue;
+        if (p.gameNftId !== game.box.assets[0].tokenId) continue;
+        if (BigInt(pBox.value) < game.participationFeeAmount) continue;
 
-        // Verificación 1: Script de Participación Correcto
-        if (uint8ArrayToHex(fleetBlake2b256(hexToBytes(pBox.ergoTree) ?? "")) !== participationScriptHash) {
-            console.warn(`La participación ${p.boxId} tiene un script incorrecto. Será omitida.`);
-            continue;
-        }
-
-        // Verificación 2: Referencia al NFT del Juego
-        if (p.gameNftId !== game.box.assets[0].tokenId) {
-            console.warn(`La participación ${p.boxId} no apunta al NFT de este juego. Será omitida.`);
-            continue;
-        }
-
-        // Verificación 3: Pago de la Tarifa de Participación
-        if (BigInt(pBox.value) < game.participationFeeAmount) {
-            console.warn(`La participación ${p.boxId} no cumple con la tarifa mínima. Será omitida.`);
-            continue;
-        }
-
-        // Simulación de la validación de la puntuación
         let actualScore = resolve_participation_commitment(p, secretS_hex, game.seed);
-
-        if (actualScore === null) {
-            console.warn(`No se pudo encontrar una puntuación válida para la participación ${p.commitmentC_Hex}. Será omitida.`);
-            continue;
-        }
+        if (actualScore === null) continue;
 
         const pBoxCreationHeight = pBox.creationHeight;
         const effectiveScore = calculateEffectiveScore(game, actualScore, p.solverIdBox?.creationHeight ?? 0);
@@ -147,41 +146,38 @@ export async function resolve_game(
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
     const resolutionDeadline = BigInt(currentHeight + JUDGE_PERIOD);
 
-    const newNumericalParams = [
-        BigInt(game.createdAt),
-        game.timeWeight,
-        BigInt(game.deadlineBlock),
-        game.resolverStakeAmount,
-        game.participationFeeAmount,
-        game.perJudgeCommissionPercentage,
-        BigInt(game.commissionPercentage),
-        resolutionDeadline
-    ];
+    // Prepare Registers for Resolution Box (Refactored)
+    // R4: State (1)
+    const r4Hex = SInt(1).toHex();
 
-    let winnerCommitmentBytes: Uint8Array;
-    if (winnerCandidateCommitment) {
-        const bytes = hexToBytes(winnerCandidateCommitment);
-        if (!bytes) throw new Error("Fallo al convertir commitmentC a bytes.");
-        winnerCommitmentBytes = bytes;
-    }
-    else {
-        winnerCommitmentBytes = new Uint8Array();
-    }
-    // max para BigInt
-    const maxBigInt = (...vals: bigint[]) => vals.reduce((a, b) => a > b ? a : b, vals[0]);
-
+    // R5: Seed
     const seedBytes = hexToBytes(game.seed);
-    if (!seedBytes) throw new Error("No se pudo obtener el 'seed' del objeto game (game.seedHex).");
+    if (!seedBytes) throw new Error("Invalid seed bytes");
+    const r5Hex = SColl(SByte, seedBytes).toHex();
 
-    const gameDetailsBytes = stringToBytes('utf8', game.content.rawJsonString);
+    // R6: (secretS, winnerCommitment)
+    let winnerCommitmentBytes = new Uint8Array();
+    if (winnerCandidateCommitment) {
+        winnerCommitmentBytes = hexToBytes(winnerCandidateCommitment) || new Uint8Array();
+    }
+    const r6Hex = SPair(SColl(SByte, secretS_bytes), SColl(SByte, winnerCommitmentBytes)).toHex();
 
-    const r4Hex = SInt(1).toHex(); // R4: Estado (1: Resuelto)
-    const r5Hex = SColl(SByte, seedBytes).toHex(); // R5: Seed
-    const r6Hex = SPair(SColl(SByte, secretS_bytes), SColl(SByte, winnerCommitmentBytes)).toHex(); // R6: (secretS, winnerCommitment)
-    const r7Hex = SColl(SColl(SByte), participatingJudgesTokens.map(t => hexToBytes(t)!)).toHex(); // R7: Jueces participantes
-    const r8Hex = SColl(SLong, newNumericalParams).toHex(); // R8: Parámetros numéricos
+    // R7: [resolutionDeadline, perJudgeCommission, resolverCommission]
+    // Note: perJudgeCommission and resolverCommission are percentages/fractions stored as Longs. 
+    // We use the values from the game object.
+    const r7Hex = SColl(SLong, [
+        resolutionDeadline,
+        BigInt(game.perJudgeCommissionPercentage),
+        BigInt(game.commissionPercentage)
+    ]).toHex();
 
-    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, hexToBytes(game.participationTokenId) ?? "", prependHexPrefix(resolverPkBytes)]).toHex();
+    // R8: resolverPK
+    const r8Hex = SColl(SByte, resolverPkBytes).toHex();
+
+    // R9: configBoxId
+    const configBoxIdBytes = hexToBytes(game.configBoxId);
+    if (!configBoxIdBytes) throw new Error("Invalid configBoxId bytes");
+    const r9Hex = SColl(SByte, configBoxIdBytes).toHex();
 
     const boxCandidate = {
         transactionId: "00".repeat(32),
@@ -191,59 +187,34 @@ export async function resolve_game(
         creationHeight: currentHeight,
         assets: game.box.assets,
         additionalRegisters: {
-            R4: r4Hex,
-            R5: r5Hex,
-            R6: r6Hex,
-            R7: r7Hex,
-            R8: r8Hex,
-            R9: r9Hex
+            R4: r4Hex, R5: r5Hex, R6: r6Hex, R7: r7Hex, R8: r8Hex, R9: r9Hex
         }
     };
 
-    let boxSize = 0;
-    try {
-        const serialized = serializeBox(boxCandidate);
-        boxSize = serialized.length;
-        console.log("REAL resolution box size:", boxSize);
-    } catch (e) {
-        console.error("Error serializing resolution box:", e);
-        throw new Error("Failed to serialize the resolution box. It might be too large or invalid.");
-    }
-
-    if (boxSize > 4096) {
-        throw new Error(`The resolution box size (${boxSize} bytes) exceeds the maximum allowed size of 4096 bytes.`);
-    }
+    let boxSize = serializeBox(boxCandidate).length;
 
     const minRequiredValue = BigInt(boxSize) * BOX_VALUE_PER_BYTE;
-
-    // valor actual de la caja (asegurate que sea BigInt)
     const originalValue = BigInt(game.box.value);
+    const resolutionBoxValue = (originalValue > minRequiredValue) ? originalValue : minRequiredValue;
+    const finalResolutionBoxValue = (resolutionBoxValue > BigInt(SAFE_MIN_BOX_VALUE)) ? resolutionBoxValue : BigInt(SAFE_MIN_BOX_VALUE);
 
-    // seleccionar el mayor entre originalValue, minRequiredValue y SAFE_MIN_BOX_VALUE
-    const resolutionBoxValue = maxBigInt(originalValue, minRequiredValue, SAFE_MIN_BOX_VALUE);
-
-    const resolutionBoxOutput = new OutputBuilder(
-        resolutionBoxValue,
-        resolutionErgoTree
-    )
+    const resolutionBoxOutput = new OutputBuilder(finalResolutionBoxValue, resolutionErgoTree)
         .addTokens(game.box.assets)
         .setAdditionalRegisters({
-            R4: r4Hex,
-            R5: r5Hex,
-            R6: r6Hex,
-            R7: r7Hex,
-            R8: r8Hex,
-            R9: r9Hex
+            R4: r4Hex, R5: r5Hex, R6: r6Hex, R7: r7Hex, R8: r8Hex, R9: r9Hex
         });
 
     // --- 4. Construir y Enviar la Transacción ---    
 
-    let dataInputs = judgeProofBoxes;
+    // Data Inputs: Judge Proofs + Config Box
+    let dataInputs = [configBox, ...judgeProofBoxes];
+
+    // Actually, judge proofs are not strictly required by verification here, but ok to include.
+    // If winner found, include them too?
     if (winnerCandidateBox) {
-        if (!winnerCandidateSolverIdBox) {
-            throw new Error("Winner candidate selected but no solver ID box found.");
-        }
-        dataInputs = [...judgeProofBoxes, winnerCandidateBox, winnerCandidateSolverIdBox];
+        if (!winnerCandidateSolverIdBox) throw new Error("Missing solver box");
+        dataInputs.push(winnerCandidateBox);
+        dataInputs.push(winnerCandidateSolverIdBox);
     }
 
     try {

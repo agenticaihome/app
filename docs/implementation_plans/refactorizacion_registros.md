@@ -123,3 +123,27 @@ Este plan detalla los pasos para separar los datos estáticos de los contratos d
     - Incluir Config Box como Data Input para leer `participationTokenId` y comisiones si es necesario validar pagos/fees.
 
 IMPORTANTE: Realizar la menor cantidad de cambios posibles.
+
+---
+
+## Estado de Implementación (Completado)
+
+La refactorización ha sido implementada exitosamente siguiendo el plan anterior.
+
+### Cambios Realizados
+
+1.  **Arquitectura de Contratos**:
+    - Todos los contratos principales (`game_active`, `game_resolution`, `game_cancellation`, `end_game`) han sido actualizados para leer datos estáticos de una `Config Box` referenciada por ID.
+    - Estructura de registros actualizada en todos los estados.
+
+2.  **Lógica Off-Chain (`src/lib/ergo/actions/`)**:
+    - **`create_game.ts`**: Implementada una cadena de 3 transacciones (`Config Tx` -> `Mint Tx` -> `Game Tx`) para asegurar la creación determinista de la Config Box y su referencia en la caja del juego, manteniendo la integridad de los IDs de tokens mintados.
+    - **Actions de Transición**: Todas las acciones (`resolve_game`, `cancel_game`, `to_end_game`, `end_game`, `judges_invalidate`, `include_omitted_participation`, `ceremony`) han sido actualizadas para incluir la `Config Box` como `Data Input` y respetar la nueva estructura de registros.
+    - **`reclaim_after_grace` y `claim_after_cancellation`**: Actualizadas para incluir la `Config Box` en data inputs, permitiendo la validación de tiempos y parámetros por los contratos de participación.
+
+3.  **Utilidades (`src/lib/ergo/fetch.ts`)**:
+    - Implementada lógica de fetching y cacheo para `Config Box`.
+    - Funciones de parseo (`parseGameActiveBox`, etc.) actualizadas para hidratar los objetos del juego combinando datos de la caja activa y la config box.
+
+4.  **Compilación (`src/lib/ergo/contract.ts`)**:
+    - Inyección de `FALSE_SCRIPT_HASH` para permitir referencias a la Config Box (que usa el script `false.es`).

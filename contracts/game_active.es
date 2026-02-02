@@ -276,12 +276,15 @@
     // Usa ceremonyDeadline calculado
     val ceremonyActive = HEIGHT < ceremonyDeadline
 
-    if (ceremonyActive && OUTPUTS.size > 0) {
-      // La caja de salida debe ser una copia del contrato actual, excepto R5
-      val out = OUTPUTS.filter({ (box: Box) => 
-        blake2b256(box.propositionBytes) == blake2b256(SELF.propositionBytes)
-      })(0)
+    val outs = OUTPUTS.filter({ (box: Box) => 
+      blake2b256(box.propositionBytes) == blake2b256(SELF.propositionBytes)
+    })
 
+    if (ceremonyActive && outs.size == 1) {
+      // La caja de salida debe ser una copia del contrato actual, excepto R5
+
+      val out = outs(0)
+      
       // El NFT debe preservarse
       val sameNFT = out.tokens(0)._1 == gameNftId
 

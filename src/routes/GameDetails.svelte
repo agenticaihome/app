@@ -174,6 +174,7 @@
         candidateParticipationInvalidVotes,
         candidateParticipationUnavailableVotes,
         $address,
+        participationIsEnded,
     );
 
     $: disabledActions = getDisabledActions(
@@ -210,6 +211,7 @@
         candidateParticipationInvalidVotes: string[],
         candidateParticipationUnavailableVotes: string[],
         address: string,
+        participationIsEnded: boolean,
     ) {
         if (!game) return [];
         const actions = [];
@@ -229,12 +231,15 @@
                     variant: "outline",
                 });
             }
-            actions.push({
-                id: "cancel_game",
-                label: "Cancel Competition",
-                icon: XCircle,
-                variant: "destructive",
-            });
+            // Only show cancel_game action before the deadline
+            if (!participationIsEnded) {
+                actions.push({
+                    id: "cancel_game",
+                    label: "Cancel Competition",
+                    icon: XCircle,
+                    variant: "destructive",
+                });
+            }
             if (isNominatedJudge && !isJudge) {
                 actions.push({
                     id: "accept_judge_nomination",

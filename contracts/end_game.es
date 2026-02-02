@@ -4,6 +4,7 @@
   // =================================================================
 
   val END_GAME_AUTH_GRACE_PERIOD = `+END_GAME_AUTH_GRACE_PERIOD+`L
+  val COMMISSION_DENOMINATOR = `+COMMISSION_DENOMINATOR+`L
 
   val JUDGES_PAID_ERGOTREE = fromBase16("`+JUDGES_PAID_ERGOTREE+`")
 
@@ -171,10 +172,10 @@
     // Esta lógica ahora se aplica tanto si hay ganador como si no.
     
     // 1. Calcular payout para DEV
-    val devCommission = prizePool * dev_commission_percentage / 1000000L
+    val devCommission = prizePool * dev_commission_percentage / COMMISSION_DENOMINATOR
     
     // 2. Calcular payout para los JUECES
-    val perJudgeComission = prizePool * perJudgeCommissionPercentage / 1000000L
+    val perJudgeComission = prizePool * perJudgeCommissionPercentage / COMMISSION_DENOMINATOR
     val totalJudgeComission = perJudgeComission * judge_amount
     
     // 3. Verificación de que el DEV recibe su pago
@@ -219,7 +220,7 @@
 
             if (validWinner) {
             val winnerPK = winnerBox.R4[Coll[Byte]].get
-            val resolverCommission = prizePool * resolverCommissionPercentage / 1000000L
+            val resolverCommission = prizePool * resolverCommissionPercentage / COMMISSION_DENOMINATOR
             
             // El premio se calcula restando los payouts finales (que ya consideran el polvo)
             val tentativeWinnerPrize = prizePool - resolverCommission - totalJudgeComission - devCommission

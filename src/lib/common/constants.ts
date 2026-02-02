@@ -11,6 +11,7 @@ export interface GameConstants {
     PARTICIPATION_TIME_WINDOW: number;
     SEED_MARGIN: number;
     MIN_TIME_WEIGHT_MARGIN: number;   //  Bloques despues de created at hasta los que la formula de efficient score puede considerar el time weight.
+    COMMISSION_DENOMINATOR: number;
 
     PARTICIPATION_TYPE_ID: string;
     PARTICIPATION_UNAVAILABLE_TYPE_ID: string;
@@ -28,6 +29,7 @@ const DevelopmentMode: GameConstants = {
     PARTICIPATION_TIME_WINDOW: 5,
     SEED_MARGIN: 1,
     MIN_TIME_WEIGHT_MARGIN: 1,
+    COMMISSION_DENOMINATOR: 1000000,
 
     PARTICIPATION_TYPE_ID: PARTICIPATION,
     PARTICIPATION_UNAVAILABLE_TYPE_ID: PARTICIPATION_UNAVAILABLE,
@@ -45,6 +47,7 @@ const ProductionMode: GameConstants = {
     PARTICIPATION_TIME_WINDOW: 2160,  // aprox. three days.   In case future_participation.es exists ... could be 720 blocks aprox. 1 day
     SEED_MARGIN: 20,
     MIN_TIME_WEIGHT_MARGIN: 720,  // approx. 24 hours
+    COMMISSION_DENOMINATOR: 1000000,
 
     PARTICIPATION_TYPE_ID: PARTICIPATION,
     PARTICIPATION_UNAVAILABLE_TYPE_ID: PARTICIPATION_UNAVAILABLE,

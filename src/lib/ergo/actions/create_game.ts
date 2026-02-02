@@ -14,7 +14,7 @@ import { hexToBytes } from '$lib/ergo/utils';
 import { getGopGameActiveErgoTreeHex, getGopMintIdtAddress } from '../contract';
 import { stringToBytes } from '@scure/base';
 import { getGameConstants } from '$lib/common/constants';
-import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE, COMMISSION_DENOMINATOR } from '../envs';
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from '../envs';
 import { estimateTotalBoxSizeFromInputs, MAX_BOX_SIZE, type GameBoxInputs } from '../utils/box-size-calculator';
 
 function randomSeed(): string {
@@ -164,9 +164,9 @@ export async function create_game(
     const r5Hex = SColl(SByte, seedBytes).toHex();
     const r6Hex = SColl(SByte, hashedSecretBytes).toHex();
     const r7Hex = SColl(SColl(SByte), judgesColl).toHex();
-    const comission = BigInt(Math.round((commissionPercentage / 100) * COMMISSION_DENOMINATOR));
-    const perJudgeComission = BigInt(Math.round((perJudgeCommissionPercentage / 100 ) * COMMISSION_DENOMINATOR));
-    const devCommission = BigInt(Math.round((DEV_COMMISSION_PERCENTAGE / 100) * COMMISSION_DENOMINATOR));
+    const comission = BigInt(Math.round((commissionPercentage / 100) * getGameConstants().COMMISSION_DENOMINATOR));
+    const perJudgeComission = BigInt(Math.round((perJudgeCommissionPercentage / 100) * getGameConstants().COMMISSION_DENOMINATOR));
+    const devCommission = BigInt(Math.round((DEV_COMMISSION_PERCENTAGE / 100) * getGameConstants().COMMISSION_DENOMINATOR));
     const devScriptBytes = hexToBytes(DEV_SCRIPT);
     if (!devScriptBytes) throw new Error("Invalid DEV_SCRIPT constant");
 

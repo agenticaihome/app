@@ -16,7 +16,7 @@ import { getGopGameResolutionErgoTreeHex, getGopParticipationErgoTreeHex } from 
 import { stringToBytes } from '@scure/base';
 import { GAME } from '../reputation/types';
 import { fetchJudges } from '../reputation/fetch';
-import { COMMISSION_DENOMINATOR } from '../envs';
+
 import { prependHexPrefix } from '$lib/utils';
 import { getGameConstants } from '$lib/common/constants';
 

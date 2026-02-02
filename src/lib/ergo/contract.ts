@@ -78,6 +78,7 @@ function ensureEndGameCompiled(): void {
 
     let source = END_GAME_SOURCE
         .replace(/`\+END_GAME_AUTH_GRACE_PERIOD\+`/g, constants.END_GAME_AUTH_GRACE_PERIOD.toString())
+        .replace(/`\+COMMISSION_DENOMINATOR\+`/g, constants.COMMISSION_DENOMINATOR.toString())
         .replace(/`\+JUDGES_PAID_ERGOTREE\+`/g, judgesPaidErgoTree)
         .replace(/`\+MAX_SCORE_LIST\+`/g, constants.MAX_SCORE_LIST.toString())
         .replace(/`\+PARTICIPATION_SCRIPT_HASH\+`/g, participationHash)

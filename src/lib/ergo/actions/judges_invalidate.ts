@@ -10,7 +10,7 @@ import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
-import { COMMISSION_DENOMINATOR } from '../envs';
+
 
 const JUDGE_PERIOD_MARGIN = 10;
 

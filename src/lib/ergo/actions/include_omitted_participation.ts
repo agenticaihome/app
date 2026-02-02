@@ -10,7 +10,7 @@ import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { prependHexPrefix } from '$lib/utils';
 import { stringToBytes } from '@scure/base';
-import { COMMISSION_DENOMINATOR } from '../envs';
+
 
 declare const ergo: any;
 

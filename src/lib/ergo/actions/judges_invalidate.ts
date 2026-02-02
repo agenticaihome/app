@@ -10,6 +10,7 @@ import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
+import { COMMISSION_DENOMINATOR } from '../envs';
 
 const JUDGE_PERIOD_MARGIN = 10;
 
@@ -113,16 +114,17 @@ export async function judges_invalidate(
                 BigInt(game.participationFeeAmount),
                 BigInt(game.perJudgeCommissionPercentage) + BigInt(game.resolverCommission),
                 0n,  // resolver commision goes to judges
+                BigInt(Math.round(game.devCommissionPercentage / 100 * COMMISSION_DENOMINATOR)),
                 BigInt(newDeadline)
             ]).toHex(),
 
-            // R9: gameProvenance: Coll[Coll[Byte]] -> [ rawJsonBytes, participationTokenId, resolverScriptBytes ]
-            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.resolverScript_Hex)!]).toHex(),
+            // R9: gameProvenance: Coll[Coll[Byte]] -> [ rawJsonBytes, participationTokenId, devScriptBytes, resolverScriptBytes ]
+            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.devScript)!, hexToBytes(game.resolverScript_Hex)!]).toHex(),
         });
 
     // --- 5. Build and Submit the Transaction ---
     const userAddress = await ergo.get_change_address();
-    const utxos: InputBox[] = await ergo.get_utxos();
+    const utxos: Box<Amount>[] = await ergo.get_utxos();
 
     // Inputs: the resolution box, the invalidated participant's box, and the judge's UTXOs
     const inputs = [parseBox(game.box), parseBox(invalidatedParticipation.box), ...utxos];

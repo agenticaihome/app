@@ -16,6 +16,7 @@ import { getGopGameResolutionErgoTreeHex, getGopParticipationErgoTreeHex } from 
 import { stringToBytes } from '@scure/base';
 import { GAME } from '../reputation/types';
 import { fetchJudges } from '../reputation/fetch';
+import { COMMISSION_DENOMINATOR } from '../envs';
 import { prependHexPrefix } from '$lib/utils';
 import { getGameConstants } from '$lib/common/constants';
 
@@ -146,6 +147,10 @@ export async function resolve_game(
 
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
     const resolutionDeadline = BigInt(currentHeight + JUDGE_PERIOD);
+    const constants = getGameConstants();
+    const devCommission = BigInt(Math.round(game.devCommissionPercentage / 100 * COMMISSION_DENOMINATOR));
+    const devScriptBytes = hexToBytes(game.devScript);
+    if (!devScriptBytes) throw new Error("Invalid DEV_SCRIPT on game object");
 
     const newNumericalParams = [
         BigInt(game.createdAt),
@@ -155,6 +160,7 @@ export async function resolve_game(
         game.participationFeeAmount,
         game.perJudgeCommissionPercentage,
         BigInt(game.commissionPercentage),
+        devCommission,
         resolutionDeadline
     ];
 
@@ -181,7 +187,7 @@ export async function resolve_game(
     const r7Hex = SColl(SColl(SByte), participatingJudgesTokens.map(t => hexToBytes(t)!)).toHex(); // R7: Jueces participantes
     const r8Hex = SColl(SLong, newNumericalParams).toHex(); // R8: Parámetros numéricos
 
-    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, hexToBytes(game.participationTokenId) ?? "", prependHexPrefix(resolverPkBytes)]).toHex();
+    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, hexToBytes(game.participationTokenId) ?? "", devScriptBytes, prependHexPrefix(resolverPkBytes)]).toHex();
 
     const boxCandidate = {
         transactionId: "00".repeat(32),

@@ -83,7 +83,10 @@ export interface GameActive {
     reputationOpinions: RPBox[];
     reputation: number;
     constants: GameConstants;
+
     createdAt: number;
+    devScript: string;
+    devCommissionPercentage: number;
 }
 
 /**
@@ -110,6 +113,8 @@ export interface GameResolution {
     resolverPK_Hex: string | null;
     resolverScript_Hex: string
     resolverCommission: number;
+    devScript: string;
+    devCommissionPercentage: number;
     content: GameContent;
     value: bigint;
     reputationOpinions: RPBox[];
@@ -396,16 +401,16 @@ export function calculateEffectiveScore(
     try {
         // Calculate the effective start block: max(B_box, B_start + M)
         const effectiveStartBlock = Math.max(
-            submissionHeight, 
+            submissionHeight,
             game.createdAt + game.constants.MIN_TIME_WEIGHT_MARGIN
         );
 
         // Calculate remaining duration: (B_deadline - effectiveStartBlock)
         const remainingDuration = BigInt(Math.max(0, game.deadlineBlock - effectiveStartBlock));
-        
+
         // Final Score: S_raw * (1 + (omega * remainingDuration))
         const timeFactor = 1n + (BigInt(game.timeWeight) * remainingDuration);
-        
+
         return rawScore * timeFactor;
     }
     catch (error) {

@@ -107,6 +107,9 @@ export const forum_explorer_url = writable<string>(default_forum_explorer_url);
 export const REPUTATION_PROOF_TOTAL_SUPPLY = 100_000_000;
 export const CACHE_DURATION_MS = 10000; // 10 seconds
 export const isDevMode = writable<boolean>(false);
+export const DEV_SCRIPT = "0008cd025ac8ab183ffde36068603120b00acdf141b91fe4e0c0c6d562b5f24e1e2cc2d1";
+export const DEV_COMMISSION_PERCENTAGE = 5;
+export const COMMISSION_DENOMINATOR = 1000000;
 
 /**
  * Controls whether chained transactions are used.

@@ -78,8 +78,6 @@ function ensureEndGameCompiled(): void {
 
     let source = END_GAME_SOURCE
         .replace(/`\+END_GAME_AUTH_GRACE_PERIOD\+`/g, constants.END_GAME_AUTH_GRACE_PERIOD.toString())
-        .replace(/`\+DEV_SCRIPT\+`/g, constants.DEV_SCRIPT)
-        .replace(/`\+DEV_COMMISSION_PERCENTAGE\+`/g, (constants.DEV_COMMISSION_PERCENTAGE / 100 * constants.COMMISSION_DENOMINATOR).toString())
         .replace(/`\+JUDGES_PAID_ERGOTREE\+`/g, judgesPaidErgoTree)
         .replace(/`\+MAX_SCORE_LIST\+`/g, constants.MAX_SCORE_LIST.toString())
         .replace(/`\+PARTICIPATION_SCRIPT_HASH\+`/g, participationHash)
@@ -127,8 +125,6 @@ function ensureGameResolutionCompiled(): void {
         .replace(/`\+JUDGE_PERIOD\+`/g, constants.JUDGE_PERIOD.toString())
         .replace(/`\+END_GAME_AUTH_GRACE_PERIOD\+`/g, constants.END_GAME_AUTH_GRACE_PERIOD.toString())
         .replace(/`\+RESOLVER_OMISSION_NO_PENALTY_PERIOD\+`/g, constants.RESOLVER_OMISSION_NO_PENALTY_PERIOD.toString())
-        .replace(/`\+DEV_SCRIPT\+`/g, constants.DEV_SCRIPT)
-        .replace(/`\+DEV_COMMISSION_PERCENTAGE\+`/g, (constants.DEV_COMMISSION_PERCENTAGE / 100 * constants.COMMISSION_DENOMINATOR).toString())
         .replace(/`\+REPUTATION_PROOF_SCRIPT_HASH\+`/g, reputationHash)
         .replace(/`\+PARTICIPATION_TYPE_ID\+`/g, constants.PARTICIPATION_TYPE_ID)
         .replace(/`\+PARTICIPATION_UNAVAILABLE_TYPE_ID\+`/g, constants.PARTICIPATION_UNAVAILABLE_TYPE_ID)

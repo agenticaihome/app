@@ -213,9 +213,9 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             catch (e) { console.warn(`Could not JSON.parse R8 for ${box.boxId}: ${r8RenderedValue}`); }
         } else if (Array.isArray(r8RenderedValue)) { parsedR8Array = r8RenderedValue; }
         const numericalParams = parseLongColl(parsedR8Array);
-        // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
-        if (!numericalParams || numericalParams.length < 7) throw new Error("R8 does not contain the 7 expected numerical parameters.");
-        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommissionPercentage, resolverCommissionPercentage] = numericalParams;
+        // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage]
+        if (!numericalParams || numericalParams.length < 8) throw new Error("R8 does not contain the 8 expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage] = numericalParams;
 
         const created_at_token = await tokenCreationHeight(gameId);
         if (created_at_token === null || createdAt < created_at_token - 5 || createdAt > created_at_token + 5) {
@@ -223,13 +223,16 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             return null;
         }
 
-        // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
+        // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId, devScript]
         const r9Value = getArrayFromValue(box.additionalRegisters.R9?.renderedValue);
-        if (!Array.isArray(r9Value) || r9Value.length < 2) {
-            throw new Error("R9 is not a valid array with at least 2 elements (gameDetailsJSON, participationTokenId).");
+        if (!Array.isArray(r9Value) || r9Value.length < 3) {
+            throw new Error("R9 is not a valid array with at least 3 elements.");
         }
         const gameDetailsHex = parseCollByteToHex(r9Value[0]);
         const participationTokenId = parseCollByteToHex(r9Value[1]);
+        const devScript = parseCollByteToHex(r9Value[2]);
+        if (!devScript) throw new Error("Could not parse devScript from R9.");
+
         const gameDetailsJson = hexToUtf8(gameDetailsHex || "");
         const content = parseGameContent(gameDetailsJson, box.boxId, box.assets[0]);
 
@@ -240,6 +243,8 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             status: GameState.Active,
             gameId,
             commissionPercentage: Number(resolverCommissionPercentage), // From R8
+            devCommissionPercentage: Number(devCommissionPercentage), // From R8
+            devScript, // From R9
             secretHash, // From R6
             judges, // From R7
             deadlineBlock: Number(deadlineBlock), // From R8
@@ -354,11 +359,11 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             .map(parseCollByteToHex)
             .filter((judge): judge is string => judge !== null && judge !== undefined);
 
-        // R8: Coll[Long] -> [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+        // R8: Coll[Long] -> [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage, resolutionDeadline]
         const r8Array = getArrayFromValue(box.additionalRegisters.R8?.renderedValue);
         const numericalParams = parseLongColl(r8Array);
-        if (!numericalParams || numericalParams.length < 8) throw new Error("R8 does not contain the 8 expected numerical parameters.");
-        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline] = numericalParams;
+        if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage, resolutionDeadline] = numericalParams;
 
         const created_at = await tokenCreationHeight(gameId);
         if (created_at === null || createdAt < created_at - 5 || createdAt > created_at + 5) {
@@ -366,15 +371,16 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             return null;
         }
 
-        // R9: (Coll[Byte], Coll[Byte], Coll[Byte]) -> gameDetailsHex, participationTokenId, resolverScript_Hex
+        // R9: (Coll[Byte], Coll[Byte], Coll[Byte], Coll[Byte]) -> gameDetailsHex, participationTokenId, devScript, resolverScript_Hex
         const r9Value = getArrayFromValue(box.additionalRegisters.R9?.renderedValue);
-        if (!r9Value || r9Value.length !== 3) throw new Error("R9 is not a valid tuple (expected 3 items).");
+        if (!r9Value || r9Value.length !== 4) throw new Error("R9 is not a valid tuple (expected 4 items).");
 
         const gameDetailsHex = r9Value[0];
         const participationTokenId = parseCollByteToHex(r9Value[1]);
-        const resolverScript_Hex = parseCollByteToHex(r9Value[2]);
+        const devScript = parseCollByteToHex(r9Value[2]);
+        const resolverScript_Hex = parseCollByteToHex(r9Value[3]);
 
-        if (!gameDetailsHex || !resolverScript_Hex) throw new Error("Could not parse R9.");
+        if (!gameDetailsHex || !resolverScript_Hex || !devScript) throw new Error("Could not parse R9.");
 
         const content = parseGameContent(hexToUtf8(gameDetailsHex), box.boxId, box.assets[0]);
 
@@ -402,6 +408,8 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             perJudgeCommissionPercentage: perJudgeCommissionPercentage,
             timeWeight: timeWeight, // From R8
             resolverCommission: Number(resolverCommissionPercentage), // Added from R8
+            devCommissionPercentage: Number(devCommissionPercentage), // Added from R8
+            devScript,
             constants: getGameConstants(),
             seed: seed, // Added from R5
             reputation: 0,

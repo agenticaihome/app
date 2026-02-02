@@ -14,6 +14,7 @@ import { hexToBytes } from '$lib/ergo/utils';
 import { getGopGameActiveErgoTreeHex, getGopMintIdtAddress } from '../contract';
 import { stringToBytes } from '@scure/base';
 import { getGameConstants } from '$lib/common/constants';
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE, COMMISSION_DENOMINATOR } from '../envs';
 import { estimateTotalBoxSizeFromInputs, MAX_BOX_SIZE, type GameBoxInputs } from '../utils/box-size-calculator';
 
 function randomSeed(): string {
@@ -163,6 +164,11 @@ export async function create_game(
     const r5Hex = SColl(SByte, seedBytes).toHex();
     const r6Hex = SColl(SByte, hashedSecretBytes).toHex();
     const r7Hex = SColl(SColl(SByte), judgesColl).toHex();
+    const constants = getGameConstants();
+    const devCommission = BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR));
+    const devScriptBytes = hexToBytes(DEV_SCRIPT);
+    if (!devScriptBytes) throw new Error("Invalid DEV_SCRIPT constant");
+
     const r8Hex = SColl(SLong, [
         BigInt(creationHeight),
         timeWeight,
@@ -170,9 +176,10 @@ export async function create_game(
         resolverStakeAmount,
         participationFeeAmount,
         BigInt(Math.round(perJudgeCommissionPercentage * 10000)),
-        BigInt(Math.round(commissionPercentage * 10000))
+        BigInt(Math.round(commissionPercentage * 10000)),
+        devCommission
     ]).toHex();
-    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes]).toHex();
+    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes, devScriptBytes]).toHex();
 
     const registers = {
         R4: r4Hex,

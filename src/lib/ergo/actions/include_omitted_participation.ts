@@ -10,6 +10,7 @@ import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { prependHexPrefix } from '$lib/utils';
 import { stringToBytes } from '@scure/base';
+import { COMMISSION_DENOMINATOR } from '../envs';
 
 declare const ergo: any;
 
@@ -72,11 +73,12 @@ export async function include_omitted_participation(
                 BigInt(game.participationFeeAmount),
                 BigInt(game.perJudgeCommissionPercentage),
                 BigInt(game.resolverCommission),
+                BigInt(Math.round(game.devCommissionPercentage / 100 * COMMISSION_DENOMINATOR)),
                 BigInt(game.resolutionDeadline)
             ]).toHex(),
 
-            // --- R9: gameProvenance: Coll[Coll[Byte]] (Detalles del juego en JSON/Hex, Participation token id, Script de gasto del resolvedor) ---
-            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.resolverScript_Hex)!]).toHex()
+            // --- R9: gameProvenance: Coll[Coll[Byte]] (Detalles del juego en JSON/Hex, Participation token id, devScript, Script de gasto del resolvedor) ---
+            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.devScript)!, resolverErgoTree]).toHex()
         });
 
     const pBox = parseBox(omittedParticipation.box);

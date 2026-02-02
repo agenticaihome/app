@@ -14,6 +14,7 @@
         resolve_participation_commitment,
         calculateEffectiveScore,
         isOpenSolverSubmit,
+        isDevFriendly,
     } from "$lib/common/game";
     import { marked } from "marked";
     import {
@@ -2246,6 +2247,25 @@
                                 game.content.description ||
                                     "No description available.",
                             )}
+
+                            {#if !isDevFriendly(game)}
+                                <div
+                                    class="mt-6 border-l-4 border-amber-500/50 bg-amber-500/10 pl-6 pr-4 py-4 text-sm text-amber-700 dark:text-amber-300 rounded-r"
+                                >
+                                    <p
+                                        class="font-semibold text-base flex items-center gap-2"
+                                    >
+                                        <AlertTriangle class="w-5 h-5" />
+                                        Not Respecting Platform Developers
+                                    </p>
+                                    <p class="mt-2 leading-relaxed">
+                                        This game doesn't follow the platform's
+                                        developer commission guidelines.
+                                        However, as an open platform, it will be
+                                        treated equally with all other games.
+                                    </p>
+                                </div>
+                            {/if}
 
                             {#if paperContent}
                                 <div

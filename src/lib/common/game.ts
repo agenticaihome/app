@@ -5,6 +5,7 @@ import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
 import { bigintToLongByteArray, hexToBytes, parseCollByteToHex, parseLongColl, uint8ArrayToHex } from "$lib/ergo/utils";
 import { fetch_token_details } from "$lib/ergo/fetch";
 import { type RPBox } from "reputation-system";
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from "$lib/ergo/envs";
 
 export interface TokenEIP4 {
     name: string,
@@ -290,6 +291,26 @@ export async function isGameDrainingAllowed(game: AnyGame): Promise<boolean> {
 
     return unlocked && remainingStake;
 }
+
+/**
+ * Checks if a game is "dev friendly" by verifying that:
+ * 1. The devScript matches the expected DEV_SCRIPT from envs.ts
+ * 2. The devCommissionPercentage is >= the expected DEV_COMMISSION_PERCENTAGE from envs.ts
+ * 
+ * This helps identify games that respect the platform developers.
+ */
+export function isDevFriendly(game: AnyGame): boolean {
+    // GameCancellation and GameFinalized might not have these fields
+    if (!('devScript' in game) || !('devCommissionPercentage' in game)) {
+        return true; // Don't penalize games that don't have these fields
+    }
+
+    const hasCorrectScript = game.devScript === DEV_SCRIPT;
+    const hasCorrectCommission = game.devCommissionPercentage >= DEV_COMMISSION_PERCENTAGE;
+
+    return hasCorrectScript && hasCorrectCommission;
+}
+
 
 export function resolve_participation_commitment(p: AnyParticipation, secretHex: string, seed: string): bigint | null {
     // Early validation

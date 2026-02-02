@@ -13,6 +13,7 @@
         type AnyGame as Game,
         isOpenCeremony,
         isOpenSolverSubmit,
+        isDevFriendly,
     } from "$lib/common/game";
     import { fetch_token_details, fetchParticipations } from "$lib/ergo/fetch";
     import { formatTokenBigInt } from "$lib/utils";
@@ -346,6 +347,21 @@
                     >
                         "{opinionContent}"
                     </blockquote>
+                {/if}
+
+                {#if !isDevFriendly(game)}
+                    <div
+                        class="border-l-4 border-amber-500/50 bg-amber-500/10 pl-4 pr-3 py-2 text-xs text-amber-600 dark:text-amber-400 rounded-r"
+                    >
+                        <p class="font-semibold">
+                            ⚠️ Not Respecting Platform Developers
+                        </p>
+                        <p class="mt-1 opacity-90">
+                            This game doesn't follow the platform's developer
+                            commission guidelines. However, as an open platform,
+                            it will be treated equally.
+                        </p>
+                    </div>
                 {/if}
             </div>
 

@@ -18,6 +18,8 @@ import {
 import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { getGopGameActiveErgoTree } from "$lib/ergo/contract";
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE, COMMISSION_DENOMINATOR } from "$lib/ergo/envs";
+import { hexToBytes } from "$lib/ergo/utils";
 
 
 // --- Test Suite ---
@@ -121,9 +123,10 @@ describe.each(baseModes)("Game Creation (create_game) - (%s)", (mode) => {
       resolverStake,
       participationFee,
       50000n,
-      100000n
+      100000n,
+      BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))
     ]).toHex();
-    const r9Hex = SColl(SByte, stringToBytes("utf8", gameDetailsJson)).toHex();
+    const r9Hex = SColl(SColl(SByte), [stringToBytes("utf8", gameDetailsJson), new Uint8Array(0), hexToBytes(DEV_SCRIPT)!]).toHex();
 
     const registers = { R4: r4Hex, R5: r5Hex, R6: r6Hex, R7: r7Hex, R8: r8Hex, R9: r9Hex };
 

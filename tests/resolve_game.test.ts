@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { MockChain } from "@fleet-sdk/mock-chain";
+import { MockChain, KeyedMockChainParty } from "@fleet-sdk/mock-chain";
 import {
   OutputBuilder,
   RECOMMENDED_MIN_FEE_VALUE,
@@ -10,11 +10,16 @@ import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { bigintToLongByteArray, hexToBytes } from "$lib/ergo/utils";
 import { prependHexPrefix } from "$lib/utils";
-import { getGopGameActiveErgoTree, getGopGameResolutionErgoTree, getGopParticipationErgoTree } from "$lib/ergo/contract";
+import {
+  getGopGameActiveErgoTree,
+  getGopGameResolutionErgoTree,
+  getGopParticipationErgoTree,
+  getGopFalseErgoTreeHex,
+} from "$lib/ergo/contract";
 import { DefaultGameConstants } from "$lib/common/constants";
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE, COMMISSION_DENOMINATOR } from "$lib/ergo/envs";
 
 const ERG_BASE_TOKEN = "";
-const ERG_BASE_TOKEN_NAME = "ERG";
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
 const USD_BASE_TOKEN_NAME = "USD";
 
@@ -31,14 +36,14 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
   let mockChain: MockChain;
 
   // --- Actores ---
-  let creator: ReturnType<MockChain["newParty"]>;
-  let participant1: ReturnType<MockChain["newParty"]>;
-  let participant2: ReturnType<MockChain["newParty"]>;
+  let creator: KeyedMockChainParty;
+  let participant1: KeyedMockChainParty;
+  let participant2: KeyedMockChainParty;
 
   // --- Partidos de Contratos --- 
-  let gameActiveContract: ReturnType<MockChain["addParty"]>;
-  let participationContract: ReturnType<MockChain["addParty"]>;
-  let gameResolutionContract: ReturnType<MockChain["addParty"]>;
+  let gameActiveContract: any;
+  let participationContract: any;
+  let gameResolutionContract: any;
 
   const participationSubmittedErgoTree = getGopParticipationErgoTree();
   const gameResolutionErgoTree = getGopGameResolutionErgoTree();
@@ -125,11 +130,12 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
           resolverStake,
           participationFee,
           perJudgeCommission,
-          resolver_commission_percentage
+          resolver_commission_percentage,
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))
         ]).toHex(),
 
         // R9: JSON Details
-        R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex()
+        R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? "", hexToBytes(DEV_SCRIPT)!]).toHex()
       }
     });
 
@@ -153,6 +159,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       participationFee,
       perJudgeCommission,
       resolver_commission_percentage,
+      BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
       resolutionDeadline
     ];
 
@@ -186,6 +193,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
         R9: SColl(SColl(SByte), [
           stringToBytes("utf8", "{}"), // Detalles del juego
           hexToBytes(mode.token) ?? "",
+          hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
           resolvedorPkBytes           // Script de gasto del resolvedor
         ]).toHex()
       });
@@ -216,7 +224,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
     // Create solver ID box
     const solverIdBox = {
       creationHeight: deadlineBlock - DefaultGameConstants.PARTICIPATION_TIME_WINDOW - DefaultGameConstants.SEED_MARGIN - 1, // Created before deadline
-      ergoTree: "1906010100d17300",
+      ergoTree: getGopFalseErgoTreeHex(),
       assets: [],
       value: RECOMMENDED_MIN_FEE_VALUE,
       additionalRegisters: {
@@ -365,6 +373,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       participationFee,
       perJudgeCommission,
       resolver_commission_percentage,
+      BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
       resolutionDeadline
     ];
 
@@ -402,6 +411,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
             R9: SColl(SColl(SByte), [
               stringToBytes("utf8", "{}"), // Detalles del juego
               hexToBytes(mode.token) ?? "",
+              hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
               resolvedorPkBytes           // Script de gasto del resolvedor
             ]).toHex()
           })
@@ -429,6 +439,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       participationFee,
       perJudgeCommission,
       resolver_commission_percentage,
+      BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
       resolutionDeadline
     ];
     const resolvedorPkBytes = creatorPkBytes;
@@ -462,6 +473,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
         R9: SColl(SColl(SByte), [
           stringToBytes("utf8", "{}"), // Detalles del juego
           hexToBytes(mode.token) ?? "",
+          hexToBytes(DEV_SCRIPT)!,
           resolvedorPkBytes           // Script de gasto del resolvedor
         ]).toHex()
       });
@@ -529,6 +541,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       participationFee,
       perJudgeCommission,
       resolver_commission_percentage,
+      BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
       resolutionDeadline
     ];
 
@@ -566,6 +579,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
           R9: SColl(SColl(SByte), [
             stringToBytes("utf8", '{"name": "anon"}'), // Detalles del juego modificados
             hexToBytes(mode.token) ?? "",
+            hexToBytes(DEV_SCRIPT)!,
             creatorPkBytes           // Script de gasto del resolvedor
           ]).toHex()
         })])

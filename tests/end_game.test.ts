@@ -21,6 +21,7 @@ import { stringToBytes } from "@scure/base";
 import { prependHexPrefix } from "$lib/utils";
 import { bigintToLongByteArray, hexToBytes } from "$lib/ergo/utils";
 import { DefaultGameConstants } from "$lib/common/constants";
+import { COMMISSION_DENOMINATOR, DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
 import { getGopGameResolutionErgoTree, getGopParticipationErgoTree, getReputationProofErgoTree, getGopJudgesPaidErgoTree, getGopJudgesPaidErgoTreeHex, getGopParticipationBatchErgoTree, getGopEndGameErgoTree } from "$lib/ergo/contract";
 
 // --- Suite de Pruebas ---
@@ -37,7 +38,7 @@ const baseModes = [
 describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
   const mockChain = new MockChain({ height: 800_000 });
 
-  const devErgoTree = DefaultGameConstants.DEV_SCRIPT;
+  const devErgoTree = DEV_SCRIPT;
   const gameResolutionErgoTree: ErgoTree = getGopGameResolutionErgoTree();
   const participationErgoTree: ErgoTree = getGopParticipationErgoTree();
   const participationBatchErgoTree: ErgoTree = getGopParticipationBatchErgoTree();
@@ -224,13 +225,15 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           participationFee,
           0n,                                       // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent),        // resolverCommissionPercentage
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
           BigInt(resolutionDeadline)
         ]).toHex(),
 
-        // gameProvenance: [Detalles del juego, TokenId (si aplica), Script del resolvedor]
+        // gameProvenance: [Detalles del juego, TokenId (si aplica), Dev Script, Script del resolvedor]
         R9: SColl(SColl(SByte), [
           stringToBytes('utf8', gameDetailsJson),                   // detalles del juego
           mode.token !== ERG_BASE_TOKEN ? (hexToBytes(mode.token) || new Uint8Array(0)) : new Uint8Array(0), // token id
+          hexToBytes(DEV_SCRIPT)!,                                  // dev script
           prependHexPrefix(resolver.key.publicKey, "0008cd")        // script del resolvedor
         ]).toHex()
       }
@@ -270,8 +273,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       }
     }, 0n);
 
-    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (prizePool * 5n) / 100n;
+    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (prizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const winnerBasePrize = prizePool - resolverCommission - devCommission;
 
     const finalWinnerPrize = winnerBasePrize;
@@ -447,6 +450,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           participationFee,
           0n,        // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent), // resolverCommissionPercentage
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
           BigInt(resolutionDeadline)
         ]).toHex(),
 
@@ -454,6 +458,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
         R9: SColl(SColl(SByte), [
           stringToBytes('utf8', gameDetailsJson),                  // Detalles del juego
           mode.token !== ERG_BASE_TOKEN ? (hexToBytes(mode.token) || new Uint8Array(0)) : new Uint8Array(0),
+          hexToBytes(DEV_SCRIPT)!,                                 // Dev Script
           prependHexPrefix(resolver.key.publicKey, "0008cd")      // Script del resolvedor
         ]).toHex()
       },
@@ -488,8 +493,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       }
     }, 0n);
 
-    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (prizePool * 5n) / 100n;
+    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (prizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const winnerBasePrize = prizePool - resolverCommission - devCommission;
 
     const finalWinnerPrize = winnerBasePrize;
@@ -634,6 +639,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           participationFee,
           0n,        // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent), // resolverCommissionPercentage
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
           BigInt(resolutionDeadline)
         ]).toHex(),
 
@@ -641,6 +647,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
         R9: SColl(SColl(SByte), [
           stringToBytes('utf8', gameDetailsJson),                  // Detalles del juego
           mode.token !== ERG_BASE_TOKEN ? (hexToBytes(mode.token) || new Uint8Array(0)) : new Uint8Array(0),
+          hexToBytes(DEV_SCRIPT)!,                                 // Dev Script
           prependHexPrefix(resolver.key.publicKey, "0008cd")      // Script del resolvedor
         ]).toHex()
       },
@@ -672,8 +679,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
     }, 0n);
 
 
-    let resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    let devCommission = (prizePool * 5n) / 100n;
+    let resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    let devCommission = (prizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     let winnerBasePrize = prizePool - resolverCommission - devCommission;
 
     if (winnerBasePrize < participationFee) {
@@ -819,7 +826,6 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
         // participatingJudges (vacío)
         R7: SColl(SColl(SByte), []).toHex(),
 
-        // numericalParameters:
         R8: SColl(SLong, [
           1n, 20n,
           BigInt(deadline),
@@ -827,12 +833,14 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           participationFee,
           0n,        // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent),        // resolverCommissionPercentage
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
           BigInt(resolutionDeadline)
         ]).toHex(),
 
         R9: SColl(SColl(SByte), [
           stringToBytes('utf8', gameDetailsJson),             // Detalles del juego
           mode.token !== ERG_BASE_TOKEN ? (hexToBytes(mode.token) || new Uint8Array(0)) : new Uint8Array(0),
+          hexToBytes(DEV_SCRIPT)!,                            // Dev Script
           prependHexPrefix(resolver.key.publicKey, "0008cd") // Script del resolvedor
         ]).toHex()
       },
@@ -867,8 +875,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       }
     }, 0n);
 
-    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (prizePool * 5n) / 100n;
+    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (prizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const winnerBasePrize = prizePool - resolverCommission - devCommission;
 
     const finalWinnerPrize = winnerBasePrize;
@@ -957,8 +965,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       }
     }, 0n);
 
-    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (prizePool * 5n) / 100n;
+    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (prizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const winnerBasePrize = prizePool - resolverCommission - devCommission;
 
     const finalWinnerPrize = winnerBasePrize;
@@ -1069,8 +1077,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       }
     }, 0n);
 
-    const resolverCommission = (prizePoolWithoutBatch * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (prizePoolWithoutBatch * 5n) / 100n;
+    const resolverCommission = (prizePoolWithoutBatch * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (prizePoolWithoutBatch * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const winnerBasePrize = prizePoolWithoutBatch - resolverCommission - devCommission;
 
     const finalWinnerPrize = winnerBasePrize;
@@ -1192,7 +1200,6 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
         // participatingJudges (lista de tokens de reputación de los jueces)
         R7: SColl(SColl(SByte), judgesTokenIds).toHex(),
 
-        // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercent, resolverCommissionPercentage, resolutionDeadline]
         R8: SColl(SLong, [
           1n, 20n,
           BigInt(deadline),              // deadline
@@ -1200,6 +1207,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           participationFee,              // participation fee
           perJudgeCommissionPercent,     // per-judge commission
           BigInt(resolverCommissionPercent),                            // resolverCommissionPercentage
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), // devCommissionPercentage
           BigInt(resolutionDeadline),    // resolution deadline
         ]).toHex(),
 
@@ -1207,6 +1215,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
         R9: SColl(SColl(SByte), [
           stringToBytes('utf8', gameDetailsJson),             // detalles del juego
           mode.token !== ERG_BASE_TOKEN ? (hexToBytes(mode.token) || new Uint8Array(0)) : new Uint8Array(0),
+          hexToBytes(DEV_SCRIPT)!,                            // Dev Script
           prependHexPrefix(resolver.key.publicKey, "0008cd") // script resolvedor
         ]).toHex()
       },
@@ -1226,12 +1235,12 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
         return acc + (p.assets.find(a => a.tokenId === mode.token)?.amount || 0n);
       }
     }, 0n);
-    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (prizePool * 5n) / 100n;
+    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (prizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const judgeCount = BigInt(judgesTokenIds.length);
 
     // Dust constants (adjust to match script's MIN_ERG_BOX)
-    const MIN_ERG_BOX = 1000000n; // Example; use your actual value
+    const MIN_ERG_BOX = BigInt(COMMISSION_DENOMINATOR); // Example; use your actual value
     const dustThreshold = mode.token === ERG_BASE_TOKEN ? MIN_ERG_BOX : 0n;
 
     // Dev forfeits
@@ -1239,7 +1248,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
     const finalDevPayout = devCommission - devForfeits;
 
     // Fix: perJudgeCommissionPercent is PER JUDGE.
-    const totalJudgeCommission = (prizePool * perJudgeCommissionPercent * BigInt(judgeCount)) / 1000000n;
+    const totalJudgeCommission = (prizePool * perJudgeCommissionPercent * BigInt(judgeCount)) / BigInt(COMMISSION_DENOMINATOR);
     const perJudgeCommission = totalJudgeCommission / judgeCount;
 
     // Judges forfeits (forfeit ALL if per-judge is dust)
@@ -1398,8 +1407,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       }
     }, 0n);
 
-    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (prizePool * 5n) / 100n;
+    const resolverCommission = (prizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (prizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const winnerBasePrize = prizePool - resolverCommission - devCommission;
 
     const finalWinnerPrize = winnerBasePrize;
@@ -1470,7 +1479,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       additionalRegisters: {
         R4: SColl(SByte, new Uint8Array(0)).toHex(),
         R5: SColl(SByte, new Uint8Array(0)).toHex(),
-        R6: SColl(SByte, gameNftId).toHex(),
+        R6: SColl(SByte, hexToBytes(gameNftId)!).toHex(),
       }
     });
 
@@ -1490,8 +1499,8 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
       }
     }, 0n);
 
-    const resolverCommission = (partialPrizePool * BigInt(resolverCommissionPercent)) / 1000000n;
-    const devCommission = (partialPrizePool * 5n) / 100n;
+    const resolverCommission = (partialPrizePool * BigInt(resolverCommissionPercent)) / BigInt(COMMISSION_DENOMINATOR);
+    const devCommission = (partialPrizePool * BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))) / BigInt(COMMISSION_DENOMINATOR);
     const winnerBasePrize = partialPrizePool - resolverCommission - devCommission;
 
     const finalWinnerPrize = winnerBasePrize;

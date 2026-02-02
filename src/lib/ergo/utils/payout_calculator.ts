@@ -1,4 +1,5 @@
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
+import { COMMISSION_DENOMINATOR, DEV_COMMISSION_PERCENTAGE } from '$lib/ergo/envs';
 
 export interface PayoutResult {
     finalWinnerPrize: bigint;
@@ -21,7 +22,6 @@ export function calculatePayouts(
 
     // B. Cálculo del Prize Pool
     const totalParticipations = participations.reduce((acc, p) => acc + BigInt(p.value), 0n);
-    // prizePool = Lo que pusieron los jugadores + Lo que había en el contrato - Lo que puso el creador (Stake)
     const prizePool = totalParticipations + contractBalance - game.resolverStakeAmount;
 
     console.log("--- DEBUG CALCULATION START ---");
@@ -35,11 +35,11 @@ export function calculatePayouts(
     const perJudgePct = BigInt(perJudgePctNumber);
     const judge_count = BigInt((game.judges ?? []).length);
 
-    const perJudgeCommission = (prizePool * perJudgePct) / BigInt(game.constants.COMMISSION_DENOMINATOR);
+    const perJudgeCommission = (prizePool * perJudgePct) / BigInt(COMMISSION_DENOMINATOR);
     const totalJudgeCommission = perJudgeCommission * judge_count;
 
     // Comisiones Dev
-    const devCommission = (prizePool * BigInt(game.constants.DEV_COMMISSION_PERCENTAGE)) / 100n;
+    const devCommission = (prizePool * BigInt(game.devCommissionPercentage)) / 100n;
 
     let finalWinnerPrize = 0n;
     let finalResolverPayout = 0n;
@@ -59,7 +59,7 @@ export function calculatePayouts(
     } else {
         // --- CASO: HAY GANADOR ---
         const resolverStake = game.resolverStakeAmount;
-        const resolverCommission = (prizePool * BigInt(game.resolverCommission)) / BigInt(game.constants.COMMISSION_DENOMINATOR);
+        const resolverCommission = (prizePool * BigInt(game.resolverCommission)) / BigInt(COMMISSION_DENOMINATOR);
 
         // Premio tentativo restando comisiones
         const tentativeWinnerPrize = prizePool - resolverCommission - totalJudgeCommission - devCommission;

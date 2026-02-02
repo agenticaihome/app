@@ -20,7 +20,9 @@ import { stringToBytes } from "@scure/base";
 import { bigintToLongByteArray, generate_pk_proposition, hexToBytes } from "$lib/ergo/utils";
 import { prependHexPrefix } from "$lib/utils";
 import { getGopGameResolutionErgoTree, getGopParticipationErgoTree, getReputationProofErgoTree } from "$lib/ergo/contract";
+
 import { DefaultGameConstants } from "$lib/common/constants";
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE, COMMISSION_DENOMINATOR } from "$lib/ergo/envs";
 
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
 const USD_BASE_TOKEN_NAME = "USD";
@@ -145,6 +147,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
 
@@ -152,6 +155,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -201,7 +205,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -226,6 +230,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -257,6 +262,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
@@ -349,6 +355,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
 
@@ -356,6 +363,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -388,7 +396,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -404,7 +412,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -426,6 +434,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -459,6 +468,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                             R9: SColl(SColl(SByte), [
                                 stringToBytes("utf8", "{}"),
                                 hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                                hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                                 prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                             ]).toHex()
                         }
@@ -545,11 +555,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -614,7 +626,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -636,6 +648,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -658,6 +671,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                             R9: SColl(SColl(SByte), [
                                 stringToBytes("utf8", "{}"),
                                 hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                                hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                                 prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                             ]).toHex()
                         }
@@ -743,11 +757,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -820,6 +836,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -842,6 +859,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                             R9: SColl(SColl(SByte), [
                                 stringToBytes("utf8", "{}"),
                                 hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                                hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                                 prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                             ]).toHex()
                         }
@@ -932,11 +950,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -969,7 +989,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -985,7 +1005,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -1008,6 +1028,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1026,6 +1047,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
@@ -1094,11 +1116,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -1132,7 +1156,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -1148,7 +1172,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, dummyInvalidInvalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -1174,6 +1198,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1191,6 +1216,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
@@ -1259,11 +1285,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -1296,7 +1324,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -1312,7 +1340,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -1337,6 +1365,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1356,6 +1385,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
@@ -1423,11 +1453,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -1460,7 +1492,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -1476,7 +1508,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -1501,6 +1533,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1518,6 +1551,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
@@ -1585,11 +1619,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -1622,7 +1658,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -1638,7 +1674,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -1663,6 +1699,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1680,6 +1717,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
@@ -1747,11 +1785,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -1784,7 +1824,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -1800,7 +1840,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -1825,6 +1865,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1842,6 +1883,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
@@ -1908,11 +1950,13 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
@@ -1945,7 +1989,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge1TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(), // Vota contra el candidato
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fcwctfPQPkDfHgxBns5Uu3dwWpaoywhkpLEobLuztfQuV5mt3T"),
@@ -1961,7 +2005,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 value: 1_000_000n,
                 assets: [{ tokenId: judge2TokenId, amount: 1n }],
                 additionalRegisters: {
-                    R4: SColl(SByte, dummyTypeNftId).toHex(),
+                    R4: SColl(SByte, hexToBytes(dummyTypeNftId) ?? new Uint8Array(0)).toHex(),
                     R5: SColl(SByte, invalidatedCommitment).toHex(),
                     R6: SBool(true).toHex(),
                     R7: generate_pk_proposition("9fwQGg6pPjibqhEZDVopd9deAHXNsWU4fjAHFYLAKexdVCDhYEs"),
@@ -1986,6 +2030,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[4],         // participationFee
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -2003,6 +2048,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
                             prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })

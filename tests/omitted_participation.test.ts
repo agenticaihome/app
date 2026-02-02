@@ -18,7 +18,8 @@ import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { bigintToLongByteArray, hexToBytes } from "$lib/ergo/utils";
 import { prependHexPrefix } from "$lib/utils";
-import { getGopGameResolutionErgoTree, getGopParticipationErgoTree } from "$lib/ergo/contract";
+import { getGopGameResolutionErgoTree, getGopParticipationErgoTree, getGopFalseErgoTreeHex } from "$lib/ergo/contract";
+import { COMMISSION_DENOMINATOR, DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
 import { DefaultGameConstants } from "$lib/common/constants";
 
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
@@ -47,7 +48,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
 
     // --- Game State Variables ---
     const initial_height = 800_000;
-    const resolutionDeadline = initial_height + DefaultGameConstants.JUDGE_PERIOD;  // initial height + 100 blocks
+    const resolutionDeadline = BigInt(initial_height) + BigInt(DefaultGameConstants.JUDGE_PERIOD);
     const gameNftId = "22ccdd22ccdd22ccdd22ccdd22ccdd22ccdd22ccdd22ccdd22ccdd22ccdd22";
     const secret = stringToBytes("utf8", "shared-secret-for-omitted-test");
     const game_deadline = 700_700n;
@@ -92,7 +93,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         omittedScore: bigint,
         omittedCreationHeight: number = 600_000,
         omittedScores: bigint[] = [],
-        newBlocks: number = 10,
+        newBlocks: number = 1,
         no_current_winner: boolean = false
     ) => {
         gameResolutionContract.utxos.clear();
@@ -107,7 +108,13 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         winnerCommitment = createCommitment("solver-winner", winnerScore, winnerLogsHash, winnerErgotree, secret);
         omittedCommitment = createCommitment("solver-omitted", omittedScore, omittedLogsHash, omittedErgotree, secret);
 
-        const numericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [
+            1n, 20n, game_deadline,
+            2_000_000_000n, 1_000_000n,
+            10000n, 200000n,
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), // dev commission percentage
+            BigInt(resolutionDeadline)
+        ];
 
         const gameBoxValue = RECOMMENDED_MIN_FEE_VALUE;
         const gameAssets = [
@@ -142,6 +149,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // dev script
                     prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                 ]).toHex()
             }
@@ -185,7 +193,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         omittedParticipantBox = participationContract.utxos.toArray()[1];
 
         // Create solver ID boxes for winner and omitted
-        const FALSE_SCRIPT_ERGOTREE = "1906010100d17300";
+        const FALSE_SCRIPT_ERGOTREE = getGopFalseErgoTreeHex();
         const winnerSolverIdBox = {
             creationHeight: 600_000,
             ergoTree: FALSE_SCRIPT_ERGOTREE,
@@ -213,7 +221,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
     it("Must maintain the resolver during RESOLVER_OMISSION_NO_PENALTY_PERIOD blocks", () => {
         setupScenario(1000n, 1200n, 600_000, [], 1);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -232,6 +240,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })
@@ -265,10 +274,11 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                             SColl(SByte, omittedCommitment)
                         ).toHex(),
                         R7: SColl(SColl(SByte), []).toHex(),
-                        R8: SColl(SLong, [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)]).toHex(),
+                        R8: SColl(SLong, [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)]).toHex(),
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(newResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })
@@ -285,7 +295,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
     it("should include an omitted participant who becomes the new winner", () => {
         setupScenario(1000n, 1200n);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -304,6 +314,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })
@@ -325,7 +336,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
     it("should fail with an omitted participant who is not the new winner", () => {
         setupScenario(1000n, 800n);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 1n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 1n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -344,6 +355,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })
@@ -361,7 +373,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         const lateCreationHeight = Number(game_deadline) + 1;
         setupScenario(1000n, 1200n, lateCreationHeight);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 1n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 1n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -380,6 +392,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })
@@ -396,7 +409,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
     it("should set the omitted participant as the winner when there is no current winner", () => {
         setupScenario(1000n, 1200n, 600_000, [], 10, true);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -415,6 +428,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })
@@ -438,7 +452,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         const earlierCreationHeight = 500_000; // Earlier than the default 600_000
         setupScenario(1000n, 1000n, earlierCreationHeight);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -454,6 +468,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -480,7 +495,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         const earlierCreationHeight = 500_000;
         setupScenario(1000n, 600n, earlierCreationHeight);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -496,6 +511,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -517,7 +533,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         const laterCreationHeight = 650_000; // Later than the default 600_000 used for currentWinnerBox
         setupScenario(1000n, 1000n, laterCreationHeight);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -533,7 +549,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
-
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -562,7 +578,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         const winnerLogsHash = blake2b256(stringToBytes("utf8", "logs-winner"));
         winnerCommitment = createCommitment("solver-winner", 1000n, winnerLogsHash, currentWinnerErgotree, secret);
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         gameResolutionContract.addUTxOs({
             ergoTree: gameResolutionErgoTree.toHex(),
@@ -578,6 +594,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                    hexToBytes(DEV_SCRIPT)!, // dev script
                     prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                 ]).toHex()
             }
@@ -633,7 +650,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
-
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -653,7 +670,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         // Use a different secret that won't match the omitted participant's commitment
         const wrongSecret = stringToBytes("utf8", "wrong-secret-for-omitted-test");
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -669,7 +686,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
-
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -705,7 +722,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         });
         const wrongGameParticipantBox = participationContract.utxos.toArray()[2]; // Third box
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -721,7 +738,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
-
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -761,7 +778,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         });
         const inconsistentParticipantBox = participationContract.utxos.toArray()[2];
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -777,6 +794,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -797,7 +815,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
         // setupScenario is at 800_000 + 10 = 800_010. Deadline is 800_030.
         mockChain.newBlocks(100); // Now at 800_110, past the deadline of 800_100.
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -813,6 +831,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -829,7 +848,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
     it("should handle omitted participant with zero score correctly", () => {
         setupScenario(1000n, 0n); // Current winner: 1000, Omitted: 0
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -845,6 +864,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")
                         ]).toHex()
                     })
@@ -862,7 +882,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
     it("should pass if the omitted participant has 10 scores", () => {
         setupScenario(1000n, 1200n, 600_000, [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n]);  // the function adds another score to make it 10
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -881,6 +901,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })
@@ -902,7 +923,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
     it("should fail if the omitted participant has more than 10 scores", () => {
         setupScenario(1000n, 1200n, 600_000, [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n, 9n, 10n]);  // the function adds another score to make it 11
 
-        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(resolutionDeadline)];
+        const newNumericalParams: bigint[] = [1n, 20n, game_deadline, 2_000_000_000n, 1_000_000n, 10000n, 200000n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), BigInt(resolutionDeadline)];
 
         const tx = new TransactionBuilder(mockChain.height)
             .from([gameResolutionBox, ...newResolver.utxos.toArray()])
@@ -921,6 +942,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(mode.token) ?? new Uint8Array(0), // participationTokenId
+                            hexToBytes(DEV_SCRIPT)!, // dev script
                             prependHexPrefix(originalResolver.address.getPublicKeys()[0], "0008cd")  // script del resolvedor
                         ]).toHex()
                     })

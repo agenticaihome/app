@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { MockChain } from "@fleet-sdk/mock-chain";
+import { MockChain, type KeyedMockChainParty } from "@fleet-sdk/mock-chain";
 import {
     Box,
     ErgoTree,
@@ -21,6 +21,7 @@ import { bigintToLongByteArray, generate_pk_proposition, hexToBytes } from "$lib
 import { prependHexPrefix } from "$lib/utils";
 import { getGopGameResolutionErgoTree, getGopParticipationErgoTree, getReputationProofErgoTree } from "$lib/ergo/contract";
 import { DefaultGameConstants } from "$lib/common/constants";
+import { COMMISSION_DENOMINATOR, DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
 
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
 const USD_BASE_TOKEN_NAME = "USD";
@@ -42,12 +43,12 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
     const mockChain = new MockChain({ height: 800_000 });
 
     // --- Actores ---
-    let resolver: ReturnType<MockChain["newParty"]>;
-    let invalidatedWinner: ReturnType<MockChain["newParty"]>;
-    let nextWinner: ReturnType<MockChain["newParty"]>;
-    let judge1: ReturnType<MockChain["newParty"]>;
-    let judge2: ReturnType<MockChain["newParty"]>;
-    let judge3: ReturnType<MockChain["newParty"]>;
+    let resolver: KeyedMockChainParty;
+    let invalidatedWinner: KeyedMockChainParty;
+    let nextWinner: KeyedMockChainParty;
+    let judge1: KeyedMockChainParty;
+    let judge2: KeyedMockChainParty;
+    let judge3: KeyedMockChainParty;
 
     // --- Contratos y Partidos ---
     let gameResolutionContract: ReturnType<MockChain["newParty"]>;
@@ -137,7 +138,7 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
                 // participatingJudges
                 R7: SColl(SColl(SByte), judges).toHex(),
 
-                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage, resolutionDeadline]
                 R8: SColl(SLong, [
                     numericalParams[0],         // createdAt
                     numericalParams[1],         // timeWeight
@@ -146,6 +147,7 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
                     numericalParams[4],         // participationFee
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
                     numericalParams[7]          // resolutionDeadline
                 ]).toHex(),
 
@@ -153,7 +155,8 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
                     hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
-                    prependHexPrefix(resolver.key.publicKey, "0008cd")  // script resolvedor
+                    hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
+                    prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                 ]).toHex()
             }
         });
@@ -217,7 +220,7 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
         const requiredVotes = 2; // (3 / 2) + 1 = 2
 
         // --- Estado Esperado de la Nueva Caja de Juego ---
-        const newFunds = gameResolutionBox.value + invalidatedWinnerBox.value;
+        const newFunds = BigInt(gameResolutionBox.value) + BigInt(invalidatedWinnerBox.value);
         const extendedDeadline = BigInt(resolutionDeadline) + JUDGE_PERIOD;
         const newNumericalParams = [
             numericalParams[0],         // createdAt
@@ -227,6 +230,7 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
             numericalParams[4],         // participationFee
             numericalParams[5],         // perJudgeCommissionPercentage
             numericalParams[6],         // resolverCommissionPercentage
+            BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -252,14 +256,15 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
                         // participatingJudges
                         R7: SColl(SColl(SByte), judges).toHex(),
 
-                        // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+                        // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage, resolutionDeadline]
                         R8: SColl(SLong, newNumericalParams).toHex(),
 
                         // gameProvenance (R9) corregido: Coll[Coll[Byte]] con elementos planos
                         R9: SColl(SColl(SByte), [
                             stringToBytes("utf8", "{}"),
                             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0), // participationTokenId
-                            prependHexPrefix(resolver.key.publicKey, "0008cd")  // script resolvedor
+                            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
+                            prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")  // script resolvedor
                         ]).toHex()
                     })
             ])
@@ -308,7 +313,8 @@ describe.each(baseModes)("Game Resolution Invalidation Unavailable by Judges - (
         expect(newGameBox.additionalRegisters.R9).to.equal(SColl(SColl(SByte), [
             stringToBytes("utf8", "{}"),
             hexToBytes(USD_BASE_TOKEN) ?? new Uint8Array(0),
-            prependHexPrefix(resolver.key.publicKey, "0008cd")
+            hexToBytes(DEV_SCRIPT)!, // Script del desarrollador
+            prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")
         ]).toHex());
     });
 });

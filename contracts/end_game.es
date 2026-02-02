@@ -23,7 +23,7 @@
   // R5: Coll[Byte]                 - Seed
   // R6: (Coll[Byte], Coll[Byte])   - (revealedSecretS, winnerCandidateCommitment): El secreto y el candidato a ganador.
   // R7: Coll[Coll[Byte]]           - participatingJudges: Lista de IDs de tokens de reputación de los jueces.
-  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage, resolutionDeadline]
+  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, resolutionDeadline]
   // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript, resolverErgoTree]
 
   // =================================================================

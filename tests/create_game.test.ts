@@ -185,7 +185,7 @@ describe.each(baseModes)("Game Creation (create_game) - (%s)", (mode) => {
       // R7: Invited judges (empty in this test)
       R7: r7Hex,
 
-      // R8: [deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+      // R8: [deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission]
       R8: r8Hex,
 
       // R9: Detalles del juego

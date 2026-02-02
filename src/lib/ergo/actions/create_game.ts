@@ -8,7 +8,7 @@ import {
     type Box,
     type Amount
 } from '@fleet-sdk/core';
-import { SColl, SLong, SInt, SByte, SPair } from '@fleet-sdk/serializer';
+import { SColl, SLong, SInt, SByte } from '@fleet-sdk/serializer';
 declare const ergo: any;
 import { hexToBytes } from '$lib/ergo/utils';
 import { getGopGameActiveErgoTreeHex, getGopMintIdtAddress } from '../contract';
@@ -164,8 +164,9 @@ export async function create_game(
     const r5Hex = SColl(SByte, seedBytes).toHex();
     const r6Hex = SColl(SByte, hashedSecretBytes).toHex();
     const r7Hex = SColl(SColl(SByte), judgesColl).toHex();
-    const constants = getGameConstants();
-    const devCommission = BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR));
+    const comission = BigInt(Math.round((commissionPercentage / 100) * COMMISSION_DENOMINATOR));
+    const perJudgeComission = BigInt(Math.round((perJudgeCommissionPercentage / 100 ) * COMMISSION_DENOMINATOR));
+    const devCommission = BigInt(Math.round((DEV_COMMISSION_PERCENTAGE / 100) * COMMISSION_DENOMINATOR));
     const devScriptBytes = hexToBytes(DEV_SCRIPT);
     if (!devScriptBytes) throw new Error("Invalid DEV_SCRIPT constant");
 
@@ -175,8 +176,8 @@ export async function create_game(
         BigInt(deadlineBlock),
         resolverStakeAmount,
         participationFeeAmount,
-        BigInt(Math.round(perJudgeCommissionPercentage * 10000)),
-        BigInt(Math.round(commissionPercentage * 10000)),
+        perJudgeComission,
+        comission,
         devCommission
     ]).toHex();
     const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes, devScriptBytes]).toHex();
@@ -189,8 +190,6 @@ export async function create_game(
         R8: r8Hex,
         R9: r9Hex
     };
-
-
 
     const gameTokens = [{
         tokenId: participationTokenId,

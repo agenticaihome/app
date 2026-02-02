@@ -88,12 +88,16 @@ export async function contribute_to_ceremony(
         BigInt(game.deadlineBlock),
         game.resolverStakeAmount,
         game.participationFeeAmount,
-        game.perJudgeCommissionPercentage,
-        BigInt(game.commissionPercentage)
+        game.perJudgeCommission,
+        BigInt(game.resolverCommission),
+        BigInt(game.devCommission)
     ];
     const r8Hex = SColl(SLong, numericalParams).toHex();
 
-    const r9 = [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? ""];
+    const devScriptBytes = hexToBytes(game.devScript);
+    if (!devScriptBytes) throw new Error("Invalid DEV_SCRIPT on game object");
+
+    const r9 = [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", devScriptBytes];
     console.log(`R9 values (bytes):`, r9);
     // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
     const r9Hex = SColl(SColl(SByte), r9).toHex()

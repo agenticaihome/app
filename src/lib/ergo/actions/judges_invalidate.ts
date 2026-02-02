@@ -105,16 +105,16 @@ export async function judges_invalidate(
             // --- R7: participatingJudges: Coll[Coll[Byte]] ---
             R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
 
-            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
             R8: SColl(SLong, [
                 BigInt(game.createdAt),
                 BigInt(game.timeWeight),
                 BigInt(game.deadlineBlock),
                 BigInt(game.resolverStakeAmount),
                 BigInt(game.participationFeeAmount),
-                BigInt(game.perJudgeCommissionPercentage) + BigInt(game.resolverCommission),
+                BigInt(game.perJudgeCommission) + BigInt(game.resolverCommission),
                 0n,  // resolver commision goes to judges
-                BigInt(Math.round(game.devCommissionPercentage / 100 * COMMISSION_DENOMINATOR)),
+                BigInt(game.devCommission),
                 BigInt(newDeadline)
             ]).toHex(),
 

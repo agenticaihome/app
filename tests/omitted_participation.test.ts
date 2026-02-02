@@ -142,7 +142,7 @@ describe.each(baseModes)("Omitted Participation Inclusion - (%s)", (mode) => {
                 // participatingJudges (en este caso vacío)
                 R7: SColl(SColl(SByte), []).toHex(),
 
-                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
                 R8: SColl(SLong, numericalParams).toHex(),
 
                 // gameProvenance: Coll[Coll[Byte]] con los tres elementos planos

@@ -1,5 +1,5 @@
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
-import { COMMISSION_DENOMINATOR, DEV_COMMISSION_PERCENTAGE } from '$lib/ergo/envs';
+import { COMMISSION_DENOMINATOR } from '$lib/ergo/envs';
 
 export interface PayoutResult {
     finalWinnerPrize: bigint;
@@ -31,7 +31,7 @@ export function calculatePayouts(
     console.log(`Calculated Prize Pool: ${prizePool}`);
 
     // C. Comisiones Base
-    const perJudgePctNumber = game.perJudgeCommissionPercentage ?? 0;
+    const perJudgePctNumber = game.perJudgeCommission ?? 0;
     const perJudgePct = BigInt(perJudgePctNumber);
     const judge_count = BigInt((game.judges ?? []).length);
 
@@ -39,7 +39,7 @@ export function calculatePayouts(
     const totalJudgeCommission = perJudgeCommission * judge_count;
 
     // Comisiones Dev
-    const devCommission = (prizePool * BigInt(game.devCommissionPercentage)) / 100n;
+    const devCommission = (prizePool * BigInt(game.devCommission)) / BigInt(COMMISSION_DENOMINATOR);
 
     let finalWinnerPrize = 0n;
     let finalResolverPayout = 0n;

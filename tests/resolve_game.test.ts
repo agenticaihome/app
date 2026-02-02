@@ -122,7 +122,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
         // R7: Coll[Coll[Byte]] - invitedJudgesReputationProofs
         R7: SColl(SColl(SByte), []).toHex(),
 
-        // R8: Coll[Long] - numericalParameters: [deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+        // R8: Coll[Long] - numericalParameters: [deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission]
         R8: SColl(SLong, [
           1n, // createdAt
           20n,                  // timeWeight

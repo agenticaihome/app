@@ -6,10 +6,9 @@ import {
     type Amount
 } from '@fleet-sdk/core';
 import { SColl, SByte, SPair, SLong, SInt } from '@fleet-sdk/serializer';
-import { bigintToLongByteArray, hexToBytes, parseBox, uint8ArrayToHex } from '$lib/ergo/utils';
+import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
-import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
-import { getGopGameResolutionErgoTreeHex, getGopParticipationErgoTreeHex } from '../contract';
+import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
 import { create_opinion_chained, update_opinion_chained } from 'reputation-system';
 import { PARTICIPATION } from '$lib/ergo/reputation/types';
@@ -129,13 +128,15 @@ export async function judges_invalidation_chained(
                 BigInt(game.deadlineBlock),
                 BigInt(game.resolverStakeAmount),
                 BigInt(game.participationFeeAmount),
-                BigInt(game.perJudgeCommissionPercentage) + BigInt(game.resolverCommission),
+                BigInt(game.perJudgeCommission) + BigInt(game.resolverCommission),
                 0n,  // resolver commission goes to judges
+                BigInt(game.devCommission),
                 BigInt(newDeadline)
             ]).toHex(),
             R9: SColl(SColl(SByte), [
                 stringToBytes('utf8', game.content.rawJsonString),
                 hexToBytes(game.participationTokenId) ?? "",
+                hexToBytes(game.devScript)!,
                 hexToBytes(game.resolverScript_Hex)!
             ]).toHex(),
         });

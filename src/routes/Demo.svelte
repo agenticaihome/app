@@ -48,7 +48,7 @@
         platform: {} as any,
         status: "Active",
         gameId: "mock_game_nft_id",
-        commissionPercentage: 5,
+        resolverCommission: 5,
         secretHash: "mock_secret_hash",
         seed: "mock_seed_value",
         ceremonyDeadline: 1000,
@@ -317,7 +317,7 @@
     // Prize Distribution Logic (Simplified for Demo)
     $: resolverPct =
         game.status === "Active"
-            ? (game as GameActive).commissionPercentage
+            ? (game as GameActive).resolverCommission
             : (game as any).resolverCommission || 5;
     $: judgesTotalPct =
         Number((game as any).perJudgeComissionPercentage) * game.judges.length;

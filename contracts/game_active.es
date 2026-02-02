@@ -33,7 +33,7 @@
   // R5: Coll[Byte]         - seed
   // R6: Coll[Byte]         - secretHash: Hash del secreto 'S' (blake2b256(S)).
   // R7: Coll[Coll[Byte]]   - invitedJudgesReputationProofs
-  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage].
+  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage].
   // R9: Coll[Coll[Byte]]   - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript]
 
 
@@ -54,7 +54,7 @@
   // R7: Jueces invitados
   val invitedJudges = SELF.R7[Coll[Coll[Byte]]].get
 
-  // R8: [deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+  // R8: [deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission]
   val numericalParams = SELF.R8[Coll[Long]].get
   val createdAt = numericalParams(0)
   val timeWeight = numericalParams(1)
@@ -224,28 +224,31 @@
   // Se ejecuta antes de la fecha límite si alguien revela el secreto para penalizar al creador.
 
   val action2_transitionToCancellation = {
-    if (isBeforeDeadline && OUTPUTS.size >= 2) {
-      val cancellationBox = OUTPUTS(0)
-      val claimerOutput = OUTPUTS(1)
+    val outs = OUTPUTS.filter({ (box: Box) => 
+      blake2b256(box.propositionBytes) == GAME_CANCELLATION_SCRIPT_HASH 
+    })
+
+    if (isBeforeDeadline && outs.size == 1) {
+      val cancellationBox = outs(0)
 
       // Calcular los valores iniciales.
       val initialStakePortionToClaim = resolverStake / STAKE_DENOMINATOR
       val remainingValue = box_value(SELF) - initialStakePortionToClaim
 
-      // --- Validar la caja de cancelación (OUTPUTS(0)) ---
       val cancellationBoxIsValid = {
-          blake2b256(cancellationBox.propositionBytes) == GAME_CANCELLATION_SCRIPT_HASH &&
           box_value(cancellationBox) >= remainingValue &&
-          cancellationBox.tokens.filter({ (token: (Coll[Byte], Long)) => token._1 == gameNftId && token._2 == 1}).size == 1 &&
+          cancellationBox.tokens(0)._1 == gameNftId &&
           cancellationBox.R4[Int].get == 2 && // Game state is "Cancelled" (2)
           cancellationBox.R5[Long].get >= HEIGHT + COOLDOWN_IN_BLOCKS &&
           blake2b256(cancellationBox.R6[Coll[Byte]].get) == secretHash &&
           cancellationBox.R7[Long].get == remainingValue &&
           cancellationBox.R8[Long].get == deadline &&
-          cancellationBox.R9[Coll[Coll[Byte]]].get == gameProvenance
+          cancellationBox.R9[Coll[Coll[Byte]]].get.size == 2 &&
+          cancellationBox.R9[Coll[Coll[Byte]]].get(0) == gameDetailsJsonHex &&
+          cancellationBox.R9[Coll[Coll[Byte]]].get(1) == participationTokenId
       }
 
-      // R7 Pasa a ser el valor restante (el cual puede ser mayor al stake original si había donaciones).  La razón por la que nos se calcula el initialStakePortionToClaim en base al valor total aqui es para evitar que, en caso de que el valor total sea STAKE_DENOMINATOR veces mayor al stake original, el creador esté incentivado a cancelar el juego en lugar de proseguirlo.
+      // R7 Pasa a ser el valor restante (el cual puede ser mayor al stake original si había donaciones).  La razón por la que no se calcula el initialStakePortionToClaim en base al valor total aqui es para evitar que, en caso de que el valor total sea STAKE_DENOMINATOR veces mayor al stake original, el creador esté incentivado a cancelar el juego en lugar de proseguirlo.
       
       // Quien cancela el juego puede agregar mas valor del que reclama, lo cual creará una diferencia entre el valor del contrato y el valor R7, esto permitirá al siguiente reclamante obtener esa diferencia. Aunque esto no es un problema, ni tiene lógica desde el punto de vista de incentivos.
 

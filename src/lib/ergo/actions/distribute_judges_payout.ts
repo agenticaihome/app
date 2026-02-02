@@ -26,7 +26,6 @@ export async function distribute_judges_payout(
 
     const currentHeight = await ergo.get_current_height();
     const userAddress = await ergo.get_change_address();
-    const reputationProofScriptHash = getReputationProofScriptHash();
 
     // 1. Parse Registers
     const r4 = judgesPaidBox.additionalRegisters['R4'];

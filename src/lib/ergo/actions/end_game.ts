@@ -72,7 +72,7 @@ export async function end_game(
     }
 
     if (finalDevPayout > 0n) {
-        outputs.push(buildOutput(finalDevPayout, game.constants.DEV_SCRIPT));
+        outputs.push(buildOutput(finalDevPayout, game.devScript) );
     }
 
     if (finalJudgesPayout > 0n && (game.judges ?? []).length > 0) {

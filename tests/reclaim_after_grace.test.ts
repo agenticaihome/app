@@ -88,7 +88,7 @@ describe.each(baseModes)("Participant Reclaim After Grace Period - (%s)", (mode)
         // R7: Invited judges (empty in this test)
         R7: SColl(SColl(SByte), []).toHex(),
 
-        // R8: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage]
+        // R8: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission]
         R8: SColl(SLong, [
           BigInt(mockChain.height),
           20n,

@@ -68,7 +68,7 @@ export interface GameActive {
     platform: ErgoPlatform;
     status: 'Active';
     gameId: string;
-    commissionPercentage: number;
+    resolverCommission: number;
     secretHash: string;
     seed: string;
     ceremonyDeadline: number;
@@ -77,7 +77,7 @@ export interface GameActive {
     resolverStakeAmount: bigint;
     participationFeeAmount: bigint;
     participationTokenId: string;
-    perJudgeCommissionPercentage: bigint;
+    perJudgeCommission: bigint;
     timeWeight: bigint;
     content: GameContent;
     value: bigint;
@@ -87,7 +87,7 @@ export interface GameActive {
 
     createdAt: number;
     devScript: string;
-    devCommissionPercentage: number;
+    devCommission: number;
 }
 
 /**
@@ -109,13 +109,13 @@ export interface GameResolution {
     resolverStakeAmount: bigint;
     participationFeeAmount: bigint;
     participationTokenId: string;
-    perJudgeCommissionPercentage: bigint;
+    perJudgeCommission: bigint;
     timeWeight: bigint;
     resolverPK_Hex: string | null;
     resolverScript_Hex: string
     resolverCommission: number;
     devScript: string;
-    devCommissionPercentage: number;
+    devCommission: number;
     content: GameContent;
     value: bigint;
     reputationOpinions: RPBox[];
@@ -178,7 +178,7 @@ export interface GameFinalized {
     revealedS_Hex: string;
     winnerCandidateCommitment: string | null;
     resolverStakeAmount: bigint;
-    perJudgeCommissionPercentage: bigint;
+    perJudgeCommission: bigint;
     timeWeight: bigint;
     resolverPK_Hex: string | null;
     resolverScript_Hex: string;
@@ -306,7 +306,7 @@ export function isDevFriendly(game: AnyGame): boolean {
     }
 
     const hasCorrectScript = game.devScript === DEV_SCRIPT;
-    const hasCorrectCommission = game.devCommissionPercentage >= DEV_COMMISSION_PERCENTAGE;
+    const hasCorrectCommission = game.devCommission >= DEV_COMMISSION_PERCENTAGE;
 
     return hasCorrectScript && hasCorrectCommission;
 }

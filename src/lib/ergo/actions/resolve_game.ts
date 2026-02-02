@@ -147,8 +147,6 @@ export async function resolve_game(
 
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
     const resolutionDeadline = BigInt(currentHeight + JUDGE_PERIOD);
-    const constants = getGameConstants();
-    const devCommission = BigInt(Math.round(game.devCommissionPercentage / 100 * COMMISSION_DENOMINATOR));
     const devScriptBytes = hexToBytes(game.devScript);
     if (!devScriptBytes) throw new Error("Invalid DEV_SCRIPT on game object");
 
@@ -158,9 +156,9 @@ export async function resolve_game(
         BigInt(game.deadlineBlock),
         game.resolverStakeAmount,
         game.participationFeeAmount,
-        game.perJudgeCommissionPercentage,
-        BigInt(game.commissionPercentage),
-        devCommission,
+        game.perJudgeCommission,
+        BigInt(game.resolverCommission),
+        BigInt(game.devCommission),
         resolutionDeadline
     ];
 

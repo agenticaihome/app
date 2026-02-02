@@ -67,7 +67,7 @@ export async function cancel_game(
     
     // La dirección/ErgoTree de la nueva caja será la del script de cancelación.
     const cancellationContractErgoTree = getGopGameCancellationErgoTreeHex();
-    const newUnlockHeight = BigInt(currentHeight + game.constants.COOLDOWN_IN_BLOCKS);
+    const newUnlockHeight = BigInt(currentHeight + game.constants.COOLDOWN_IN_BLOCKS + 5);
 
     // SALIDA(0): La nueva caja de cancelación (`game_cancellation.es`)
     const cancellationBoxOutput = new OutputBuilder(

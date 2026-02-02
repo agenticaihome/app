@@ -185,7 +185,7 @@ export function estimateTotalBoxSizeFromInputs(
         const resR7 = r7Hex;
 
         // Resolution R8: Config (6 elements in resolution vs 5 in active)
-        // [deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+        // [deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
         const resR8 = SColl(SLong, [
             0n, // Dummy createdAt
             0n, // Dummy timeWeight

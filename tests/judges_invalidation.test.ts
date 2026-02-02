@@ -138,7 +138,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 // participatingJudges
                 R7: SColl(SColl(SByte), judges).toHex(),
 
-                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
                 R8: SColl(SLong, [
                     1n,                         // createdAt
                     20n,                        // timeWeight
@@ -255,7 +255,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                         // participatingJudges
                         R7: SColl(SColl(SByte), judges).toHex(),
 
-                        // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+                        // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
                         R8: SColl(SLong, newNumericalParams).toHex(),
 
                         // gameProvenance (R9) corregido: Coll[Coll[Byte]] con elementos planos
@@ -346,7 +346,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                 // participatingJudges
                 R7: SColl(SColl(SByte), judges).toHex(),
 
-                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+                // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
                 R8: SColl(SLong, [
                     1n,                         // createdAt
                     20n,                        // timeWeight
@@ -461,7 +461,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                             // participatingJudges
                             R7: SColl(SColl(SByte), judges).toHex(),
 
-                            // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
+                            // numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
                             R8: SColl(SLong, newNumericalParams).toHex(),
 
                             // gameProvenance (R9) corregido: Coll[Coll[Byte]] con elementos planos

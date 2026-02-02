@@ -296,7 +296,7 @@
 
     $: judgesList = judges.map((j) => j.value.trim()).filter((id) => id);
     $: judgeValidationError = (() => {
-        if (judgesList.length > 20) return "Maximum 20 judges allowed.";
+        if (judgesList.length > 20) return "Maximum 20 judges allowed."; // Podría quitarse, pero asi se controla que no se pueda crear un juego con demasiados jueces
         const unique = new Set(judgesList);
         if (unique.size !== judgesList.length)
             return "Duplicate judges are not allowed.";

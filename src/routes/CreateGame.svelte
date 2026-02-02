@@ -296,6 +296,7 @@
 
     $: judgesList = judges.map((j) => j.value.trim()).filter((id) => id);
     $: judgeValidationError = (() => {
+        if (judgesList.length > 20) return "Maximum 20 judges allowed.";
         const unique = new Set(judgesList);
         if (unique.size !== judgesList.length)
             return "Duplicate judges are not allowed.";
@@ -390,6 +391,11 @@
 
     // --- Logic for repeaters
     function addJudge() {
+        // Limit to 20 judges maximum
+        if (judges.length >= 20) {
+            alert("Maximum 20 judges allowed.");
+            return;
+        }
         judges = [...judges, { id: nextJudgeId++, value: "" }];
     }
     function removeJudge(id: number) {
@@ -698,6 +704,12 @@
             .filter((id) => id);
 
         // Validate Judges
+        if (judgesArray.length > 20) {
+            errorMessage = "Maximum 20 judges allowed.";
+            isSubmitting = false;
+            return;
+        }
+
         const uniqueJudges = new Set(judgesArray);
         if (uniqueJudges.size !== judgesArray.length) {
             errorMessage = "Duplicate judges are not allowed.";

@@ -20,8 +20,10 @@ import { blake2b256, randomBytes } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { prependHexPrefix } from "$lib/utils";
 import { bigintToLongByteArray, hexToBytes } from "$lib/ergo/utils";
-import { DefaultGameConstants } from "$lib/common/constants";
-import { COMMISSION_DENOMINATOR, DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
+import { DefaultGameConstants, getGameConstants } from "$lib/common/constants";
+import { DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
+
+const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
 import { getGopGameResolutionErgoTree, getGopParticipationErgoTree, getReputationProofErgoTree, getGopJudgesPaidErgoTree, getGopJudgesPaidErgoTreeHex, getGopParticipationBatchErgoTree, getGopEndGameErgoTree } from "$lib/ergo/contract";
 
 // --- Suite de Pruebas ---

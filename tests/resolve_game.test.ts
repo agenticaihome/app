@@ -16,8 +16,10 @@ import {
   getGopParticipationErgoTree,
   getGopFalseErgoTreeHex,
 } from "$lib/ergo/contract";
-import { DefaultGameConstants } from "$lib/common/constants";
-import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE, COMMISSION_DENOMINATOR } from "$lib/ergo/envs";
+import { DefaultGameConstants, getGameConstants } from "$lib/common/constants";
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from "$lib/ergo/envs";
+
+const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
 
 const ERG_BASE_TOKEN = "";
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";

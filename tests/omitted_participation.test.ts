@@ -19,8 +19,10 @@ import { stringToBytes } from "@scure/base";
 import { bigintToLongByteArray, hexToBytes } from "$lib/ergo/utils";
 import { prependHexPrefix } from "$lib/utils";
 import { getGopGameResolutionErgoTree, getGopParticipationErgoTree, getGopFalseErgoTreeHex } from "$lib/ergo/contract";
-import { COMMISSION_DENOMINATOR, DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
-import { DefaultGameConstants } from "$lib/common/constants";
+import { DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
+import { DefaultGameConstants, getGameConstants } from "$lib/common/constants";
+
+const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
 
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
 const USD_BASE_TOKEN_NAME = "USD";

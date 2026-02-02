@@ -18,9 +18,11 @@ import {
 import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { getGopGameActiveErgoTree } from "$lib/ergo/contract";
-import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE, COMMISSION_DENOMINATOR } from "$lib/ergo/envs";
+import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from "$lib/ergo/envs";
 import { hexToBytes } from "$lib/ergo/utils";
+import { getGameConstants } from "$lib/common/constants";
 
+const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
 
 // --- Test Suite ---
 

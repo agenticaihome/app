@@ -4,8 +4,7 @@
   // =================================================================
 
   val END_GAME_AUTH_GRACE_PERIOD = `+END_GAME_AUTH_GRACE_PERIOD+`L
-  val DEV_SCRIPT = fromBase16("`+DEV_SCRIPT+`")
-  val DEV_COMMISSION_PERCENTAGE = `+DEV_COMMISSION_PERCENTAGE+`L
+
   val JUDGES_PAID_ERGOTREE = fromBase16("`+JUDGES_PAID_ERGOTREE+`")
 
   val MAX_SCORE_LIST = `+MAX_SCORE_LIST+`L
@@ -24,8 +23,8 @@
   // R5: Coll[Byte]                 - Seed
   // R6: (Coll[Byte], Coll[Byte])   - (revealedSecretS, winnerCandidateCommitment): El secreto y el candidato a ganador.
   // R7: Coll[Coll[Byte]]           - participatingJudges: Lista de IDs de tokens de reputación de los jueces.
-  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, resolutionDeadline]
-  // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, resolverErgoTree]
+  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage, resolutionDeadline]
+  // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript, resolverErgoTree]
 
   // =================================================================
   // === EXTRACCIÓN DE VALORES
@@ -47,12 +46,14 @@
   val participationFee = numericalParams(4)
   val perJudgeCommissionPercentage = numericalParams(5)
   val resolverCommissionPercentage = numericalParams(6)
-  val resolutionDeadline = numericalParams(7)
+  val dev_commission_percentage = numericalParams(7)
+  val resolutionDeadline = numericalParams(8)
 
   val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   // gameProvenance(0) = gameDetailsJsonHex
   val participationTokenId = gameProvenance(1)
-  val resolverPK = gameProvenance(2)
+  val dev_script = gameProvenance(2)
+  val resolverPK = gameProvenance(3)
   
   val gameNft = SELF.tokens(0)
   val gameNftId = gameNft._1
@@ -170,7 +171,7 @@
     // Esta lógica ahora se aplica tanto si hay ganador como si no.
     
     // 1. Calcular payout para DEV
-    val devCommission = prizePool * DEV_COMMISSION_PERCENTAGE / 1000000L
+    val devCommission = prizePool * dev_commission_percentage / 1000000L
     
     // 2. Calcular payout para los JUECES
     val perJudgeComission = prizePool * perJudgeCommissionPercentage / 1000000L
@@ -178,8 +179,8 @@
     
     // 3. Verificación de que el DEV recibe su pago
     val devGetsPaid = if (devCommission > 0L) {
-        val inputVal = INPUTS.filter({(b:Box) => b.propositionBytes == DEV_SCRIPT}).fold(0L, { (acc: Long, b: Box) => acc + box_value(b) })
-        val outputVal = OUTPUTS.filter({(b:Box) => b.propositionBytes == DEV_SCRIPT}).fold(0L, { (acc: Long, b: Box) => acc + box_value(b) })
+        val inputVal = INPUTS.filter({(b:Box) => b.propositionBytes == dev_script}).fold(0L, { (acc: Long, b: Box) => acc + box_value(b) })
+        val outputVal = OUTPUTS.filter({(b:Box) => b.propositionBytes == dev_script}).fold(0L, { (acc: Long, b: Box) => acc + box_value(b) })
         val addedValue = outputVal - inputVal
         addedValue >= devCommission
     } else { true }

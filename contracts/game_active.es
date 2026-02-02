@@ -33,8 +33,8 @@
   // R5: Coll[Byte]         - seed
   // R6: Coll[Byte]         - secretHash: Hash del secreto 'S' (blake2b256(S)).
   // R7: Coll[Coll[Byte]]   - invitedJudgesReputationProofs
-  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage].
-  // R9: Coll[Coll[Byte]]   - gameDetailsJsonHex, ParticipationTokenID
+  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommissionPercentage, resolverCommissionPercentage, devCommissionPercentage].
+  // R9: Coll[Coll[Byte]]   - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript]
 
 
   // Note: The game seed that must be used to reproduce the random scenario for all participants is first added by the creator, and the action3_open_ceremony allows anyone to add entropy to it making updated_seed = blake2b256(old_seed ++ INPUTS(0).id).
@@ -63,6 +63,7 @@
   val participationFee = numericalParams(4)
   val perJudgeCommissionPercentage = numericalParams(5)
   val resolverCommissionPercentage = numericalParams(6)
+  val devCommissionPercentage = numericalParams(7)
 
   val ceremonyDeadline = deadline - PARTICIPATION_TIME_WINDOW
 
@@ -70,6 +71,7 @@
   val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   val gameDetailsJsonHex = gameProvenance(0)
   val participationTokenId = gameProvenance(1)
+  val devScript = gameProvenance(2)
   
   val gameNft = SELF.tokens(0)
   val gameNftId = gameNft._1
@@ -202,10 +204,12 @@
               resolutionBox.R8[Coll[Long]].get(4) == participationFee &&
               resolutionBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
               resolutionBox.R8[Coll[Long]].get(6) >= resolverCommissionPercentage &&
-              resolutionBox.R8[Coll[Long]].get(7) >= HEIGHT + JUDGE_PERIOD &&
+              resolutionBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
+              resolutionBox.R8[Coll[Long]].get(8) >= HEIGHT + JUDGE_PERIOD &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(0) == gameDetailsJsonHex &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(1) == participationTokenId &&
-              resolutionBox.R9[Coll[Coll[Byte]]].get.size == 3
+              resolutionBox.R9[Coll[Coll[Byte]]].get(2) == devScript &&
+              resolutionBox.R9[Coll[Coll[Byte]]].get.size == 4
             }
 
           resolutionBoxIsValid && allVotesAreUnique

@@ -48,8 +48,7 @@ export async function drain_cancelled_game_stake(
     const nextBoxTokens = [game.box.assets[0]]; // Always preserve NFT
     nextBoxTokens.push({ tokenId: game.participationTokenId, amount: remainingStake });
 
-    const claimerValue = SAFE_MIN_BOX_VALUE;
-    const claimerTokens = [{ tokenId: game.participationTokenId, amount: stakePortionToClaim }];
+    // const claimerTokens = [{ tokenId: game.participationTokenId, amount: stakePortionToClaim }];  sendChangeTo will handle it
 
     // OUTPUT(0): The recreated cancellation box with updated values
     const recreatedCancellationBox = new OutputBuilder(
@@ -67,20 +66,13 @@ export async function drain_cancelled_game_stake(
             R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? ""]).toHex()
         });
 
-    // OUTPUT(1): The portion of the stake for the claimer
-    const claimerOutput = new OutputBuilder(
-        claimerValue,
-        claimerAddressString
-    )
-    .addTokens(claimerTokens);
-
     // --- 3. Build and Send the Transaction ---
     const utxos: InputBox[] = await ergo.get_utxos();
     const inputs = [parseBox(game.box), ...utxos];
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(inputs)
-        .to([recreatedCancellationBox, claimerOutput])
+        .to([recreatedCancellationBox])
         .sendChangeTo(claimerAddressString)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
         .build();

@@ -14,6 +14,7 @@
         isOpenCeremony,
         isOpenSolverSubmit,
         isDevFriendly,
+        getPrizePool,
     } from "$lib/common/game";
     import { fetch_token_details, fetchParticipations } from "$lib/ergo/fetch";
     import { formatTokenBigInt } from "$lib/utils";
@@ -46,9 +47,7 @@
     let tokenSymbol = "ERG";
     let tokenDecimals = 9;
 
-    $: currentPrizePool =
-        BigInt(participations?.length ?? 0) *
-        BigInt(game.participationFeeAmount);
+    $: currentPrizePool = getPrizePool(game, participations || []);
 
     function scheduleUpdate() {
         if (scheduled) return;

@@ -439,3 +439,62 @@ export function calculateEffectiveScore(
         return 0n;
     }
 }
+
+/**
+ * Calculates the current prize pool for a given game.
+ * 
+ * Logic:
+ * 1. Contract Balance: The current balance of the game box.
+ * 2. Unbatched Participations: Sum of values from "Submitted" participations that haven't been batched yet.
+ * 3. Base Prize Pool: (Contract Balance + Unbatched Participations) - Resolver Stake.
+ * 4. Commissions: Deduct commissions for judges, resolver, and developer from the Base Prize Pool.
+ * 5. Final Prize: The remaining amount after deductions.
+ * 
+ * @param game The game object (AnyGame).
+ * @param participations Array of participations (AnyParticipation[]).
+ * @returns The calculated prize pool as a bigint.
+ */
+export function getPrizePool(game: AnyGame | null, participations: AnyParticipation[] | null): bigint {
+    if (!game) return 0n;
+
+    // A. Contract Balance (donations, invalidated participations and stake)
+    const contractBalance = BigInt(game.value ?? 0n);
+
+    // B. Unbatched Participations
+    const totalParticipationsValue = (participations || [])
+        .filter((p) => p && p.status === "Submitted")
+        .reduce((acc, p) => {
+            return acc + BigInt(p.value ?? 0n);
+        }, 0n);
+
+    // C. Base Prize Pool
+    const resolverStake = BigInt(game.resolverStakeAmount ?? 0n);
+    const prizePoolBase = totalParticipationsValue + contractBalance - resolverStake;
+
+    // D. Commissions
+    // Commissions are percentages of the prizePoolBase.
+    const perJudgePct = BigInt((game as any).perJudgeCommission ?? 0n);
+    const judgeCount = BigInt(game.judges?.length ?? 0);
+    const resolverPct = BigInt((game as any).resolverCommission ?? 0n);
+    const devPct = BigInt((game as any).devCommission ?? 0n);
+
+    const denominator = BigInt(game.constants.COMMISSION_DENOMINATOR);
+
+    const totalJudgeCommission = (prizePoolBase * perJudgePct * judgeCount) / denominator;
+    const resolverCommission = (prizePoolBase * resolverPct) / denominator;
+    const devCommission = (prizePoolBase * devPct) / denominator;
+
+    const finalPrize =
+        prizePoolBase -
+        totalJudgeCommission -
+        resolverCommission -
+        devCommission;
+
+    // Winner Protection Policy:
+    const participationFee = BigInt(game.participationFeeAmount ?? 0n);
+    if (finalPrize < participationFee) {
+        return prizePoolBase > 0n ? prizePoolBase : 0n;
+    }
+
+    return finalPrize > 0n ? finalPrize : 0n;
+}

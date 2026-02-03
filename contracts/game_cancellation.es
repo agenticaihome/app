@@ -46,39 +46,45 @@
   // Permite a cualquiera reclamar una porción del stake si ha pasado el cooldown
   // y si queda suficiente stake para continuar el ciclo.
   val action1_drainStake = {
-    val recreatedCancellationBox = OUTPUTS(0)
-    
-    val stakePortionToClaim = currentStake / STAKE_DENOMINATOR
-    val remainingStake = currentStake - stakePortionToClaim
-
-    // En caso de que el valor en el contrato sea mayor a R7, el ejecutor puede quedarse la diferencia sin problema; en este caso ya no hay problema, pues ya no tiene porque ser el creador, si no, posiblemente, quien mine el bloque (si el minero es inteligente...).
-
-    val cooldownIsOver = HEIGHT >= unlockHeight
-
-    val recreatedValue = {
-      val matchingTokens = recreatedCancellationBox.tokens.filter { (token: (Coll[Byte], Long)) => 
-        token._1 == participationTokenId
-      }
-      if (matchingTokens.size > 0) {
-        matchingTokens(0)._2
-      } else {
-        0L
-      }
+    val recreatedCancellationBoxes = OUTPUTS.filter { (box: Box) => 
+      box.propositionBytes == SELF.propositionBytes
     }
 
-    val boxIsRecreatedCorrectly = {
-      recreatedCancellationBox.propositionBytes == SELF.propositionBytes &&
-      recreatedValue >= remainingStake &&
-      recreatedCancellationBox.tokens(0)._1 == gameNftId &&
-      recreatedCancellationBox.R4[Int].get == gameState &&
-      recreatedCancellationBox.R5[Long].get >= HEIGHT + COOLDOWN_IN_BLOCKS &&
-      recreatedCancellationBox.R6[Coll[Byte]].get == revealedSecret &&
-      recreatedCancellationBox.R7[Long].get == remainingStake &&
-      recreatedCancellationBox.R8[Long].get == originalDeadline &&
-      recreatedCancellationBox.R9[Coll[Coll[Byte]]].get == gameProvenance
-    }
+    if (recreatedCancellationBoxes.size == 1 ) {
+      val recreatedCancellationBox = recreatedCancellationBoxes(0)
     
-    cooldownIsOver && boxIsRecreatedCorrectly
+      val stakePortionToClaim = currentStake / STAKE_DENOMINATOR
+      val remainingStake = currentStake - stakePortionToClaim
+
+      // En caso de que el valor en el contrato sea mayor a R7, el ejecutor puede quedarse la diferencia sin problema; en este caso ya no hay problema, pues ya no tiene porque ser el creador, si no, posiblemente, quien mine el bloque (si el minero es inteligente...).
+
+      val cooldownIsOver = HEIGHT >= unlockHeight
+
+      val recreatedValue = {
+        val matchingTokens = recreatedCancellationBox.tokens.filter { (token: (Coll[Byte], Long)) => 
+          token._1 == participationTokenId
+        }
+        if (matchingTokens.size > 0) {
+          matchingTokens(0)._2
+        } else {
+          0L
+        }
+      }
+
+      val boxIsRecreatedCorrectly = {
+        recreatedValue >= remainingStake &&
+        recreatedCancellationBox.tokens(0)._1 == gameNftId &&
+        recreatedCancellationBox.R4[Int].get == gameState &&
+        recreatedCancellationBox.R5[Long].get >= HEIGHT + COOLDOWN_IN_BLOCKS &&
+        recreatedCancellationBox.R6[Coll[Byte]].get == revealedSecret &&
+        recreatedCancellationBox.R7[Long].get == remainingStake &&
+        recreatedCancellationBox.R8[Long].get == originalDeadline &&
+        recreatedCancellationBox.R9[Coll[Coll[Byte]]].get == gameProvenance
+      }
+      
+      cooldownIsOver && boxIsRecreatedCorrectly
+
+    } else { false }
   }
 
   sigmaProp(gameIsCancelled && action1_drainStake)

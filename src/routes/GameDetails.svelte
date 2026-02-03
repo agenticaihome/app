@@ -911,7 +911,9 @@
             clockInformation = "This game has finished.";
         }
 
-        createdDateDisplay = formatDistanceToNow(new Date(game.createdAt));
+        if (game.createdAt) {
+            createdDateDisplay = formatDistanceToNow(new Date(game.createdAt));
+        }
 
         isSubmitting = false;
         transactionId = null;

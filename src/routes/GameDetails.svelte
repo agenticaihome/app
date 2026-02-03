@@ -139,6 +139,7 @@
         isNominatedJudge,
         isJudge,
         isBeforeDeadline,
+        currentHeight,
     );
 
     function getPrimaryAction(
@@ -148,6 +149,7 @@
         isNominatedJudge: boolean,
         isJudge: boolean,
         isBeforeDeadline: boolean,
+        currentHeight: number,
     ): string | null {
         if (!game) return null;
 
@@ -161,7 +163,12 @@
             return null; // No primary action during judge period (only secondary/destructive)
         }
 
-        if (game.status === "Cancelled_Draining") return "drain_stake";
+        if (game.status === "Cancelled_Draining") {
+            if (currentHeight >= (game as GameCancellation).unlockHeight) {
+                return "drain_stake";
+            }
+            return null;
+        }
 
         return null;
     }
@@ -176,6 +183,7 @@
         candidateParticipationUnavailableVotes,
         $address,
         participationIsEnded,
+        currentHeight,
     );
 
     $: disabledActions = getDisabledActions(
@@ -184,6 +192,7 @@
         participationIsEnded,
         isBeforeDeadline,
         strictMode,
+        currentHeight,
     );
 
     $: if (soundtrackUrl) loadedHandlerAdded = false;
@@ -213,6 +222,7 @@
         candidateParticipationUnavailableVotes: string[],
         address: string,
         participationIsEnded: boolean,
+        currentHeight: number,
     ) {
         if (!game) return [];
         const actions = [];
@@ -317,6 +327,7 @@
         participationIsEnded: boolean,
         isBeforeDeadline: boolean,
         strictMode: boolean,
+        currentHeight: number,
     ) {
         if (!game) return [];
         const actions = [];
@@ -369,6 +380,18 @@
                     label: "Include Omitted",
                     reason: "Judge period ended",
                     icon: Users,
+                });
+            }
+        }
+
+        if (game.status === "Cancelled_Draining") {
+            const unlockHeight = (game as GameCancellation).unlockHeight;
+            if (currentHeight < unlockHeight) {
+                const blocksLeft = unlockHeight - currentHeight;
+                actions.push({
+                    label: "Drain Resolver Stake",
+                    reason: `Available in ~${blocksLeft} blocks (Cooldown period active)`,
+                    icon: Trash2,
                 });
             }
         }
@@ -1795,7 +1818,7 @@
             submit_score: `Submit Score`,
             resolve_game: `Resolve Competition`,
             cancel_game: `Cancel Competition`,
-            drain_stake: `Drain Creator Stake`,
+            drain_stake: `Drain Resolver Stake`,
             end_game: `Finalize Competition`,
             invalidate_winner: `Judge Invalidation`,
             judge_unavailable: `Judge Mark Unavailable`,

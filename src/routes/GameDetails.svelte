@@ -895,6 +895,13 @@
             );
             clockLabel = "RESOLUTION DEADLINE";
             clockInformation = "Judges must resolve the game before this time.";
+        } else if (game.status === "Cancelled_Draining") {
+            targetDate = await block_height_to_timestamp(
+                (game as GameCancellation).unlockHeight,
+                platform,
+            );
+            clockLabel = "STAKE UNLOCK DEADLINE";
+            clockInformation = "Creator stake is locked until this time.";
         } else {
             targetDate = 0;
             clockLabel = "GAME ENDED";
@@ -1135,11 +1142,15 @@
                 deadlineDateDisplay = `${clockLabel} ends ${formatDistanceToNow(new Date(targetDate), { addSuffix: true })}`;
             } else if (game.status === "Cancelled_Draining") {
                 targetDate = await block_height_to_timestamp(
-                    game.unlockHeight,
+                    (game as GameCancellation).unlockHeight,
                     platform,
                 );
-                clockLabel = "Stake Unlocks";
-                deadlineDateDisplay = `Stake unlocks ${formatDistanceToNow(new Date(targetDate), { addSuffix: true })}`;
+                clockLabel = "STAKE UNLOCK DEADLINE";
+                clockInformation = "Creator stake is locked until this time.";
+                deadlineDateDisplay = format(
+                    new Date(targetDate),
+                    "MMM d, yyyy 'at' HH:mm",
+                );
             } else {
                 deadlineDateDisplay = "N/A";
             }
@@ -3252,7 +3263,7 @@
                         {/if}
                     </div>
 
-                    {#if targetDate && (game.status === "Resolution" || !participationIsEnded)}
+                    {#if targetDate && (game.status === "Resolution" || game.status === "Cancelled_Draining" || !participationIsEnded)}
                         <div class="countdown-container mb-8">
                             <div class="timeleft">
                                 <span class="timeleft-label">

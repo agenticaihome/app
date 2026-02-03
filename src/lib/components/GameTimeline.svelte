@@ -35,7 +35,8 @@
         PARTICIPATION,
         PARTICIPATION_UNAVAILABLE,
     } from "$lib/ergo/reputation/types";
-    import { getTransactionInfo } from "$lib/ergo/fetch";
+    import { getTransactionInfo, fetch_token_details } from "$lib/ergo/fetch";
+    import { formatTokenBigInt } from "$lib/utils";
 
     export let history: AnyGame[] = [];
     export let currentGame: AnyGame | null = null;
@@ -119,7 +120,29 @@
     ) {
         const newSteps: TimelineStep[] = [];
         const addedBotBoxes = new Set<string>();
-        const explorerUrl = get(explorer_uri);
+
+        // Fetch token details if applicable
+        let decimals = 9;
+        let tokenSymbol = "ERG";
+        const referenceGame = current || (hist.length > 0 ? hist[0] : null);
+
+        if (referenceGame && referenceGame.participationTokenId) {
+            try {
+                const tokenInfo = await fetch_token_details(
+                    referenceGame.participationTokenId,
+                );
+                decimals = tokenInfo.decimals;
+                tokenSymbol = tokenInfo.name;
+            } catch (e) {
+                console.error("Failed to fetch token details", e);
+            }
+        }
+
+        // Find the first box that should have the creation parameters (Active/Resolution)
+        const creationBox =
+            hist.find((b) => b.status === GameState.Active) ||
+            current ||
+            (hist.length > 0 ? hist[0] : null);
 
         // 1. State Changes from history
         let lastSeed = "";
@@ -147,6 +170,14 @@
                         Height: eventHeight,
                         "Game ID": g.gameId,
                         "Creator Token": g.content.creatorTokenId || "None",
+                        "Entry Fee": `${formatTokenBigInt(g.participationFeeAmount, decimals)} ${tokenSymbol}`,
+                        "Initial Prize": `${formatTokenBigInt(g.value, decimals)} ${tokenSymbol}`,
+                        "Resolver Commission": creationBox
+                            ? `${(Number((creationBox as any).resolverCommission || 0) / 10000).toFixed(2)}%`
+                            : "N/A",
+                        "Judge Commission": creationBox
+                            ? `${(Number((creationBox as any).perJudgeCommission || 0n) / 10000).toFixed(2)}% (per judge)`
+                            : "N/A",
                     },
                 });
                 if ("seed" in g) lastSeed = g.seed;
@@ -175,7 +206,11 @@
 
                     if (isDonation) {
                         label = "Prize Increased";
-                        description = `Someone added to the prize pool and updated the seed.`;
+                        const formattedAmount = formatTokenBigInt(
+                            prizeDiff,
+                            decimals,
+                        );
+                        description = `Someone added ${formattedAmount} ${tokenSymbol} to the prize pool and updated the seed.`;
                         icon = Trophy;
                         color = "text-yellow-500 border-yellow-500";
                     }
@@ -196,7 +231,9 @@
                             Height: eventHeight,
                             "New Seed": g.seed,
                             ...(isDonation
-                                ? { "Added Amount": prizeDiff.toString() }
+                                ? {
+                                      "Added Amount": `${formatTokenBigInt(prizeDiff, decimals)} ${tokenSymbol}`,
+                                  }
                                 : {}),
                         },
                     });
@@ -332,7 +369,7 @@
                             "Transaction ID": txId,
                             Height: eventHeight,
                             "New Candidate Commitment": newCandidate || "N/A",
-                            "Resolver Commission": resolverCommission,
+                            "Resolver Commission": `${(Number(resolverCommission) / 10000).toFixed(2)}%`,
                             Resolver: resolver,
                         },
                     });
@@ -341,7 +378,8 @@
                     newSteps.push({
                         id: `cancelled_${h}`,
                         label: "Game Cancelled",
-                        description: "The game was cancelled and entered the drainage state.",
+                        description:
+                            "The game was cancelled and entered the drainage state.",
                         status: "completed",
                         date: eventDate,
                         icon: XCircle,
@@ -353,7 +391,7 @@
                             "Transaction ID": txId,
                             Height: eventHeight,
                             "Original Deadline": g_cancel.deadlineBlock,
-                            "Current Stake": g_cancel.resolverStakeAmount?.toString() || "0",
+                            "Current Stake": `${formatTokenBigInt(g_cancel.resolverStakeAmount, 9)} ERG`,
                             "Unlock Height": g_cancel.unlockHeight,
                             "Revealed S": g_cancel.revealedS_Hex || "None",
                         },
@@ -362,7 +400,8 @@
                     newSteps.push({
                         id: `finalized_${h}`,
                         label: "Game Finalized",
-                        description: "The game was finalized and prizes were distributed.",
+                        description:
+                            "The game was finalized and prizes were distributed.",
                         status: "completed",
                         date: eventDate,
                         icon: Trophy,
@@ -373,6 +412,7 @@
                             "Box ID": g.boxId,
                             "Transaction ID": txId,
                             Height: eventHeight,
+                            "Final Prize Pool": `${formatTokenBigInt(g.value, decimals)} ${tokenSymbol}`,
                         },
                     });
                 } else {
@@ -471,6 +511,7 @@
                     "Transaction ID": p.transactionId,
                     Height: pHeight,
                     "Player PK": p.playerPK_Hex || "Unknown",
+                    "Fee Paid": `${formatTokenBigInt(p.value, decimals)} ${tokenSymbol}`,
                     Commitment: p.commitmentC_Hex,
                     "Solver ID": p.solverId_RawBytesHex,
                     ...efficientScoreDetails,
@@ -922,7 +963,8 @@
                 newSteps.push({
                     id: "cancelled",
                     label: "Cancelled",
-                    description: "The game was cancelled and is in drainage state.",
+                    description:
+                        "The game was cancelled and is in drainage state.",
                     status: "cancelled",
                     icon: XCircle,
                     height: 9999999,
@@ -931,10 +973,10 @@
                     details: {
                         "Box ID": current.boxId,
                         "Unlock Height": current.unlockHeight,
-                        "Stake to Drain": current.resolverStakeAmount.toString(),
+                        "Stake to Drain": `${formatTokenBigInt(current.resolverStakeAmount, 9)} ERG`,
                         "Original Deadline": current.deadlineBlock,
                         "Revealed S": current.revealedS_Hex || "None",
-                    }
+                    },
                 });
             } else {
                 newSteps.push({

@@ -122,8 +122,8 @@
         const addedBotBoxes = new Set<string>();
 
         // Fetch token details if applicable
-        let decimals = 9;
-        let tokenSymbol = "ERG";
+        let decimals = 0;
+        let tokenSymbol = "N/A";
         const referenceGame = current || (hist.length > 0 ? hist[0] : null);
 
         if (referenceGame && referenceGame.participationTokenId) {
@@ -375,11 +375,24 @@
                     });
                 } else if (g.status === GameState.Cancelled_Draining) {
                     const g_cancel = g as any;
+                    const drainPortion =
+                        g_cancel.resolverStakeAmount /
+                        BigInt(g_cancel.constants.STAKE_DENOMINATOR || 1);
+                    const isUnlocked = height >= g_cancel.unlockHeight;
+                    const unlockTimestamp = await block_height_to_timestamp(
+                        g_cancel.unlockHeight,
+                        new ErgoPlatform(),
+                    );
+                    const countdown = formatDistanceToNow(
+                        new Date(unlockTimestamp),
+                    );
+
                     newSteps.push({
                         id: `cancelled_${h}`,
                         label: "Game Cancelled",
-                        description:
-                            "The game was cancelled and entered the drainage state.",
+                        description: isUnlocked
+                            ? `The game was cancelled. Stake draining is available!`
+                            : `The game was cancelled. Next drain available in ~${countdown}.`,
                         status: "completed",
                         date: eventDate,
                         icon: XCircle,
@@ -390,9 +403,10 @@
                             "Box ID": g.boxId,
                             "Transaction ID": txId,
                             Height: eventHeight,
-                            "Original Deadline": g_cancel.deadlineBlock,
-                            "Current Stake": `${formatTokenBigInt(g_cancel.resolverStakeAmount, 9)} ERG`,
+                            "Current Stake": `${formatTokenBigInt(g_cancel.resolverStakeAmount, decimals)} ${tokenSymbol}`,
+                            "Drainable Amount": `${formatTokenBigInt(drainPortion, decimals)} ${tokenSymbol}`,
                             "Unlock Height": g_cancel.unlockHeight,
+                            "Original Deadline": g_cancel.deadlineBlock,
                             "Revealed S": g_cancel.revealedS_Hex || "None",
                         },
                     });
@@ -960,12 +974,26 @@
                     txId: current.box.transactionId,
                 });
             } else if (current.status === GameState.Cancelled_Draining) {
+                const drainPortion =
+                    current.resolverStakeAmount /
+                    BigInt(current.constants.STAKE_DENOMINATOR || 1);
+                const isUnlocked = height >= current.unlockHeight;
+                const unlockTimestamp = await block_height_to_timestamp(
+                    current.unlockHeight,
+                    new ErgoPlatform(),
+                );
+                const countdown = formatDistanceToNow(
+                    new Date(unlockTimestamp),
+                );
+
                 newSteps.push({
                     id: "cancelled",
-                    label: "Cancelled",
-                    description:
-                        "The game was cancelled and is in drainage state.",
-                    status: "cancelled",
+                    label: "Draining Stake",
+                    description: isUnlocked
+                        ? "Cooldown period ended. Stake can be drained!"
+                        : `Wait for cooldown to end to drain stake.`,
+                    status: "active",
+                    date: isUnlocked ? "Unlocked" : `Unlocks in ~${countdown}`,
                     icon: XCircle,
                     height: 9999999,
                     color: "text-red-500 border-red-500",
@@ -973,7 +1001,8 @@
                     details: {
                         "Box ID": current.boxId,
                         "Unlock Height": current.unlockHeight,
-                        "Stake to Drain": `${formatTokenBigInt(current.resolverStakeAmount, 9)} ERG`,
+                        "Current Stake": `${formatTokenBigInt(current.resolverStakeAmount, decimals)} ${tokenSymbol}`,
+                        "Drainable Amount": `${formatTokenBigInt(drainPortion, decimals)} ${tokenSymbol}`,
                         "Original Deadline": current.deadlineBlock,
                         "Revealed S": current.revealedS_Hex || "None",
                     },

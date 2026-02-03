@@ -70,12 +70,18 @@ export async function drain_cancelled_game_stake(
     const utxos: InputBox[] = await ergo.get_utxos();
     const inputs = [parseBox(game.box), ...utxos];
 
+    console.log("R5 value of the input: ", inputs[0].additionalRegisters.R5);
+    // Shows R5 05a49ed101 (1714066)
+
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(inputs)
         .to([recreatedCancellationBox])
         .sendChangeTo(claimerAddressString)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
         .build();
+
+    console.log(unsignedTransaction.inputs[0].additionalRegisters)
+    // Here stills R5 == 05a49ed101
 
     try {
         const signedTransaction = await ergo.sign_tx(unsignedTransaction.toEIP12Object());
@@ -86,6 +92,9 @@ export async function drain_cancelled_game_stake(
     }
     catch (error) {
         console.warn(error)
+         // FIRST TEST:  SELF.R5 es 1714239.
+         // SECOND TEST:  SELF.R5 es 1714260.
+         // WHY CHANGED?  Why not 1714066?
         throw error;
     }
 }

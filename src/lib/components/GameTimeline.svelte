@@ -336,6 +336,45 @@
                             Resolver: resolver,
                         },
                     });
+                } else if (g.status === GameState.Cancelled_Draining) {
+                    const g_cancel = g as any;
+                    newSteps.push({
+                        id: `cancelled_${h}`,
+                        label: "Game Cancelled",
+                        description: "The game was cancelled and entered the drainage state.",
+                        status: "completed",
+                        date: eventDate,
+                        icon: XCircle,
+                        height: eventHeight,
+                        color: "text-red-500 border-red-500",
+                        txId: txId,
+                        details: {
+                            "Box ID": g.boxId,
+                            "Transaction ID": txId,
+                            Height: eventHeight,
+                            "Original Deadline": g_cancel.deadlineBlock,
+                            "Current Stake": g_cancel.resolverStakeAmount?.toString() || "0",
+                            "Unlock Height": g_cancel.unlockHeight,
+                            "Revealed S": g_cancel.revealedS_Hex || "None",
+                        },
+                    });
+                } else if (g.status === GameState.Finalized) {
+                    newSteps.push({
+                        id: `finalized_${h}`,
+                        label: "Game Finalized",
+                        description: "The game was finalized and prizes were distributed.",
+                        status: "completed",
+                        date: eventDate,
+                        icon: Trophy,
+                        height: eventHeight,
+                        color: "text-yellow-500 border-yellow-500",
+                        txId: txId,
+                        details: {
+                            "Box ID": g.boxId,
+                            "Transaction ID": txId,
+                            Height: eventHeight,
+                        },
+                    });
                 } else {
                     // Unknown transition - provide all data.
                     newSteps.push({
@@ -883,12 +922,19 @@
                 newSteps.push({
                     id: "cancelled",
                     label: "Cancelled",
-                    description: "The game was cancelled.",
+                    description: "The game was cancelled and is in drainage state.",
                     status: "cancelled",
                     icon: XCircle,
                     height: 9999999,
                     color: "text-red-500 border-red-500",
                     txId: current.box.transactionId,
+                    details: {
+                        "Box ID": current.boxId,
+                        "Unlock Height": current.unlockHeight,
+                        "Stake to Drain": current.resolverStakeAmount.toString(),
+                        "Original Deadline": current.deadlineBlock,
+                        "Revealed S": current.revealedS_Hex || "None",
+                    }
                 });
             } else {
                 newSteps.push({

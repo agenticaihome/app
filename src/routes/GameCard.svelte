@@ -117,15 +117,7 @@
     onDestroy(() => {
         if (rafId) cancelAnimationFrame(rafId);
     });
-
-    function formatErg(nano: bigint | number): string {
-        const erg = Number(nano) / 1e9;
-        return erg.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 6,
-        });
-    }
-
+    
     async function updateStatus() {
         if (!game) return;
         switch (game.status) {

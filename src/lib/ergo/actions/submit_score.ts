@@ -7,7 +7,7 @@ import {
     type Box,
     type Amount
 } from '@fleet-sdk/core';
-import { SColl, SLong, SByte, SGroupElement } from '@fleet-sdk/serializer';
+import { SColl, SLong, SByte } from '@fleet-sdk/serializer';
 import { hexToBytes } from '$lib/ergo/utils';
 import { getGopParticipationErgoTreeHex } from '../contract'; // <-- Importación actualizada
 import { prependHexPrefix } from '$lib/utils';

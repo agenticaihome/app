@@ -2,19 +2,16 @@ import {
     OutputBuilder,
     TransactionBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
-    SAFE_MIN_BOX_VALUE,
-    SConstant
-} from '@fleet-sdk/core';
+    SAFE_MIN_BOX_VALUE} from '@fleet-sdk/core';
 import { SColl, SByte, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox, uint8ArrayToHex } from '$lib/ergo/utils';
 import { type GameActive } from '$lib/common/game';
 import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
 import { getGopGameCancellationErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
+import { ErgoPlatform } from '../platform';
 
 // --- Constantes del contrato game_cancellation.es ---
-const STAKE_DENOMINATOR = 5n; // Usar BigInt para consistencia
-const COOLDOWN_IN_BLOCKS = 40; // Cooldown base definido en el contrato
 
 /**
  * Inicia la cancelación de un juego activo, haciendo la transición de GameActive -> GameCancellation.

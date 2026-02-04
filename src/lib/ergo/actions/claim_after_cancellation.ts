@@ -7,6 +7,7 @@ import {
 } from '@fleet-sdk/core';
 import { parseBox } from '$lib/ergo/utils'; // Assuming you have a utility function to parse JSON to InputBox
 import type { GameCancellation, ValidParticipation } from '$lib/common/game'; // Assuming your data types
+import { ErgoPlatform } from '../platform';
 
 // Declaration for the wallet connector (dApp connector)
 declare var ergo: any;

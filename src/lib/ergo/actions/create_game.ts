@@ -16,6 +16,7 @@ import { stringToBytes } from '@scure/base';
 import { getGameConstants } from '$lib/common/constants';
 import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from '../envs';
 import { estimateTotalBoxSizeFromInputs, MAX_BOX_SIZE, type GameBoxInputs } from '../utils/box-size-calculator';
+import { ErgoPlatform } from '../platform';
 
 function randomSeed(): string {
     const array = new Uint8Array(32);

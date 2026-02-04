@@ -10,6 +10,7 @@ import type { GameActive } from '$lib/common/game';
 import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
 import { getGopGameActiveErgoTreeHex } from '../contract'; // Asume que esta función existe
 import { stringToBytes } from '@scure/base';
+import { ErgoPlatform } from '../platform';
 
 declare const ergo: any;
 

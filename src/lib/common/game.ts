@@ -462,7 +462,7 @@ export function getPrizePool(game: AnyGame | null, participations: AnyParticipat
 
     // B. Unbatched Participations
     const totalParticipationsValue = (participations || [])
-        .filter((p) => p && p.status === "Submitted")
+        .filter((p) => p && p.spent === false)
         .reduce((acc, p) => {
             return acc + BigInt(p.value ?? 0n);
         }, 0n);
@@ -471,18 +471,16 @@ export function getPrizePool(game: AnyGame | null, participations: AnyParticipat
     const resolverStake = BigInt(game.resolverStakeAmount ?? 0n);
     const prizePoolBase = totalParticipationsValue + contractBalance - resolverStake;
 
-    // D. Commissions
-    // Commissions are percentages of the prizePoolBase.
-    const perJudgePct = BigInt((game as any).perJudgeCommission ?? 0n);
-    const judgeCount = BigInt(game.judges?.length ?? 0);
-    const resolverPct = BigInt((game as any).resolverCommission ?? 0n);
-    const devPct = BigInt((game as any).devCommission ?? 0n);
-
+    // D. Commissions (Ya no calculamos el "Pct" por separado)
     const denominator = BigInt(game.constants.COMMISSION_DENOMINATOR);
+    const perJudgeCommValue = BigInt((game as any).perJudgeCommission ?? 0n);
+    const judgeCount = BigInt(game.judges?.length ?? 0);
+    const resolverCommValue = BigInt((game as any).resolverCommission ?? 0n);
+    const devCommValue = BigInt((game as any).devCommission ?? 0n);
 
-    const totalJudgeCommission = (prizePoolBase * perJudgePct * judgeCount) / denominator;
-    const resolverCommission = (prizePoolBase * resolverPct) / denominator;
-    const devCommission = (prizePoolBase * devPct) / denominator;
+    const totalJudgeCommission = (prizePoolBase * perJudgeCommValue * judgeCount) / denominator;
+    const resolverCommission = (prizePoolBase * resolverCommValue) / denominator;
+    const devCommission = (prizePoolBase * devCommValue) / denominator;
 
     const finalPrize =
         prizePoolBase -
@@ -493,6 +491,16 @@ export function getPrizePool(game: AnyGame | null, participations: AnyParticipat
     // Winner Protection Policy:
     const participationFee = BigInt(game.participationFeeAmount ?? 0n);
     if (finalPrize < participationFee) {
+        console.warn("Winner protection policy")
+        console.log("All data")
+        console.log("Particpations ", participations)
+        console.log("Total participations ", totalParticipationsValue)
+        console.log("Contract balance ", contractBalance)
+        console.log("Stake ", resolverStake)
+        console.log("Prize pool ", prizePoolBase)
+        console.log("Total judge com ", totalJudgeCommission)
+        console.log("Resolver com ", resolverCommission)
+        console.log("Dev com ", devCommission)
         return prizePoolBase > 0n ? prizePoolBase : 0n;
     }
 

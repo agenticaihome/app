@@ -40,7 +40,15 @@
         walletBalance,
         walletManager,
     } from "wallet-svelte-component";
-    import { Settings, Menu, X, Wallet, VolumeX, Music } from "lucide-svelte";
+    import {
+        Settings,
+        Menu,
+        X,
+        Wallet,
+        VolumeX,
+        Music,
+        Github,
+    } from "lucide-svelte";
     import SettingsModal from "./SettingsModal.svelte";
     import InvalidExplorerModal from "./InvalidExplorerModal.svelte";
     import {
@@ -569,6 +577,15 @@
         {#if $current_height}
             <span>{$current_height}</span>
         {/if}
+        <a
+            href="http://github.com/game-of-prompts"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-foreground transition-colors"
+            title="GitHub Repository"
+        >
+            <Github class="h-4 w-4" />
+        </a>
     </div>
 </footer>
 

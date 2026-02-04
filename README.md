@@ -440,7 +440,19 @@ The Main Game Box uses specific registers to store critical parameters. Notably:
 
     > **Note on `createdAt`**: This value is critical for validating the **Solver ID Box**. The protocol checks that the Solver ID Box was created between `createdAt` and `createdAt + CEREMONY_WINDOW`.
 
-More details on the specific implementation of the contracts can be found in [STATES.md](STATES.md).
+
+### 6.7. Anti-Fraud Game Validation
+
+To ensure the integrity of the games listed on the platform and prevent malicious actors from creating misleading or fraudulent games, the `Game of Prompts` frontend (app) implements a strict validation mechanism (`fetch_conditions`). This validation is performed for every game state (Active, Resolution, Cancelled, Finalized) and enforces two critical conditions:
+
+1.  **Minting Contract Verification:**
+    The game token (NFT) must have been minted by the official `Mint IDT` contract. This ensures that the token was created following the platform's standardized process. The validation checks that the `ergoTree` of the issuance box (the box that minted the token) matches the `mint_idt.es` contract script. If a token was minted by any other ergotree, the game is considered fraudulent and is not displayed.
+
+2.  **Creation Height Consistency:**
+    The `createdAt` timestamp declared in the game's register `R8` must accurately reflect the actual block height at which the *Game Token* was minted. The validation fetches the creation height of the token's issuance box and verifies that the `createdAt` value in the game box is within a margin of ±5 blocks of the token's actual creation height. This prevents "Time-Travel" attacks where a game might claim to have been created in the past to manipulate participation windows or validation logic. (Note: In `Cancelled` state, this check is only performed if `createdAt` is available in the box registers).
+
+These checks are performed client-side by the `fetch_conditions` function before any game is loaded into the application state, effectively filtering out any potential spam or fake games from the user interface.
+
 
 -----
 

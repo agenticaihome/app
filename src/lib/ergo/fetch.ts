@@ -29,7 +29,8 @@ import {
     getGopGameActiveTemplateHash,
     getGopEndGameTemplateHash,
     getGopParticipationBatchTemplateHash,
-    getGopFalseTemplateHash
+    getGopFalseTemplateHash,
+    getGopMintIdtErgoTreeHex
 } from "./contract"; // Assumes this file exports functions to get script hashes
 import {
     hexToUtf8,
@@ -112,6 +113,46 @@ export async function tokenCreationHeight(tokenId: string): Promise<number | nul
         return null;
     }
     return null;
+}
+
+export async function fetch_conditions(tokenId: string, createdAt?: number): Promise<boolean> {
+    const url = `${get(explorer_uri)}/api/v1/tokens/${tokenId}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API response: ${response.status}`);
+        const data = await response.json();
+        const boxId = data?.boxId;
+
+        if (boxId) {
+            const boxUrl = `${get(explorer_uri)}/api/v1/boxes/${boxId}`;
+            const boxResponse = await fetch(boxUrl);
+            if (!boxResponse.ok) throw new Error(`Box API response: ${boxResponse.status}`);
+            const boxData = await boxResponse.json();
+
+            // Validate Height (only if createdAt is provided)
+            const creationHeight = boxData?.creationHeight;
+            if (createdAt !== undefined) {
+                if (creationHeight === undefined || createdAt < creationHeight - 5 || createdAt > creationHeight + 5) {
+                    console.warn(`fetch_conditions: Token ${tokenId} has inconsistent creation height.`);
+                    return false;
+                }
+            }
+
+            // Validate Contract (Mint IDT Check)
+            const ergoTree = boxData?.ergoTree;
+            const mintIdtErgoTree = getGopMintIdtErgoTreeHex();
+            if (ergoTree !== mintIdtErgoTree) {
+                console.warn(`fetch_conditions: Token ${tokenId} was not created in mintIdt contract. Found: ${ergoTree}, Expected: ${mintIdtErgoTree}`);
+                return false;
+            }
+
+            return true;
+        }
+    } catch (error) {
+        console.error(`Error checking conditions for token ${tokenId}:`, error);
+        return false;
+    }
+    return false;
 }
 
 // =================================================================
@@ -217,9 +258,8 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
         if (!numericalParams || numericalParams.length < 8) throw new Error("R8 does not contain the 8 expected numerical parameters.");
         const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission] = numericalParams;
 
-        const created_at_token = await tokenCreationHeight(gameId);
-        if (created_at_token === null || createdAt < created_at_token - 5 || createdAt > created_at_token + 5) {
-            console.warn(`parseGameActiveBox: Box ${box.boxId} has inconsistent creation height in R8.`);
+        if (!await fetch_conditions(gameId, Number(createdAt))) {
+            console.warn(`parseGameActiveBox: Box ${box.boxId} failed validity conditions.`);
             return null;
         }
 
@@ -365,9 +405,8 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
         if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
         const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, resolutionDeadline] = numericalParams;
 
-        const created_at = await tokenCreationHeight(gameId);
-        if (created_at === null || createdAt < created_at - 5 || createdAt > created_at + 5) {
-            console.warn(`parseGameResolutionBox: Box ${box.boxId} has inconsistent creation height in R8.`);
+        if (!await fetch_conditions(gameId, Number(createdAt))) {
+            console.warn(`parseGameResolutionBox: Box ${box.boxId} failed validity conditions.`);
             return null;
         }
 
@@ -546,6 +585,11 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
         }
 
         const participationFeeAmount = BigInt(0); // Assuming 0 in cancellation
+
+        if (!await fetch_conditions(gameId, createdAt ? Number(createdAt) : undefined)) {
+            console.warn(`parseGameCancellationBox: Box ${box.boxId} failed validity conditions.`);
+            return null;
+        }
 
         const gameCancelled: GameCancellation = {
             platform: new ErgoPlatform(),

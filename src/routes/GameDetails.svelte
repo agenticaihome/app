@@ -113,10 +113,11 @@
     } from "$lib/utils";
     import {
         fetchJudges,
-        fetchReputationProofByTokenId,
+
+        fetchReputationProofByTokenId
+
     } from "$lib/ergo/reputation/fetch";
     import { type RPBox, type ReputationProof } from "reputation-system";
-    import { GAME, PARTICIPATION } from "$lib/ergo/reputation/types";
     import { Forum } from "forum-application";
     import ShareModal from "./ShareModal.svelte";
     import SolverSourceModal from "./SolverSourceModal.svelte";
@@ -1024,6 +1025,28 @@
             }
 
             // 9. Determinar Roles del Usuario Conectado
+            acceptedJudgeNominations = 
+                game.status === "Active"
+                    ? (
+                          await Promise.all(
+                              game.judges.map(async (judge) => {
+                                  const judge_proof = await fetchReputationProofByTokenId(judge);
+                                  if (!judge_proof) return null;
+
+                                  const foundBox =
+                                      judge_proof.current_boxes.find(
+                                          (box: RPBox) =>
+                                              box.type.tokenId === game?.constants.ACCEPT_GAME_INVITATION_TYPE_ID &&
+                                              box.object_pointer ===
+                                                  game?.gameId &&
+                                              box.polarization === true,
+                                      );
+                                  return foundBox ? judge : null;
+                              }),
+                          )
+                      ).filter((j): j is string => j !== null)
+                    : [];
+
             const connectedAddress = get(address);
             if (get(connected) && connectedAddress) {
                 const userPKBytes = ErgoAddress.fromBase58(connectedAddress).getPublicKeys()[0];
@@ -1034,9 +1057,7 @@
                 const own_proof = get(reputation_proof);
                 if (own_proof) {
                     isNominatedJudge = game.judges.includes(own_proof.token_id);
-                    isJudge = isNominatedJudge && own_proof.current_boxes.some(box => 
-                        box.type.tokenId === GAME && box.object_pointer === game?.gameId && box.polarization
-                    );
+                    isJudge = acceptedJudgeNominations.includes(own_proof.token_id);
                 }
             }
 
@@ -3623,6 +3644,10 @@
                                             {#if game.status === "Active" && acceptedJudgeNominations && acceptedJudgeNominations.includes(judge)}
                                                 <span class="text-green-500">
                                                     (accepted)</span
+                                                >
+                                            {:else if game.status === "Active" && acceptedJudgeNominations && !acceptedJudgeNominations.includes(judge)}
+                                                <span class="text-yellow-500">
+                                                    (pending)</span
                                                 >
                                             {:else if game.status === "Resolution" && participationVotes.get(game.winnerCandidateCommitment) && candidateParticipationInvalidVotes.includes(judge)}
                                                 <span class="text-red-500">

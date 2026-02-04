@@ -166,7 +166,8 @@ function ensureGameActiveCompiled(): void {
         .replace(/`\+MAX_SCORE_LIST\+`/g, constants.MAX_SCORE_LIST.toString())
         .replace(/`\+PARTICIPATION_TIME_WINDOW\+`/g, constants.PARTICIPATION_TIME_WINDOW.toString())
         .replace(/`\+FALSE_SCRIPT_HASH\+`/g, getGopFalseScriptHash())
-        .replace(/`\+SEED_MARGIN\+`/g, constants.SEED_MARGIN.toString());
+        .replace(/`\+SEED_MARGIN\+`/g, constants.SEED_MARGIN.toString())
+        .replace(/`\+GRACE_PERIOD\+`/g, constants.PARTICIPATION_GRACE_PERIOD.toString());
 
     _gameActive.ergoTree = compile(source, { version: ergoTreeVersion });
 }

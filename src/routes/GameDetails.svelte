@@ -16,6 +16,7 @@
         calculateEffectiveScore,
         isOpenSolverSubmit,
         isDevFriendly,
+        isResolutionAllowed,
     } from "$lib/common/game";
     import { marked } from "marked";
     import {
@@ -139,6 +140,7 @@
         game,
         openCeremony,
         participationIsEnded,
+        resolutionAllowed,
         isNominatedJudge,
         isJudge,
         isBeforeDeadline,
@@ -149,6 +151,7 @@
         game: AnyGame | null,
         openCeremony: boolean,
         participationIsEnded: boolean,
+        resolutionAllowed: boolean,
         isNominatedJudge: boolean,
         isJudge: boolean,
         isBeforeDeadline: boolean,
@@ -158,7 +161,7 @@
 
         if (game.status === "Active") {
             if (!participationIsEnded) return "submit_score";
-            return "resolve_game";
+            if (resolutionAllowed) return "resolve_game";
         }
 
         if (game.status === "Resolution") {
@@ -432,6 +435,7 @@
 
     // Game Status State
     let participationIsEnded = true;
+    let resolutionAllowed = false;
     let deadlineDateDisplay = "N/A";
     let isOwner = false;
     let isResolver = false;
@@ -896,6 +900,7 @@
             });
 
             participationIsEnded = await isGameParticipationEnded(game);
+            resolutionAllowed = await isResolutionAllowed(game);
             openCeremony = await isOpenCeremony(game);
             openSolverSubmit = await isOpenSolverSubmit(game);
 
@@ -1180,6 +1185,7 @@
                     isJudge = acceptedJudgeNominations.includes(
                         own_proof.token_id,
                     );
+                    isOwner = own_proof.token_id === game.content.creatorTokenId;
                 }
             }
 

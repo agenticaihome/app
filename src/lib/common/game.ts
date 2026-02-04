@@ -250,6 +250,11 @@ export async function isGameParticipationEnded(game: AnyGame): Promise<boolean> 
     return game.status !== GameState.Active || game.deadlineBlock <= currentHeight;
 }
 
+export async function isResolutionAllowed(game: AnyGame): Promise<boolean> {
+    const currentHeight = await (new ErgoPlatform).get_current_height();
+    return game.status === GameState.Active && game.deadlineBlock <= currentHeight && currentHeight < game.deadlineBlock + game.constants.PARTICIPATION_GRACE_PERIOD;
+}
+
 export async function isOpenCeremony(game: AnyGame): Promise<boolean> {
     const currentHeight = await (new ErgoPlatform).get_current_height();
     return game.status === "Active" && currentHeight < game.ceremonyDeadline

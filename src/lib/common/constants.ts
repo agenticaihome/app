@@ -43,7 +43,7 @@ const ProductionMode: GameConstants = {
     STAKE_DENOMINATOR: 5,
     COOLDOWN_IN_BLOCKS: 30,
     END_GAME_AUTH_GRACE_PERIOD: 64800,  // aprox. 90 days
-    PARTICIPATION_GRACE_PERIOD: 2160,  // aprox. three days
+    PARTICIPATION_GRACE_PERIOD: 6480,  // aprox. 9 days
     PARTICIPATION_TIME_WINDOW: 2160,  // aprox. three days.   In case future_participation.es exists ... could be 720 blocks aprox. 1 day
     SEED_MARGIN: 20,
     MIN_TIME_WEIGHT_MARGIN: 720,  // approx. 24 hours

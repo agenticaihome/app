@@ -23,7 +23,8 @@
   val PARTICIPATION_TIME_WINDOW = `+PARTICIPATION_TIME_WINDOW+`L
   val SEED_MARGIN          = `+SEED_MARGIN+`L
 
-  val MIN_BOX_VALUE       = 1000000L
+  // Periodo de gracia en bloques para que el jugador reclame si el juego se atasca.
+  val GRACE_PERIOD = `+GRACE_PERIOD+`L
 
   // =================================================================
   // === DEFINICIONES DE REGISTROS (ESTADO ACTIVO)
@@ -78,6 +79,7 @@
 
   val isAfterDeadline = HEIGHT >= deadline
   val isBeforeDeadline = HEIGHT < deadline
+  val gracePeriodIsNotOver = HEIGHT < deadline + GRACE_PERIOD
 
   val box_value = { (box: Box) =>
     box.tokens.filter { (token: (Coll[Byte], Long)) => token._1 == participationTokenId }.fold(0L, { (acc: Long, token: (Coll[Byte], Long)) => acc + token._2 })
@@ -109,7 +111,7 @@
   // Consume esta caja y todas las participaciones, y lee las pruebas de los jueces como dataInputs.
 
   val action1_transitionToResolution = {
-    if (isAfterDeadline) {
+    if (isAfterDeadline && gracePeriodIsNotOver) {
       val resolutionBoxes = OUTPUTS.filter({ (box: Box) => 
         blake2b256(box.propositionBytes) == GAME_RESOLUTION_SCRIPT_HASH 
       })

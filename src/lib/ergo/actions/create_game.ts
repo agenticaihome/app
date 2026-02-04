@@ -51,7 +51,9 @@ export async function create_game(
     gameDetailsJson: string,
     perJudgeCommissionPercentage: number,
     participationTokenId: string,
-    timeWeight: bigint
+    timeWeight: bigint,
+    eip4ImageHash?: string,
+    eip4ImageLink?: string
 ): Promise<string[] | null> {
 
     const seedHex = randomSeed();
@@ -74,6 +76,8 @@ export async function create_game(
         judges,
         gameDetailsJsonBrief: gameDetailsJson.substring(0, 100) + "...",
         seedHex: seedHex.substring(0, 10) + "...",
+        eip4ImageHash,
+        eip4ImageLink
     });
 
     // --- 1. Data and Address Preparation ---
@@ -217,6 +221,17 @@ export async function create_game(
             decimals: 0,
             description: gameDescription
         });
+
+    if (eip4ImageHash && eip4ImageLink) {
+        const imageHashBytes = hexToBytes(eip4ImageHash);
+        if (imageHashBytes) {
+            mintOutput.setAdditionalRegisters({
+                R7: SColl(SByte, [0x01, 0x01]).toHex(),
+                R8: SColl(SByte, imageHashBytes).toHex(),
+                R9: SColl(SByte, stringToBytes("utf8", eip4ImageLink)).toHex()
+            });
+        }
+    }
 
     // --- Tx B Output: Game Box ---
     const gameBoxOutput = new OutputBuilder(

@@ -45,6 +45,8 @@ interface CreateGoPGamePlatformParams {
     perJudgeCommissionPercentage: number;
     participationTokenId?: string;
     timeWeight: bigint;
+    eip4ImageHash?: string;
+    eip4ImageLink?: string;
 }
 
 async function createOrUpdateOpinion(
@@ -135,7 +137,9 @@ export class ErgoPlatform implements Platform {
                 params.gameDetailsJson,
                 params.perJudgeCommissionPercentage,
                 params.participationTokenId || "",
-                params.timeWeight
+                params.timeWeight,
+                params.eip4ImageHash,
+                params.eip4ImageLink
             );
         } catch (error) {
             console.error("Error en el método de plataforma createGoPGame:", error);

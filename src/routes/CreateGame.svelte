@@ -23,6 +23,7 @@
     import { Textarea } from "$lib/components/ui/textarea";
     import { Button } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
+    import { Checkbox } from "$lib/components/ui/checkbox";
     import {
         Trophy,
         Eye,
@@ -94,6 +95,35 @@
     let showDidacticModal = false;
     let didacticModalTitle = "";
     let didacticModalText = "";
+
+    // EIP-004 State
+    let useEip4: boolean = false;
+    let eip4ImageUrl: string = "";
+    let isFetchingImage: boolean = false;
+
+    async function handleEip4Image() {
+        if (!eip4ImageUrl) return;
+        isFetchingImage = true;
+        try {
+            const response = await fetch(eip4ImageUrl);
+            if (!response.ok) throw new Error("Failed to fetch image");
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+
+            const hashBufferSha = await crypto.subtle.digest(
+                "SHA-256",
+                arrayBuffer,
+            );
+            const hashHex = uint8ArrayToHex(new Uint8Array(hashBufferSha));
+
+            gameImageHashStore.set(hashHex);
+        } catch (e: any) {
+            console.error(e);
+            alert("Error fetching or hashing image: " + e.message);
+        } finally {
+            isFetchingImage = false;
+        }
+    }
 
     function openDidacticModal(title: string, text: string) {
         didacticModalTitle = title;
@@ -752,6 +782,8 @@
                 gameDetailsJson: gameDetails,
                 perJudgeCommissionPercentage: perJudgeComissionPercentage,
                 timeWeight: calculateTimeWeight(),
+                eip4ImageHash: useEip4 ? get(gameImageHashStore) : undefined,
+                eip4ImageLink: useEip4 ? eip4ImageUrl : undefined,
             });
             transactionId = result;
         } catch (error: any) {
@@ -2201,14 +2233,71 @@
                                     </p>
                                 </div>
                                 <div class="form-group lg:col-span-4">
+                                    <div
+                                        class="flex items-center space-x-2 mb-4"
+                                    >
+                                        <Checkbox
+                                            id="useEip4"
+                                            bind:checked={useEip4}
+                                        />
+                                        <Label
+                                            for="useEip4"
+                                            class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                        >
+                                            Use EIP-004 (Picture Artwork
+                                            Standard)
+                                        </Label>
+                                    </div>
+
+                                    {#if useEip4}
+                                        <div
+                                            class="mb-4 pl-4 border-l-2 border-primary/20 py-2 bg-primary/5 rounded-r-md"
+                                        >
+                                            <Label
+                                                for="eip4ImageUrl"
+                                                class="mb-1.5 block"
+                                                >Artwork URL</Label
+                                            >
+                                            <div class="flex gap-2 mb-1">
+                                                <Input
+                                                    id="eip4ImageUrl"
+                                                    bind:value={eip4ImageUrl}
+                                                    placeholder="https://example.com/image.png"
+                                                    on:blur={handleEip4Image}
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    on:click={handleEip4Image}
+                                                    disabled={isFetchingImage}
+                                                >
+                                                    {isFetchingImage
+                                                        ? "Fetching..."
+                                                        : "Fetch & Hash"}
+                                                </Button>
+                                            </div>
+                                            <p
+                                                class="text-xs text-muted-foreground"
+                                            >
+                                                Enter the URL to automatically
+                                                calculate the SHA-256 hash
+                                                below. use consistent URLs (e.g.
+                                                IPFS gateway).
+                                            </p>
+                                        </div>
+                                    {/if}
+
                                     <Label for="gameImageHash"
-                                        >Game Image Hash</Label
+                                        >Game Image Hash ({useEip4
+                                            ? "SHA-256"
+                                            : "Blake2b256"})</Label
                                     >
                                     <div class="flex gap-2">
                                         <Input
                                             id="gameImageHash"
                                             bind:value={$gameImageHashStore}
-                                            placeholder="Blake2b256 hash (64-character hex)"
+                                            placeholder={useEip4
+                                                ? "SHA-256 hash (64-character hex)"
+                                                : "Blake2b256 hash (64-character hex)"}
                                             maxlength={64}
                                             pattern="[a-fA-F0-9]{64}"
                                         />
@@ -2226,8 +2315,8 @@
                                     <p
                                         class="text-xs mt-1 text-muted-foreground"
                                     >
-                                        The Blake2b256 hash of the game's image
-                                        file
+                                        The {useEip4 ? "SHA-256" : "Blake2b256"}
+                                        hash of the game's image file
                                     </p>
                                 </div>
                                 <div class="form-group lg:col-span-4">

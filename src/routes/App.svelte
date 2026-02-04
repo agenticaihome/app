@@ -48,6 +48,7 @@
         VolumeX,
         Music,
         Github,
+        Send,
     } from "lucide-svelte";
     import SettingsModal from "./SettingsModal.svelte";
     import InvalidExplorerModal from "./InvalidExplorerModal.svelte";
@@ -562,6 +563,15 @@
             title="GitHub Repository"
         >
             <Github class="h-4 w-4" />
+        </a>
+        <a
+            href="https://t.me/unstopbots"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-foreground transition-colors ml-2"
+            title="Telegram Channel"
+        >
+            <Send class="h-4 w-4" />
         </a>
     </div>
 

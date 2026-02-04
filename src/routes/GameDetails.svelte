@@ -28,6 +28,7 @@
         muted,
         audio_element,
         user_volume,
+        current_height,
     } from "$lib/common/store";
     import { ErgoPlatform } from "$lib/ergo/platform";
     import { onDestroy, onMount, tick } from "svelte";
@@ -161,7 +162,7 @@
         }
 
         if (game.status === "Resolution") {
-            if (!isBeforeDeadline) return "end_game";
+            if (currentHeight >= game.resolutionDeadline) return "end_game";
             return null; // No primary action during judge period (only secondary/destructive)
         }
 
@@ -263,7 +264,7 @@
             }
         }
 
-        if (game.status === "Resolution" && isBeforeDeadline) {
+        if (game.status === "Resolution" && currentHeight < game.resolutionDeadline) {
             // Only allow judge actions if there's a winner candidate
             // ANY user with a reputation proof can vote (reputation system is open),
             // but only appointed judges count for the quorum.
@@ -523,8 +524,8 @@
         }, stepDuration);
     }
 
-    let tokenSymbol = "ERG";
-    let tokenDecimals = 9;
+    let tokenSymbol = "N/A";
+    let tokenDecimals = 0;
 
     $: prizePoolValue = getPrizePool(game, participations);
 

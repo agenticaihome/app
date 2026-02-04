@@ -95,6 +95,6 @@ export async function drain_cancelled_game_stake(
          // FIRST TEST:  SELF.R5 es 1714239.
          // SECOND TEST:  SELF.R5 es 1714260.
          // WHY CHANGED?  Why not 1714066?
-        throw error;
+        throw new Error("Error: https://github.com/game-of-prompts/app/issues/3");
     }
 }

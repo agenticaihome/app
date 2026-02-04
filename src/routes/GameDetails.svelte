@@ -977,7 +977,7 @@
                     // Procesamiento de votos de jueces
                     for (const item of participations) {
                         const participation = item.commitmentC_Hex;
-                        const allJudges = Array.from(get(judges).data.entries()).filter(([_, j]) => j.token_id in game.judges);
+                        const allJudges = Array.from(get(judges).data.entries()).filter(([_, j]) => game.judges.includes(j.token_id));
 
                         const votes = new Map(allJudges.filter(([_, j]) => 
                             j.current_boxes.some(b => b.object_pointer === participation && b.type.tokenId === game.constants.PARTICIPATION_TYPE_ID && b.is_locked === true)
@@ -1006,13 +1006,17 @@
 
                             
                             isInvalidationMajorityReached = candidateParticipationInvalidVotes.length >= requiredVotes;
+                            console.log("CANDIDATE PARTICIPATION VOTES")
+                            console.log(candidateParticipationInvalidVotes)
+                            console.log("VOTES ARRAY")
+                            console.log(votesArray)
                         }
 
                         const candidateUnvailVotes = participationUnavailableVotes.get(game.winnerCandidateCommitment);
                         if (candidateUnvailVotes) {
                             const votesArray = Array.from(candidateUnvailVotes.entries());
 
-                            isInvalidationMajorityReached = votesArray.length >= requiredVotes;
+                            isUnavailableMajorityReached = votesArray.length >= requiredVotes;
                         }
                     }
                 }

@@ -554,6 +554,15 @@
 <footer class="page-footer">
     <div class="footer-left">
         <Kya />
+        <a
+            href="http://github.com/game-of-prompts"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-foreground transition-colors ml-2"
+            title="GitHub Repository"
+        >
+            <Github class="h-4 w-4" />
+        </a>
     </div>
 
     <div class="footer-center">
@@ -577,15 +586,6 @@
         {#if $current_height}
             <span>{$current_height}</span>
         {/if}
-        <a
-            href="http://github.com/game-of-prompts"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="hover:text-foreground transition-colors"
-            title="GitHub Repository"
-        >
-            <Github class="h-4 w-4" />
-        </a>
     </div>
 </footer>
 

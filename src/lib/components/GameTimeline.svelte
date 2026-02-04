@@ -49,7 +49,7 @@
     // Helper to get a readable date and height from block height or timestamp
     async function getEventDetails(
         box: Box<Amount> | null,
-    ): Promise<{ date: string; height: number }> {
+    ): Promise<{ date: string; height: number, creationHeight: number }> {
         if (!box) return { date: "Unknown", height: 0 };
 
         const txInfo = await getTransactionInfo(box.transactionId);
@@ -57,6 +57,7 @@
             return {
                 date: new Date(txInfo.timestamp).toLocaleString(),
                 height: txInfo.inclusionHeight || box.creationHeight,
+                creationHeight: box.creationHeight
             };
         }
 
@@ -469,9 +470,7 @@
 
         // 2. Participations and their Bot Boxes
         for (const p of parts) {
-            const h = p.creationHeight;
-
-            const { date: pDate, height: pHeight } = await getEventDetails(
+            const { date: pDate, height: pHeight, creationHeight: cHeight } = await getEventDetails(
                 p.box,
             );
 
@@ -523,7 +522,8 @@
                 details: {
                     "Box ID": p.boxId,
                     "Transaction ID": p.transactionId,
-                    Height: pHeight,
+                    "Included in Block": pHeight,
+                    "Creation height": cHeight,
                     "Player PK": p.playerPK_Hex || "Unknown",
                     "Fee Paid": `${formatTokenBigInt(p.value, decimals)} ${tokenSymbol}`,
                     Commitment: p.commitmentC_Hex,
@@ -535,7 +535,7 @@
             // Bot Box Event (if available)
             if (p.solverIdBox && !addedBotBoxes.has(p.solverIdBox.boxId)) {
                 addedBotBoxes.add(p.solverIdBox.boxId);
-                const { date: botDate, height: botHeight } =
+                const { date: botDate, height: botHeight, creationHeight: botCHeight } =
                     await getEventDetails(p.solverIdBox);
                 newSteps.push({
                     id: `bot_box_${p.solverIdBox.boxId}`,
@@ -551,7 +551,8 @@
                     details: {
                         "Box ID": p.solverIdBox.boxId,
                         "Transaction ID": p.solverIdBox.transactionId,
-                        Height: botHeight,
+                        "Included in Block": botHeight,
+                        "Creation height": botCHeight,
                         "Solver ID": p.solverId_RawBytesHex,
                     },
                 });

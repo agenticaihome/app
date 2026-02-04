@@ -851,98 +851,93 @@
     });
 
     async function loadGameDetailsAndTimers() {
+        // 1. Verificación inicial y limpieza
         if (!game) {
             cleanupTimers();
             return;
         }
 
-        currentHeight = await platform.get_current_height();
-
-        // Fetch history
-        fetchGameHistory(game.gameId).then((history) => {
-            gameHistory = history;
-        });
-
-        if (game.status === "Active") {
-            const seedMargin = game.constants.SEED_MARGIN;
-            const hashDeadline = game.ceremonyDeadline - seedMargin;
-
-            if (currentHeight < hashDeadline) {
-                targetDate = await block_height_to_timestamp(
-                    hashDeadline,
-                    platform,
-                );
-                clockLabel = "HASH SUBMISSION DEADLINE";
-                clockInformation = "Submit your bot's hash before this time.";
-            } else if (currentHeight < game.ceremonyDeadline) {
-                targetDate = await block_height_to_timestamp(
-                    game.ceremonyDeadline,
-                    platform,
-                );
-                clockLabel = "SEED RANDOMNESS DEADLINE";
-                clockInformation =
-                    "Add randomness to the seed before this time.";
-            } else {
-                targetDate = await block_height_to_timestamp(
-                    game.deadlineBlock,
-                    platform,
-                );
-                clockLabel = "GAME EXECUTION DEADLINE";
-                clockInformation =
-                    "Run the game and submit results before this time.";
-            }
-        } else if (game.status === "Resolution") {
-            targetDate = await block_height_to_timestamp(
-                game.resolutionDeadline,
-                platform,
-            );
-            clockLabel = "RESOLUTION DEADLINE";
-            clockInformation = "Judges must resolve the game before this time.";
-        } else if (game.status === "Cancelled_Draining") {
-            targetDate = await block_height_to_timestamp(
-                (game as GameCancellation).unlockHeight,
-                platform,
-            );
-            clockLabel = "STAKE UNLOCK DEADLINE";
-            clockInformation = "Creator stake is locked until this time.";
-        } else {
-            targetDate = 0;
-            clockLabel = "GAME ENDED";
-            clockInformation = "This game has finished.";
-        }
-
-        if (game.createdAt) {
-            createdDateDisplay = formatDistanceToNow(new Date(game.createdAt));
-        }
-
+        cleanupTimers(); // Limpiamos una sola vez al inicio
         isSubmitting = false;
         transactionId = null;
         errorMessage = null;
         warningMessage = null;
+
         try {
+            // 2. Integración de Comisiones (Lógica unificada)
+            // Solo calculamos si el estado requiere desglose de comisiones
+            if (game.status === "Active" || game.status === "Resolution") {
+                const denominator = game.constants.COMMISSION_DENOMINATOR / 100;
+                resolverPct = Number(game.resolverCommission ?? 0) / denominator;
+                judgesTotalPct = (Number(game.perJudgeCommission ?? 0n) * game.judges.length) / denominator;
+                developersPct = Number(game.devCommission ?? 0) / denominator;
+                totalPct = resolverPct + judgesTotalPct + developersPct;
+                winnerPct = Math.max(0, 100 - totalPct);
+                overAllocated = totalPct > 100 ? (totalPct - 100).toFixed(2) : 0;
+            }
+
+            // 3. Obtener datos de red y estado actual
+            currentHeight = await platform.get_current_height();
+            
+            // Fetch history (sin bloquear el hilo principal)
+            fetchGameHistory(game.gameId).then((history) => {
+                gameHistory = history;
+            });
+
             participationIsEnded = await isGameParticipationEnded(game);
             openCeremony = await isOpenCeremony(game);
             openSolverSubmit = await isOpenSolverSubmit(game);
 
-            soundtrackUrl = game.content.soundtrackURL;
+            // 4. Lógica de Tiempos y Deadlines (Consolidada)
+            if (game.status === "Active") {
+                if (openSolverSubmit) {
+                    targetDate = await block_height_to_timestamp(game.ceremonyDeadline - game.constants.SEED_MARGIN, platform);
+                    clockLabel = "Solver Submit Deadline";
+                    clockInformation = "Block limit to implement your solution and submit your bot hash.";
+                } else if (openCeremony) {
+                    targetDate = await block_height_to_timestamp(game.ceremonyDeadline, platform);
+                    clockLabel = "Ceremony Deadline";
+                    clockInformation = "Block limit to add randomness to the game seed.";
+                } else if (currentHeight < game.deadlineBlock) {
+                    targetDate = await block_height_to_timestamp(game.deadlineBlock, platform);
+                    clockLabel = "Participation Deadline";
+                    clockInformation = "Block limit for submissions. After this block, no new participations will be accepted.";
+                } else {
+                    targetDate = await block_height_to_timestamp(game.deadlineBlock + game.constants.PARTICIPATION_GRACE_PERIOD, platform);
+                    clockLabel = "Grace Period";
+                }
+                deadlineDateDisplay = format(new Date(targetDate), "MMM d, yyyy 'at' HH:mm");
 
-            if (game.content.image) {
-                imageSources = await fetchFileSourcesByHash(
-                    game.content.image,
-                    get(explorer_uri),
-                );
+            } else if (game.status === "Resolution") {
+                const isGrace = currentHeight >= game.resolutionDeadline;
+                const height = isGrace ? game.resolutionDeadline + game.constants.END_GAME_AUTH_GRACE_PERIOD : game.resolutionDeadline;
+                
+                targetDate = await block_height_to_timestamp(height, platform);
+                clockLabel = isGrace ? "Grace Period" : "Resolution Deadline";
+                clockInformation = "Judges must resolve the game before this time.";
+                deadlineDateDisplay = `${clockLabel} ends ${formatDistanceToNow(new Date(targetDate), { addSuffix: true })}`;
+
+            } else if (game.status === "Cancelled_Draining") {
+                targetDate = await block_height_to_timestamp((game as GameCancellation).unlockHeight, platform);
+                clockLabel = "STAKE UNLOCK DEADLINE";
+                clockInformation = "Creator stake is locked until this time.";
+                deadlineDateDisplay = format(new Date(targetDate), "MMM d, yyyy 'at' HH:mm");
+            } else {
+                targetDate = 0;
+                clockLabel = "GAME ENDED";
+                clockInformation = "This game has finished.";
+                deadlineDateDisplay = "N/A";
             }
-            if (game.content.serviceId) {
-                serviceSources = await fetchFileSourcesByHash(
-                    game.content.serviceId,
-                    get(explorer_uri),
-                );
-            }
+
+            // 5. Carga de Contenido Multimedia
+            soundtrackUrl = game.content.soundtrackURL;
+            const explorer = get(explorer_uri);
+
+            if (game.content.image) imageSources = await fetchFileSourcesByHash(game.content.image, explorer);
+            if (game.content.serviceId) serviceSources = await fetchFileSourcesByHash(game.content.serviceId, explorer);
+            
             if (game.content.paper) {
-                paperSources = await fetchFileSourcesByHash(
-                    game.content.paper,
-                    get(explorer_uri),
-                );
+                paperSources = await fetchFileSourcesByHash(game.content.paper, explorer);
                 if (paperSources.length > 0) {
                     try {
                         const response = await fetch(paperSources[0].sourceUrl);
@@ -950,25 +945,18 @@
                             paperContent = await response.text();
                             extractToc(paperContent);
                         }
-                    } catch (e) {
-                        console.error("Error fetching paper content:", e);
-                    }
-                }
-            }
-            if (game.content.soundtrack) {
-                soundtrackSources = await fetchFileSourcesByHash(
-                    game.content.soundtrack,
-                    get(explorer_uri),
-                );
-                if (soundtrackSources.length > 0) {
-                    soundtrackUrl = soundtrackSources[0].sourceUrl;
+                    } catch (e) { console.error("Error paper:", e); }
                 }
             }
 
+            if (game.content.soundtrack) {
+                soundtrackSources = await fetchFileSourcesByHash(game.content.soundtrack, explorer);
+                if (soundtrackSources.length > 0) soundtrackUrl = soundtrackSources[0].sourceUrl;
+            }
+
+            // 6. Detalles del Token
             if (game.participationTokenId) {
-                const tokenDetails = await fetch_token_details(
-                    game.participationTokenId,
-                );
+                const tokenDetails = await fetch_token_details(game.participationTokenId);
                 tokenSymbol = tokenDetails.name;
                 tokenDecimals = tokenDetails.decimals;
             } else {
@@ -976,291 +964,81 @@
                 tokenDecimals = 9;
             }
 
-            if (game.status === "Active") {
+            // 7. Lógica de Participaciones y Votaciones (Solo en estados relevantes)
+            if (game.status === "Active" || game.status === "Resolution" || 
+                game.status === GameState.Cancelled_Draining || game.status === GameState.Finalized) {
+                
                 participations = await fetchParticipations(game);
-            } else if (game.status === "Resolution") {
-                participations = await fetchParticipations(game);
-                participationBatches = await fetchParticipationBatches(game);
-                participations.forEach(async (item) => {
-                    const participation = item.commitmentC_Hex;
-                    const votes = new Map<string, ReputationProof>(
-                        Array.from(get(judges).data.entries()).filter(
-                            ([key, judge]) => {
-                                return judge.current_boxes.some((box) => {
-                                    return (
-                                        box.object_pointer === participation &&
-                                        box.type.tokenId === PARTICIPATION
-                                    );
-                                });
-                            },
-                        ),
-                    );
 
-                    participationVotes.set(participation, votes);
+                if (game.status === "Resolution") {
+                    participationBatches = await fetchParticipationBatches(game);
+                    
+                    // Procesamiento de votos de jueces
+                    for (const item of participations) {
+                        const participation = item.commitmentC_Hex;
+                        const allJudges = Array.from(get(judges).data.entries());
 
-                    const unavailableVotes = new Map<string, ReputationProof>(
-                        Array.from(get(judges).data.entries()).filter(
-                            ([key, judge]) => {
-                                return judge.current_boxes.some((box) => {
-                                    return (
-                                        box.object_pointer === participation &&
-                                        box.type.tokenId ===
-                                            game?.constants
-                                                .PARTICIPATION_UNAVAILABLE_TYPE_ID
-                                    );
-                                });
-                            },
-                        ),
-                    );
+                        const votes = new Map(allJudges.filter(([_, j]) => 
+                            j.current_boxes.some(b => b.object_pointer === participation && b.type.tokenId === PARTICIPATION)
+                        ));
+                        participationVotes.set(participation, votes);
 
-                    participationUnavailableVotes.set(
-                        participation,
-                        unavailableVotes,
-                    );
-                });
+                        const unavailVotes = new Map(allJudges.filter(([_, j]) => 
+                            j.current_boxes.some(b => b.object_pointer === participation && b.type.tokenId === game.constants.PARTICIPATION_UNAVAILABLE_TYPE_ID)
+                        ));
+                        participationUnavailableVotes.set(participation, unavailVotes);
+                    }
 
-                const candidate_participation_votes = Array.from(
-                    participationVotes
-                        .get(game.winnerCandidateCommitment)
-                        ?.entries() ?? [],
-                );
-                if (candidate_participation_votes) {
-                    candidateParticipationValidVotes =
-                        candidate_participation_votes
-                            .filter(([key, value]) => {
-                                return value.current_boxes.some((box) => {
-                                    return (
-                                        box.object_pointer ===
-                                            game.winnerCandidateCommitment &&
-                                        box.type.tokenId === PARTICIPATION &&
-                                        box.polarization === true
-                                    );
-                                });
-                            })
-                            .map(([key, value]) => key);
+                    // Cálculo de mayorías para el candidato ganador
+                    const candidateVotes = game.winnerCandidateCommitment ? participationVotes.get(game.winnerCandidateCommitment) : [];
+                    if (candidateVotes) {
+                        const votesArray = Array.from(candidateVotes.entries());
+                        candidateParticipationValidVotes = votesArray.filter(([_, v]) => 
+                            v.current_boxes.some(b => b.object_pointer === game.winnerCandidateCommitment && b.type.tokenId === PARTICIPATION && b.polarization)
+                        ).map(([k]) => k);
 
-                    candidateParticipationInvalidVotes =
-                        candidate_participation_votes
-                            .filter(([key, value]) => {
-                                return value.current_boxes.some((box) => {
-                                    return (
-                                        box.object_pointer ===
-                                            game.winnerCandidateCommitment &&
-                                        box.type.tokenId === PARTICIPATION &&
-                                        box.polarization === false
-                                    );
-                                });
-                            })
-                            .map(([key, value]) => key);
+                        candidateParticipationInvalidVotes = votesArray.filter(([_, v]) => 
+                            v.current_boxes.some(b => b.object_pointer === game.winnerCandidateCommitment && b.type.tokenId === PARTICIPATION && !b.polarization)
+                        ).map(([k]) => k);
 
-                    const candidate_unavailable_votes = Array.from(
-                        participationUnavailableVotes
-                            .get(game.winnerCandidateCommitment)
-                            ?.entries() ?? [],
-                    );
-
-                    candidateParticipationUnavailableVotes =
-                        candidate_unavailable_votes
-                            .filter(([key, value]) => {
-                                return value.current_boxes.some((box) => {
-                                    return (
-                                        box.object_pointer ===
-                                            game.winnerCandidateCommitment &&
-                                        box.type.tokenId ===
-                                            game.constants
-                                                .PARTICIPATION_UNAVAILABLE_TYPE_ID
-                                    );
-                                });
-                            })
-                            .map(([key, value]) => key);
-
-                    const requiredVotes =
-                        Math.floor(game.judges.length / 2) + 1;
-                    isInvalidationMajorityReached =
-                        candidateParticipationInvalidVotes.length >=
-                        requiredVotes;
-                    isUnavailableMajorityReached =
-                        candidateParticipationUnavailableVotes.length >=
-                        requiredVotes;
+                        const requiredVotes = Math.floor(game.judges.length / 2) + 1;
+                        isInvalidationMajorityReached = candidateParticipationInvalidVotes.length >= requiredVotes;
+                    }
                 }
-            } else if (game.status === GameState.Cancelled_Draining) {
-                participations = await fetchParticipations(game);
-            } else if (game.status === GameState.Finalized) {
-                participations = await fetchParticipations(game);
             }
 
-            if (game.status === "Active") {
-                if (openSolverSubmit) {
-                    targetDate = await block_height_to_timestamp(
-                        game.ceremonyDeadline - game.constants.SEED_MARGIN,
-                        platform,
-                    );
-                    clockLabel = "Solver Submit Deadline";
-                    clockInformation =
-                        "Block limit to implement your solution and submit your bot hash.";
-                } else if (openCeremony) {
-                    targetDate = await block_height_to_timestamp(
-                        game.ceremonyDeadline,
-                        platform,
-                    );
-                    clockLabel = "Ceremony Deadline";
-                    clockInformation =
-                        "Block limit to add randomness to the game seed.";
-                } else if (currentHeight < game.deadlineBlock) {
-                    targetDate = await block_height_to_timestamp(
-                        game.deadlineBlock,
-                        platform,
-                    );
-                    clockLabel = "Participation Deadline";
-                    clockInformation =
-                        "Block limit for submissions. After this block, no new participations will be accepted.";
-                } else {
-                    // Grace Period
-                    targetDate = await block_height_to_timestamp(
-                        game.deadlineBlock +
-                            game.constants.PARTICIPATION_GRACE_PERIOD,
-                        platform,
-                    );
-                    clockLabel = "Grace Period";
-                }
-
-                deadlineDateDisplay = format(
-                    new Date(targetDate),
-                    "MMM d, yyyy 'at' HH:mm",
-                );
-            } else if (game.status === "Resolution") {
-                if (currentHeight < game.resolutionDeadline) {
-                    targetDate = await block_height_to_timestamp(
-                        game.resolutionDeadline,
-                        platform,
-                    );
-                    clockLabel = "Resolution Deadline";
-                } else {
-                    // Grace Period for Resolution
-                    targetDate = await block_height_to_timestamp(
-                        game.resolutionDeadline +
-                            game.constants.END_GAME_AUTH_GRACE_PERIOD,
-                        platform,
-                    );
-                    clockLabel = "Grace Period";
-                }
-                deadlineDateDisplay = `${clockLabel} ends ${formatDistanceToNow(new Date(targetDate), { addSuffix: true })}`;
-            } else if (game.status === "Cancelled_Draining") {
-                targetDate = await block_height_to_timestamp(
-                    (game as GameCancellation).unlockHeight,
-                    platform,
-                );
-                clockLabel = "STAKE UNLOCK DEADLINE";
-                clockInformation = "Creator stake is locked until this time.";
-                deadlineDateDisplay = format(
-                    new Date(targetDate),
-                    "MMM d, yyyy 'at' HH:mm",
-                );
-            } else {
-                deadlineDateDisplay = "N/A";
-            }
-
+            // 8. Fecha de Creación
             if (game.createdAt) {
-                const createdTimestamp = await block_height_to_timestamp(
-                    game.createdAt,
-                    platform,
-                );
-                createdDateDisplay = format(
-                    new Date(createdTimestamp),
-                    "MMM d, yyyy",
-                );
+                const createdTimestamp = await block_height_to_timestamp(game.createdAt, platform);
+                createdDateDisplay = format(new Date(createdTimestamp), "MMM d, yyyy");
             }
 
-            acceptedJudgeNominations =
-                game.status === "Active"
-                    ? (
-                          await Promise.all(
-                              game.judges.map(async (judge) => {
-                                  const judge_proof =
-                                      await fetchReputationProofByTokenId(
-                                          judge,
-                                      );
-                                  if (!judge_proof) return null;
-
-                                  const foundBox =
-                                      judge_proof.current_boxes.find(
-                                          (box: RPBox) =>
-                                              box.type.tokenId === GAME &&
-                                              box.object_pointer ===
-                                                  game?.gameId &&
-                                              box.polarization,
-                                      );
-                                  return foundBox ? judge : null;
-                              }),
-                          )
-                      ).filter((j): j is string => j !== null)
-                    : [];
-
+            // 9. Determinar Roles del Usuario Conectado
             const connectedAddress = get(address);
-            if (get(connected) && connectedAddress && game) {
-                isResolver = false;
-                isJudge = false;
-                isNominatedJudge = false;
-
-                const userPKBytes =
-                    ErgoAddress.fromBase58(connectedAddress).getPublicKeys()[0];
-                const userPKHex = userPKBytes
-                    ? uint8ArrayToHex(userPKBytes)
-                    : null;
-
-                if (game.status === "Active") {
-                    if (userPKHex) {
-                        const own_proof = get(reputation_proof);
-                        if (own_proof) {
-                            isNominatedJudge = game.judges.includes(
-                                own_proof.token_id,
-                            );
-
-                            const foundBox = own_proof.current_boxes.find(
-                                (box: RPBox) =>
-                                    box.type.tokenId === GAME &&
-                                    box.object_pointer === game?.gameId &&
-                                    box.polarization,
-                            );
-                            const exists = !!foundBox;
-                            isJudge = isNominatedJudge && exists;
-                        }
-                    }
-                } else if (game.status === "Resolution") {
-                    if (userPKHex) {
-                        isResolver = userPKHex === game.resolverPK_Hex;
-                        const own_proof = get(reputation_proof);
-                        if (own_proof) {
-                            isNominatedJudge = game.judges.includes(
-                                own_proof.token_id,
-                            );
-
-                            const foundBox = own_proof.current_boxes.find(
-                                (box: RPBox) =>
-                                    box.type.tokenId === GAME &&
-                                    box.object_pointer === game?.gameId &&
-                                    box.polarization,
-                            );
-                            const exists = !!foundBox;
-                            isJudge = isNominatedJudge && exists;
-                        }
-                    }
+            if (get(connected) && connectedAddress) {
+                const userPKBytes = ErgoAddress.fromBase58(connectedAddress).getPublicKeys()[0];
+                const userPKHex = userPKBytes ? uint8ArrayToHex(userPKBytes) : null;
+                
+                isResolver = userPKHex === game.resolverPK_Hex;
+                
+                const own_proof = get(reputation_proof);
+                if (own_proof) {
+                    isNominatedJudge = game.judges.includes(own_proof.token_id);
+                    isJudge = isNominatedJudge && own_proof.current_boxes.some(box => 
+                        box.type.tokenId === GAME && box.object_pointer === game?.gameId && box.polarization
+                    );
                 }
             }
 
-            cleanupTimers();
-            cleanupTimers();
-            if (game.status !== "Finalized" && targetDate) {
-                clockCountdownInterval = setInterval(
-                    updateClockCountdown,
-                    1000,
-                );
+            // 10. Iniciar cuenta regresiva si es necesario
+            if (game.status !== "Finalized" && targetDate > 0) {
+                clockCountdownInterval = setInterval(updateClockCountdown, 1000);
                 updateClockCountdown();
             }
+
         } catch (error: any) {
-            errorMessage =
-                "Could not load game details: " +
-                (error.message || "Unknown error");
+            errorMessage = "Could not load game details: " + (error.message || "Unknown error");
+            console.error(error);
         }
     }
 
@@ -1916,38 +1694,12 @@
 
     // === Cálculo de distribución de premios ===
     // Datos base según el tipo de juego
-    let creatorPct = 0;
+    let totalPct = 0;
+    let winnerPct = 0;
+    let overAllocated = 0;
+    let resolverPct = 0;
     let judgesTotalPct = 0;
     let developersPct = 0;
-    let winnerPct = 0;
-
-    if (game) {
-        if (game.status === "Active") {
-            creatorPct = Number(game.commissionPercentage ?? 0) / 10000;
-            judgesTotalPct =
-                (Number(game.perJudgeComissionPercentage ?? 0n) *
-                    game.judges.length) /
-                10000;
-            developersPct = Number(
-                game.constants.DEV_COMMISSION_PERCENTAGE ?? 0,
-            );
-        } else if (game.status === "Resolution") {
-            creatorPct = Number(game.resolverCommission ?? 0) / 10000;
-            judgesTotalPct =
-                (Number(game.perJudgeComissionPercentage ?? 0n) *
-                    game.judges.length) /
-                10000;
-            developersPct = Number(
-                game.constants.DEV_COMMISSION_PERCENTAGE ?? 0,
-            );
-        }
-    }
-
-    // El porcentaje del ganador es lo que queda
-    const totalPct = creatorPct + judgesTotalPct + developersPct;
-    winnerPct = Math.max(0, 100 - totalPct);
-
-    const overAllocated = totalPct > 100 ? (totalPct - 100).toFixed(2) : 0;
 
     // --- Image Resolution Logic ---
     let resolvedImageSrc = game?.content?.imageURL ?? "";
@@ -2128,7 +1880,7 @@
                         <div
                             class="stat-blocks-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full"
                         >
-                            {#each [{ label: "Reputation", value: game.reputation.toFixed(4), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commission", value: `${game.status == "Active" ? (game.resolverCommission / 10000).toFixed(2) : "N/A"}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool..." }] as stat}
+                            {#each [{ label: "Reputation", value: game.reputation.toFixed(4), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commissions", value: `${totalPct}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool..." }] as stat}
                                 <div
                                     class="group relative flex flex-col justify-between p-5 rounded-xl border border-white/20 bg-white/10 backdrop-blur-md transition-all duration-300 hover:bg-white/20"
                                 >
@@ -2481,8 +2233,8 @@
                                 ></div>
                                 <div
                                     class="bar-segment creator"
-                                    style:width="{clampPct(creatorPct)}%"
-                                    title="Creator: {creatorPct.toFixed(2)}%"
+                                    style:width="{clampPct(resolverPct)}%"
+                                    title="Creator: {resolverPct.toFixed(2)}%"
                                 ></div>
                                 <div
                                     class="bar-segment judges"
@@ -2515,7 +2267,7 @@
                                         >{game.status === "Resolution" ||
                                         game.status === "EndGame"
                                             ? "Resolver"
-                                            : "Creator"} ({creatorPct.toFixed(
+                                            : "Creator"} ({resolverPct.toFixed(
                                             2,
                                         )}%)</span
                                     >

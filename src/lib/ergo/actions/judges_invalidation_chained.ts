@@ -53,20 +53,6 @@ export async function judges_invalidation_chained(
         throw new Error("The provided participation does not correspond to the current winning candidate of the game.");
     }
 
-    // Check all existing judge votes
-    for (const p of judgeVoteDataInputs) {
-        const reg = p.additionalRegisters;
-
-        const valid = reg.R4 === "0e20" + game.constants.PARTICIPATION_TYPE_ID &&
-            reg.R5 === "0e20" + game.winnerCandidateCommitment &&
-            reg.R6 === "01" && // true in SBoolean
-            reg.R8 === "00";   // false in SBoolean
-
-        if (!valid) {
-            throw new Error("Invalid judge vote [chained].")
-        }
-    }
-
     // --- 2. Prepare Tx A: Create or Update Opinion ---
     const proof = get(reputation_proof);
     if (!proof) throw new Error("User has no reputation proof");

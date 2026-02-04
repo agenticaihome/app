@@ -964,8 +964,8 @@
                 tokenDecimals = 9;
             }
 
-            // 7. Lógica de Participaciones y Votaciones (Solo en estados relevantes)
-            if (game.status === "Active" || game.status === "Resolution" || 
+            // 7. Lógica de Participaciones y Votaciones
+            if (game.status === GameState.Active || game.status === GameState.Resolution || 
                 game.status === GameState.Cancelled_Draining || game.status === GameState.Finalized) {
                 
                 participations = await fetchParticipations(game);
@@ -976,10 +976,10 @@
                     // Procesamiento de votos de jueces
                     for (const item of participations) {
                         const participation = item.commitmentC_Hex;
-                        const allJudges = Array.from(get(judges).data.entries());
+                        const allJudges = Array.from(get(judges).data.entries()).filter(([_, j]) => j.token_id in game.judges);
 
                         const votes = new Map(allJudges.filter(([_, j]) => 
-                            j.current_boxes.some(b => b.object_pointer === participation && b.type.tokenId === PARTICIPATION)
+                            j.current_boxes.some(b => b.object_pointer === participation && b.type.tokenId === game.constants.PARTICIPATION_TYPE_ID && b.is_locked === true)
                         ));
                         participationVotes.set(participation, votes);
 
@@ -990,19 +990,29 @@
                     }
 
                     // Cálculo de mayorías para el candidato ganador
-                    const candidateVotes = game.winnerCandidateCommitment ? participationVotes.get(game.winnerCandidateCommitment) : [];
-                    if (candidateVotes) {
-                        const votesArray = Array.from(candidateVotes.entries());
-                        candidateParticipationValidVotes = votesArray.filter(([_, v]) => 
-                            v.current_boxes.some(b => b.object_pointer === game.winnerCandidateCommitment && b.type.tokenId === PARTICIPATION && b.polarization)
-                        ).map(([k]) => k);
+                    const requiredVotes = Math.floor(game.judges.length / 2) + 1;
+                    if (game.winnerCandidateCommitment) {
+                        const candidateVotes = participationVotes.get(game.winnerCandidateCommitment);
+                        if (candidateVotes) {
+                            const votesArray = Array.from(candidateVotes.entries());
+                            candidateParticipationValidVotes = votesArray.filter(([_, v]) => 
+                                v.current_boxes.some(b => b.polarization == true)
+                            ).map(([k]) => k);
 
-                        candidateParticipationInvalidVotes = votesArray.filter(([_, v]) => 
-                            v.current_boxes.some(b => b.object_pointer === game.winnerCandidateCommitment && b.type.tokenId === PARTICIPATION && !b.polarization)
-                        ).map(([k]) => k);
+                            candidateParticipationInvalidVotes = votesArray.filter(([_, v]) => 
+                                v.current_boxes.some(b => b.polarization == false)
+                            ).map(([k]) => k);
 
-                        const requiredVotes = Math.floor(game.judges.length / 2) + 1;
-                        isInvalidationMajorityReached = candidateParticipationInvalidVotes.length >= requiredVotes;
+                            
+                            isInvalidationMajorityReached = candidateParticipationInvalidVotes.length >= requiredVotes;
+                        }
+
+                        const candidateUnvailVotes = participationUnavailableVotes.get(game.winnerCandidateCommitment);
+                        if (candidateUnvailVotes) {
+                            const votesArray = Array.from(candidateUnvailVotes.entries());
+
+                            isInvalidationMajorityReached = votesArray.length >= requiredVotes;
+                        }
                     }
                 }
             }
@@ -1271,7 +1281,7 @@
         isSubmitting = true;
         try {
             const winner_participation = participations.filter(
-                (p) => game.winnerCandidateCommitment === p.commitmentC_Hex,
+                (p) => game.winnerCandidateCommitment === p.commitmentC_Hex && p.status === "Submitted",
             )[0];
 
             if (isInvalidationMajorityReached) {
@@ -1281,9 +1291,7 @@
                     game.winnerCandidateCommitment,
                 );
                 if (winnerVotes) {
-                    const judgeInvalidVotesDataInputs = Array.from(
-                        winnerVotes.entries(),
-                    ).filter(([key, value]) => {
+                    const judgeInvalidVotesDataInputs = Array.from(winnerVotes.entries()).filter(([key, value]) => {
                         return candidateParticipationInvalidVotes.includes(key);
                     });
 
@@ -1292,9 +1300,10 @@
                             return value.current_boxes.filter((box) => {
                                 return (
                                     box.polarization === false &&
+                                    box.is_locked === true &&  // Ya se ha comprobado en el init, pero por si acaso.
                                     box.object_pointer ===
-                                        game.winnerCandidateCommitment &&
-                                    box.type.tokenId === PARTICIPATION
+                                        (game?.winnerCandidateCommitment ?? "") &&
+                                    box.type.tokenId === game.constants.PARTICIPATION_TYPE_ID
                                 );
                             })[0].box;
                         });
@@ -1337,9 +1346,7 @@
                     game.winnerCandidateCommitment,
                 );
                 if (winnerVotes) {
-                    const judgeUnavailableVotesDataInputs = Array.from(
-                        winnerVotes.entries(),
-                    ).filter(([key, value]) => {
+                    const judgeUnavailableVotesDataInputs = Array.from(winnerVotes.entries()).filter(([key, value]) => {
                         return candidateParticipationUnavailableVotes.includes(
                             key,
                         );
@@ -1388,23 +1395,21 @@
             const opinionBox = $reputation_proof.boxes.find(
                 (box) =>
                     box.object_pointer === game.winnerCandidateCommitment &&
-                    box.polarization === false &&
-                    (box.type.tokenId === PARTICIPATION ||
-                        box.type.tokenId ===
-                            game.constants.PARTICIPATION_UNAVAILABLE_TYPE_ID),
+                    game.constants.PARTICIPATION_UNAVAILABLE_TYPE_ID
             );
             if (!opinionBox) {
                 throw new Error("No opinion box found for this participation.");
             }
+
             // Find the main reputation box
-            const mainBox = $reputation_proof.boxes.find(
+            const mainBox = $reputation_proof.current_boxes.find(
                 (box) => box.type.tokenId === $reputation_proof.token_id,
             );
             if (!mainBox) {
                 throw new Error("Main reputation box not found.");
             }
             transactionId = await remove_opinion(
-                explorer_uri,
+                get(explorer_uri),
                 opinionBox,
                 mainBox,
             );

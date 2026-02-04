@@ -46,24 +46,6 @@ export async function judges_invalidate_unavailable(
         throw new Error("The provided participation does not correspond to the current winning candidate of the game.");
     }
 
-    // Check all judge votes - they should be for PARTICIPATION_UNAVAILABLE_TYPE_ID
-    for (const p of judgeVoteDataInputs) {
-        const reg = p.additionalRegisters;
-
-        console.log("Regs ", reg)
-
-        // TODO CHECK.
-        const valid = reg.R4 === "0e20" + game.constants.PARTICIPATION_UNAVAILABLE_TYPE_ID &&
-            reg.R5 === "0e20" + game.winnerCandidateCommitment;
-
-        if (!valid) {
-            console.log(reg.R4)
-            console.log(reg.R5)
-            throw new Error("Invalid judge vote for unavailable marking.")
-        }
-
-    }
-
     const requiredVotes = Math.floor(game.judges.length / 2) + 1;
     if (judgeVoteDataInputs.length < requiredVotes) {
         throw new Error(`Required ${requiredVotes} judge votes, but only ${judgeVoteDataInputs.length} were provided.`);

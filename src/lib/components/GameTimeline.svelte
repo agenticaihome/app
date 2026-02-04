@@ -1030,6 +1030,7 @@
             <History class="w-6 h-6 text-blue-500" />
             <h3 class="text-xl font-bold">Game Event Timeline</h3>
         </div>
+        {#if false}
         <button
             class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors
                    {showBotEvents
@@ -1045,6 +1046,7 @@
                 Show Bot Uploads
             {/if}
         </button>
+        {/if}
     </div>
 
     {#if isLoadingTimeline}

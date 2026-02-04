@@ -36,7 +36,7 @@ export async function cancel_game(
     console.warn(`Iniciando transición de cancelación para el juego: ${game.boxId}`);
     
     // --- 1. Obtener datos y realizar pre-chequeos ---
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
 
     if (currentHeight >= game.deadlineBlock) {
         throw new Error("La cancelación del juego solo es posible antes de la fecha límite.");

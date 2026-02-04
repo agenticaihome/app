@@ -19,6 +19,7 @@ import { fetchJudges } from '../reputation/fetch';
 
 import { prependHexPrefix } from '$lib/utils';
 import { getGameConstants } from '$lib/common/constants';
+import { ErgoPlatform } from '../platform';
 
 declare const ergo: any;
 
@@ -57,7 +58,7 @@ export async function resolve_game(
     if (!Array.isArray(participations)) {
         throw new Error("El listado de participaciones proporcionado es inválido.");
     }
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     if (currentHeight < game.deadlineBlock) {
         throw new Error("El juego no puede ser resuelto antes de su fecha límite.");
     }

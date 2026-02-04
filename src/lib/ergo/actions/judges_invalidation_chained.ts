@@ -15,6 +15,7 @@ import { PARTICIPATION } from '$lib/ergo/reputation/types';
 import { reputation_proof } from '$lib/common/store';
 import { get } from 'svelte/store';
 import { explorer_uri } from '../envs';
+import { ErgoPlatform } from '../platform';
 
 declare const ergo: any;
 
@@ -40,7 +41,7 @@ export async function judges_invalidation_chained(
 
     console.log(`[judges_invalidation_chained] Starting chained invalidation for game: ${game.boxId}`);
 
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     const userAddress = await ergo.get_change_address();
 
     // --- 1. Preliminary checks ---

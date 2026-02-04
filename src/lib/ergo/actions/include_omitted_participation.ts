@@ -10,6 +10,7 @@ import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { prependHexPrefix } from '$lib/utils';
 import { stringToBytes } from '@scure/base';
+import { ErgoPlatform } from '../platform';
 
 
 declare const ergo: any;
@@ -34,7 +35,7 @@ export async function include_omitted_participation(
     console.log(`Intentando incluir la participación omitida ${omittedParticipation.boxId} en el juego: ${game.boxId}`);
 
     // --- 1. Verificaciones preliminares ---
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     if (currentHeight >= game.resolutionDeadline) {
         throw new Error("No se pueden incluir participaciones después de que finalice el período de los jueces.");
     }

@@ -10,6 +10,7 @@ import { parseBox, hexToBytes } from '$lib/ergo/utils';
 import { type GameCancellation } from '$lib/common/game';
 import { getGopGameCancellationErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
+import { ErgoPlatform } from '../platform';
 
 const COOLDOWN_IN_BLOCKS_MARGIN = 10;
 
@@ -30,7 +31,7 @@ export async function drain_cancelled_game_stake(
     console.log(`Attempting to drain the stake of the cancelled game: ${game.boxId}`);
 
     // --- 1. Preliminary Checks ---
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     if (currentHeight < game.unlockHeight) {
         throw new Error(`The cooldown period has not ended. Draining is only possible after block ${game.unlockHeight}.`);
     }

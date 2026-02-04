@@ -5,6 +5,7 @@ import {
 import { parseBox } from '$lib/ergo/utils';
 import { type GameResolution } from '$lib/common/game';
 import { getGopEndGameErgoTreeHex } from '../contract';
+import { ErgoPlatform } from '../platform';
 
 
 declare const ergo: any;
@@ -15,7 +16,7 @@ export async function to_end_game(
 
     console.log(`[to_end_game] Starting transition to end game for: ${game.boxId}`);
 
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     const userAddress = await ergo.get_change_address();
 
     if (currentHeight < game.resolutionDeadline) {

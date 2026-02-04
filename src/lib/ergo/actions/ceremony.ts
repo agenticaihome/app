@@ -32,7 +32,7 @@ export async function contribute_to_ceremony(
     console.log(`Iniciando contribución a ceremonia para el juego: ${game.boxId}`);
     if (donation > 0n) console.log(`Donación de: ${donation.toString()} para el token ${game.participationTokenId}`);
 
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
 
     // 1. --- Validación (Pre-checks) ---
     if (currentHeight >= game.ceremonyDeadline) {

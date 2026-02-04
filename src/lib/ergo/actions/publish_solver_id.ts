@@ -8,6 +8,7 @@ import { SColl, SByte } from '@fleet-sdk/serializer';
 import { hexToBytes } from '$lib/ergo/utils';
 
 import { getGopFalseErgoTreeHex } from '../contract';
+import { ErgoPlatform } from '../platform';
 
 declare const ergo: any;
 
@@ -18,7 +19,7 @@ declare const ergo: any;
  * @returns The transaction ID.
  */
 export async function publish_solver_id(solverId: string): Promise<string> {
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     const changeAddress = await ergo.get_change_address();
 
     const solverIdBytes = hexToBytes(solverId);

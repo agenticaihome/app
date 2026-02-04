@@ -9,6 +9,7 @@ import { getGopJudgesPaidErgoTreeHex } from '../contract';
 import { parseBox, pkHexToBase58Address, hexToBytes } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { calculatePayouts } from '../utils/payout_calculator';
+import { ErgoPlatform } from '../platform';
 declare const ergo: any;
 
 export async function end_game(
@@ -19,7 +20,7 @@ export async function end_game(
     console.log(`[end_game] Participations: ${participations.length}`)
     console.log(`[end_game] Starting game finalization: ${game.boxId}`);
 
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     const userAddress = await ergo.get_change_address();
 
     const winnerParticipation = participations.find(p => p.commitmentC_Hex === game.winnerCandidateCommitment) ?? null;

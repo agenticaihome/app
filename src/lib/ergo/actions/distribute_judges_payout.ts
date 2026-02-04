@@ -11,6 +11,7 @@ import { getGopJudgesPaidErgoTreeHex, getReputationProofScriptHash } from '../co
 import { fetchJudges } from '../reputation/fetch';
 import { GAME } from '../reputation/types';
 import { SConstant } from '@fleet-sdk/serializer';
+import { ErgoPlatform } from '../platform';
 
 declare const ergo: any;
 
@@ -24,7 +25,7 @@ export async function distribute_judges_payout(
 ): Promise<string> {
     console.log(`[distribute_judges_payout] Starting distribution for box: ${judgesPaidBox.boxId}`);
 
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     const userAddress = await ergo.get_change_address();
 
     // 1. Parse Registers

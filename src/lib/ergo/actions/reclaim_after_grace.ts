@@ -7,6 +7,7 @@ import {
 } from '@fleet-sdk/core';
 import { parseBox } from '$lib/ergo/utils'; // Assuming you have a utility function to parse JSON
 import type { GameActive, ValidParticipation } from '$lib/common/game'; // Assuming your data types
+import { ErgoPlatform } from '../platform';
 
 /**
  * Builds and sends a transaction for a participant to claim their share
@@ -25,7 +26,7 @@ export async function reclaim_after_grace(
     // --- 1. Get user and chain data ---
     const userAddress = await ergo.get_change_address();
     const utxos: InputBox[] = await ergo.get_utxos();
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
 
     // --- 2. Preliminary validations ---
     if (!utxos || utxos.length === 0) {

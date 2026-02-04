@@ -18,7 +18,7 @@ export async function batch_participations(
     participations: ValidParticipation[],
     batches: Box<Amount>[]
 ): Promise<string> {
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     const batchScript = getGopParticipationBatchErgoTreeHex();
 
     // 1. Select inputs (mix of participations and batches)

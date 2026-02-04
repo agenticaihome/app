@@ -106,7 +106,7 @@ export async function create_game(
     if (!seedBytes) throw new Error("Failed to convert the seedHex to bytes.");
 
     const ceremonyDeadlineBlock = deadlineBlock - getGameConstants().PARTICIPATION_TIME_WINDOW;
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
 
     if (currentHeight >= ceremonyDeadlineBlock) {
         throw new Error(`Current height (${currentHeight}) is past the ceremony deadline (${ceremonyDeadlineBlock}). Increase the deadline or reduce the participation time window.`)
@@ -159,7 +159,7 @@ export async function create_game(
     }
 
     // Registers preparation (using the same data as the calculator)
-    const creationHeight = await ergo.get_current_height();
+    const creationHeight = await (new ErgoPlatform()).get_current_height();
     const r4Hex = SInt(0).toHex();
     const r5Hex = SColl(SByte, seedBytes).toHex();
     const r6Hex = SColl(SByte, hashedSecretBytes).toHex();

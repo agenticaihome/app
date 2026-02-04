@@ -10,6 +10,7 @@ import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
+import { ErgoPlatform } from '../platform';
 
 
 const JUDGE_PERIOD_MARGIN = 10;
@@ -35,7 +36,7 @@ export async function judges_invalidate(
     console.log(`Initiating candidate invalidation for the game: ${game.boxId}`);
 
     // --- 1. Preliminary checks ---
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     if (currentHeight >= game.resolutionDeadline) {
         throw new Error("Invalidation is only possible before the judges' period ends.");
     }
@@ -49,12 +50,16 @@ export async function judges_invalidate(
     for (const p of judgeVoteDataInputs) {
         const reg = p.additionalRegisters;
 
-        const valid = reg.R4 === "0e20" + game.constants.PARTICIPATION_TYPE_ID &&
-            reg.R5 === "0e20" + game.winnerCandidateCommitment &&
-            reg.R6 === "true" &&
-            reg.R8 === "false";
+        const valid = reg.R4 === game.constants.PARTICIPATION_TYPE_ID &&
+            reg.R5 === game.winnerCandidateCommitment &&
+            reg.R6 === "0101" &&
+            reg.R8 === "0100";
 
         if (!valid) {
+            console.log(game.constants.PARTICIPATION_TYPE_ID)
+            console.log(game.winnerCandidateCommitment)
+            console.log(reg.R6)
+            console.log(reg.R8)
             throw new Error("Invalid judge vote [basic].")
         }
 

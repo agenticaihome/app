@@ -10,6 +10,7 @@ import { hexToBytes, parseBox } from '$lib/ergo/utils';
 import { type GameResolution, type ValidParticipation } from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
+import { ErgoPlatform } from '../platform';
 
 
 const JUDGE_PERIOD_MARGIN = 10;
@@ -35,7 +36,7 @@ export async function judges_invalidate_unavailable(
     console.log(`Initiating candidate unavailable marking for the game: ${game.boxId}`);
 
     // --- 1. Preliminary checks ---
-    const currentHeight = await ergo.get_current_height();
+    const currentHeight = await (new ErgoPlatform()).get_current_height();
     if (currentHeight >= game.resolutionDeadline) {
         throw new Error("Unavailable marking is only possible before the judges' period ends.");
     }

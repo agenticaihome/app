@@ -129,7 +129,7 @@
                     statusClasses =
                         "bg-orange-500/15 text-orange-400 border border-orange-500/30";
                 } else if (participationEnded) {
-                    statusLabel = "Awaiting Results";
+                    statusLabel = "Awaiting Resolution";
                     statusClasses =
                         "bg-amber-500/15 text-amber-400 border border-amber-500/30";
                 } else if (await isOpenSolverSubmit(game)) {
@@ -242,6 +242,10 @@
                         game.ceremonyDeadline - game.constants.SEED_MARGIN;
                 } else if (await isOpenCeremony(game)) {
                     targetBlock = game.ceremonyDeadline;
+                } else if (participationEnded) {
+                    targetBlock =
+                        game.deadlineBlock +
+                        game.constants.PARTICIPATION_GRACE_PERIOD;
                 }
             }
 

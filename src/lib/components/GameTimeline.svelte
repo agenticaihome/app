@@ -49,7 +49,7 @@
     // Helper to get a readable date and height from block height or timestamp
     async function getEventDetails(
         box: Box<Amount> | null,
-    ): Promise<{ date: string; height: number, creationHeight: number }> {
+    ): Promise<{ date: string; height: number; creationHeight: number }> {
         if (!box) return { date: "Unknown", height: 0 };
 
         const txInfo = await getTransactionInfo(box.transactionId);
@@ -57,7 +57,7 @@
             return {
                 date: new Date(txInfo.timestamp).toLocaleString(),
                 height: txInfo.inclusionHeight || box.creationHeight,
-                creationHeight: box.creationHeight
+                creationHeight: box.creationHeight,
             };
         }
 
@@ -470,9 +470,11 @@
 
         // 2. Participations and their Bot Boxes
         for (const p of parts) {
-            const { date: pDate, height: pHeight, creationHeight: cHeight } = await getEventDetails(
-                p.box,
-            );
+            const {
+                date: pDate,
+                height: pHeight,
+                creationHeight: cHeight,
+            } = await getEventDetails(p.box);
 
             // Participation Event
             // Calculate efficient score details if we have the necessary data
@@ -535,8 +537,11 @@
             // Bot Box Event (if available)
             if (p.solverIdBox && !addedBotBoxes.has(p.solverIdBox.boxId)) {
                 addedBotBoxes.add(p.solverIdBox.boxId);
-                const { date: botDate, height: botHeight, creationHeight: botCHeight } =
-                    await getEventDetails(p.solverIdBox);
+                const {
+                    date: botDate,
+                    height: botHeight,
+                    creationHeight: botCHeight,
+                } = await getEventDetails(p.solverIdBox);
                 newSteps.push({
                     id: `bot_box_${p.solverIdBox.boxId}`,
                     label: "Bot Uploaded",
@@ -846,6 +851,37 @@
                         "Block Height": participationDeadline,
                     },
                 });
+
+                // Suspended State (deadline + grace period)
+                const suspendedHeight =
+                    participationDeadline +
+                    current.constants.PARTICIPATION_GRACE_PERIOD;
+                if (
+                    height >= suspendedHeight &&
+                    current.status === GameState.Active
+                ) {
+                    const suspendedTimestamp = await block_height_to_timestamp(
+                        suspendedHeight,
+                        new ErgoPlatform(),
+                    );
+                    newSteps.push({
+                        id: `past_suspended`,
+                        label: "Game Suspended",
+                        description:
+                            "The resolution grace period ended. Creator stake is locked and players can claim refunds.",
+                        status: "completed",
+                        date: new Date(suspendedTimestamp).toLocaleString(),
+                        icon: EyeOff,
+                        height: suspendedHeight,
+                        color: "text-red-500 border-red-500",
+                        details: {
+                            Reason: "Resolution Deadline Passed",
+                            "Block Height": suspendedHeight,
+                            "Grace Period":
+                                current.constants.PARTICIPATION_GRACE_PERIOD,
+                        },
+                    });
+                }
             }
         }
 
@@ -907,17 +943,32 @@
                     });
                 }
 
-                newSteps.push({
-                    id: "future_resolution",
-                    label: "Resolution & Judging",
-                    description:
-                        "After the deadline, judges will reproduce the winning robot to verify creator honesty.",
-                    status: "pending",
-                    date: `Starts in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(current.deadlineBlock, new ErgoPlatform())))}`,
-                    icon: Gavel,
-                    height: 9999999,
-                    color: "text-lime-500 border-lime-500",
-                });
+                const isPartEnded = height >= current.deadlineBlock;
+                const suspendedHeight =
+                    current.deadlineBlock +
+                    current.constants.PARTICIPATION_GRACE_PERIOD;
+                const isSuspended = isPartEnded && height >= suspendedHeight;
+
+                if (!isSuspended) {
+                    newSteps.push({
+                        id: "future_resolution",
+                        label: isPartEnded
+                            ? "Awaiting Resolution"
+                            : "Resolution & Judging",
+                        description: isPartEnded
+                            ? "Waiting for the creator to reveal the seed and start the resolution phase."
+                            : "After the deadline, judges will reproduce the winning robot to verify creator honesty.",
+                        status: isPartEnded ? "active" : "pending",
+                        date: isPartEnded
+                            ? `Suspends in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(suspendedHeight, new ErgoPlatform())))}`
+                            : `Starts in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(current.deadlineBlock, new ErgoPlatform())))}`,
+                        icon: Gavel,
+                        height: 9999999,
+                        color: isPartEnded
+                            ? "text-amber-500 border-amber-500"
+                            : "text-lime-500 border-lime-500",
+                    });
+                }
             }
 
             // Resolution & Finalization
@@ -1032,21 +1083,21 @@
             <h3 class="text-xl font-bold">Game Event Timeline</h3>
         </div>
         {#if false}
-        <button
-            class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors
+            <button
+                class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full border transition-colors
                    {showBotEvents
-                ? 'bg-amber-500/10 text-amber-600 border-amber-200'
-                : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'}"
-            on:click={() => (showBotEvents = !showBotEvents)}
-        >
-            {#if showBotEvents}
-                <Eye class="w-3.5 h-3.5" />
-                Hide Bot Uploads
-            {:else}
-                <EyeOff class="w-3.5 h-3.5" />
-                Show Bot Uploads
-            {/if}
-        </button>
+                    ? 'bg-amber-500/10 text-amber-600 border-amber-200'
+                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'}"
+                on:click={() => (showBotEvents = !showBotEvents)}
+            >
+                {#if showBotEvents}
+                    <Eye class="w-3.5 h-3.5" />
+                    Hide Bot Uploads
+                {:else}
+                    <EyeOff class="w-3.5 h-3.5" />
+                    Show Bot Uploads
+                {/if}
+            </button>
         {/if}
     </div>
 

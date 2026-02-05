@@ -937,7 +937,9 @@
                             game.constants.PARTICIPATION_GRACE_PERIOD,
                         platform,
                     );
-                    clockLabel = "Grace Period";
+                    clockLabel = "Awaiting Resolution";
+                    clockInformation =
+                        "Participation period ended. Waiting for the creator to reveal the secret and start the resolution phase.";
                 }
                 deadlineDateDisplay = format(
                     new Date(targetDate),

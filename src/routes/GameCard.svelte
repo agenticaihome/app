@@ -9,6 +9,7 @@
     import { onMount, onDestroy } from "svelte";
     import {
         isGameParticipationEnded,
+        isGameSuspended,
         GameState,
         type AnyGame as Game,
         isOpenCeremony,
@@ -27,6 +28,7 @@
     $: isEven = index % 2 === 0;
 
     let participationEnded = true;
+    let gameSuspended = false;
     let deadlineTimestamp = 0;
     let remainingTime = "Loading...";
     let statusLabel = "Loading...";
@@ -117,12 +119,16 @@
     onDestroy(() => {
         if (rafId) cancelAnimationFrame(rafId);
     });
-    
+
     async function updateStatus() {
         if (!game) return;
         switch (game.status) {
             case GameState.Active:
-                if (participationEnded) {
+                if (gameSuspended) {
+                    statusLabel = "Suspended";
+                    statusClasses =
+                        "bg-orange-500/15 text-orange-400 border border-orange-500/30";
+                } else if (participationEnded) {
                     statusLabel = "Awaiting Results";
                     statusClasses =
                         "bg-amber-500/15 text-amber-400 border border-amber-500/30";
@@ -224,6 +230,7 @@
         }
 
         participationEnded = await isGameParticipationEnded(game);
+        gameSuspended = await isGameSuspended(game);
         if (
             game.status === GameState.Active ||
             game.status === GameState.Resolution

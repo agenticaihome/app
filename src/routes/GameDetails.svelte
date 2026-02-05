@@ -11,6 +11,7 @@
         getPrizePool,
         isGameParticipationEnded,
         isGameEnded,
+        isGameSuspended,
         isOpenCeremony,
         resolve_participation_commitment,
         calculateEffectiveScore,
@@ -436,6 +437,7 @@
     // Game Status State
     let participationIsEnded = true;
     let resolutionAllowed = false;
+    let gameSuspended = false;
     let deadlineDateDisplay = "N/A";
     let isOwner = false;
     let isResolver = false;
@@ -446,8 +448,6 @@
     let acceptedJudgeNominations: string[] = [];
     let isInvalidationMajorityReached = false;
     let isUnavailableMajorityReached = false;
-
-    // Refund State
     let isClaimingRefundFor: string | null = null;
     let claimRefundError: { [boxId: string]: string | null } = {};
     let claimRefundSuccessTxId: { [boxId: string]: string | null } = {};
@@ -901,6 +901,7 @@
 
             participationIsEnded = await isGameParticipationEnded(game);
             resolutionAllowed = await isResolutionAllowed(game);
+            gameSuspended = await isGameSuspended(game);
             openCeremony = await isOpenCeremony(game);
             openSolverSubmit = await isOpenSolverSubmit(game);
 
@@ -1185,7 +1186,8 @@
                     isJudge = acceptedJudgeNominations.includes(
                         own_proof.token_id,
                     );
-                    isOwner = own_proof.token_id === game.content.creatorTokenId;
+                    isOwner =
+                        own_proof.token_id === game.content.creatorTokenId;
                 }
             }
 
@@ -3193,11 +3195,11 @@
                                 >
                                     <div
                                         class="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 {game.status ===
-                                        'Active'
+                                            'Active' && !participationIsEnded
                                             ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-110'
                                             : 'bg-green-500 border-green-500 text-white'}"
                                     >
-                                        {#if game.status !== "Active"}
+                                        {#if game.status !== "Active" || participationIsEnded}
                                             <Check class="w-6 h-6" />
                                         {:else}
                                             <span class="text-base font-bold"
@@ -3220,16 +3222,23 @@
                                 >
                                     <div
                                         class="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 {game.status ===
-                                        'Resolution'
+                                            'Resolution' ||
+                                        (game.status === 'Active' &&
+                                            participationIsEnded &&
+                                            !gameSuspended)
                                             ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-110'
                                             : game.status === 'Finalized'
                                               ? 'bg-green-500 border-green-500 text-white'
-                                              : 'bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600'}"
+                                              : gameSuspended
+                                                ? 'bg-red-500/10 border-red-500/50 text-red-500'
+                                                : 'bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600'}"
                                     >
                                         {#if game.status === "Finalized"}
                                             <Check class="w-6 h-6" />
-                                        {:else if game.status === "Resolution"}
+                                        {:else if game.status === "Resolution" || (game.status === "Active" && participationIsEnded && !gameSuspended)}
                                             <Gavel class="w-5 h-5" />
+                                        {:else if gameSuspended}
+                                            <XCircle class="w-5 h-5" />
                                         {:else}
                                             <span class="text-base font-bold"
                                                 >2</span
@@ -3240,8 +3249,12 @@
                                         class="mt-2 text-xs font-bold uppercase tracking-wider {game.status ===
                                         'Resolution'
                                             ? 'text-blue-600 dark:text-blue-400'
-                                            : 'text-gray-500 dark:text-gray-400'}"
-                                        >Resolution</span
+                                            : gameSuspended
+                                              ? 'text-red-500'
+                                              : 'text-gray-500 dark:text-gray-400'}"
+                                        >{gameSuspended
+                                            ? "Suspended"
+                                            : "Resolution"}</span
                                     >
                                 </div>
 
@@ -3341,20 +3354,27 @@
                                         class="text-lg font-bold flex items-center gap-2 {game.status ===
                                             'Active' && openCeremony
                                             ? 'text-purple-600 dark:text-purple-400'
-                                            : game.status === 'Active'
-                                              ? 'text-green-600 dark:text-green-400'
-                                              : game.status === 'Resolution'
-                                                ? 'text-amber-600 dark:text-amber-400'
-                                                : game.status === 'Finalized'
-                                                  ? 'text-gray-600 dark:text-gray-400'
-                                                  : 'text-red-600 dark:text-red-400'}"
+                                            : game.status === 'Active' &&
+                                                gameSuspended
+                                              ? 'text-orange-600 dark:text-orange-400'
+                                              : game.status === 'Active'
+                                                ? 'text-green-600 dark:text-green-400'
+                                                : game.status === 'Resolution'
+                                                  ? 'text-amber-600 dark:text-amber-400'
+                                                  : game.status === 'Finalized'
+                                                    ? 'text-gray-600 dark:text-gray-400'
+                                                    : 'text-red-600 dark:text-red-400'}"
                                     >
                                         {#if game.status === "Active" && openCeremony}
                                             PLAYING
                                         {:else if game.status === "Active" && !participationIsEnded}
                                             PARTICIPATIONS MUST BE SUBMITED
                                         {:else if game.status === "Active" && participationIsEnded}
-                                            AWAITING RESOLUTION
+                                            {#if resolutionAllowed}
+                                                AWAITING RESOLUTION
+                                            {:else}
+                                                SUSPENDED
+                                            {/if}
                                         {:else if game.status === "Resolution"}
                                             {@const isBeforeDeadline =
                                                 new Date().getTime() <
@@ -3383,8 +3403,19 @@
                                             A seed has been agreed upon. Execute
                                             and publish your results.
                                         {:else if game.status === "Active" && participationIsEnded}
-                                            Time is up. The creator must now
-                                            resolve the competition.
+                                            {#if resolutionAllowed}
+                                                Time is up. The creator must now
+                                                resolve the competition.
+                                            {:else}
+                                                The creator failed to resolve
+                                                the competition in time.
+                                                <br />
+                                                <strong
+                                                    >Players can recover their
+                                                    fees. Resolver stake is
+                                                    lost.</strong
+                                                >
+                                            {/if}
                                         {:else if game.status === "Resolution"}
                                             {@const isBeforeDeadline =
                                                 new Date().getTime() <
@@ -3504,16 +3535,18 @@
                                                 </li>
                                             {:else}
                                                 <!-- AWAITING RESOLUTION PHASE -->
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Creator:</span
+                                                {#if resolutionAllowed}
+                                                    <li
+                                                        class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
                                                     >
-                                                    Resolve the game by revealing
-                                                    the secret.
-                                                </li>
+                                                        <span
+                                                            class="font-medium text-gray-900 dark:text-gray-100"
+                                                            >Creator:</span
+                                                        >
+                                                        Resolve the game by revealing
+                                                        the secret.
+                                                    </li>
+                                                {/if}
                                                 <li
                                                     class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
                                                 >
@@ -3524,6 +3557,19 @@
                                                     Cancel the competition (if secret
                                                     leaked).
                                                 </li>
+                                                {#if gameSuspended}
+                                                    <li
+                                                        class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
+                                                    >
+                                                        <span
+                                                            class="font-medium text-gray-900 dark:text-gray-100"
+                                                            >Players:</span
+                                                        >
+                                                        Claim full refund immediately
+                                                        (Creator resolution deadline
+                                                        passed).
+                                                    </li>
+                                                {/if}
                                                 <li
                                                     class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
                                                 >
@@ -3677,6 +3723,18 @@
                                                     >
                                                     Deadline has passed.
                                                 </li>
+                                                {#if gameSuspended}
+                                                    <li
+                                                        class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
+                                                    >
+                                                        <span
+                                                            class="font-medium"
+                                                            >Resolve
+                                                            Competition:</span
+                                                        >
+                                                        Resolution deadline has passed.
+                                                    </li>
+                                                {/if}
                                                 <li
                                                     class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
                                                 >

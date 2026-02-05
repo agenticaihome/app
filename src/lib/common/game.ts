@@ -255,6 +255,24 @@ export async function isResolutionAllowed(game: AnyGame): Promise<boolean> {
     return game.status === GameState.Active && game.deadlineBlock <= currentHeight && currentHeight < game.deadlineBlock + game.constants.PARTICIPATION_GRACE_PERIOD;
 }
 
+/**
+ * Checks if a game is in a "suspended" state.
+ * A game is suspended when:
+ * 1. The game is still in "Active" state
+ * 2. The participation period has ended (deadlineBlock passed)
+ * 3. The resolution grace period has also ended (currentHeight >= deadlineBlock + PARTICIPATION_GRACE_PERIOD)
+ * 
+ * In this state:
+ * - Participants can recover their participation fee
+ * - The creator CANNOT recover their stake (penalty for not resolving in time)
+ */
+export async function isGameSuspended(game: AnyGame): Promise<boolean> {
+    const currentHeight = await (new ErgoPlatform).get_current_height();
+    return game.status === GameState.Active &&
+        game.deadlineBlock <= currentHeight &&
+        currentHeight >= game.deadlineBlock + game.constants.PARTICIPATION_GRACE_PERIOD;
+}
+
 export async function isOpenCeremony(game: AnyGame): Promise<boolean> {
     const currentHeight = await (new ErgoPlatform).get_current_height();
     return game.status === "Active" && currentHeight < game.ceremonyDeadline

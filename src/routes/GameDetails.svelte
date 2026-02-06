@@ -463,6 +463,8 @@
         minutesValue = 0,
         secondsValue = 0;
     let targetDate: number;
+    let targetBlockHeight: number = 0;
+    let remainingBlocks: number = 0;
     let clockLabel: string = "TIME LEFT";
     let clockInformation: string = "Depends on game status";
     let clockCountdownInterval: ReturnType<typeof setInterval> | null = null;
@@ -908,38 +910,40 @@
             // 4. Lógica de Tiempos y Deadlines (Consolidada)
             if (game.status === "Active") {
                 if (openSolverSubmit) {
+                    targetBlockHeight =
+                        game.ceremonyDeadline - game.constants.SEED_MARGIN;
                     targetDate = await block_height_to_timestamp(
-                        game.ceremonyDeadline - game.constants.SEED_MARGIN,
+                        targetBlockHeight,
                         platform,
                     );
                     clockLabel = "Solver Submit Deadline";
-                    clockInformation =
-                        "Block limit to implement your solution and submit your bot hash.";
+                    clockInformation = `Block limit to implement your solution and submit your bot hash. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 } else if (openCeremony) {
+                    targetBlockHeight = game.ceremonyDeadline;
                     targetDate = await block_height_to_timestamp(
-                        game.ceremonyDeadline,
+                        targetBlockHeight,
                         platform,
                     );
                     clockLabel = "Ceremony Deadline";
-                    clockInformation =
-                        "Block limit to add randomness to the game seed.";
+                    clockInformation = `Block limit to add randomness to the game seed. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 } else if (currentHeight < game.deadlineBlock) {
+                    targetBlockHeight = game.deadlineBlock;
                     targetDate = await block_height_to_timestamp(
-                        game.deadlineBlock,
+                        targetBlockHeight,
                         platform,
                     );
                     clockLabel = "Participation Deadline";
-                    clockInformation =
-                        "Block limit for submissions. After this block, no new participations will be accepted.";
+                    clockInformation = `Block limit for submissions. After this block, no new participations will be accepted. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 } else {
-                    targetDate = await block_height_to_timestamp(
+                    targetBlockHeight =
                         game.deadlineBlock +
-                            game.constants.PARTICIPATION_GRACE_PERIOD,
+                        game.constants.PARTICIPATION_GRACE_PERIOD;
+                    targetDate = await block_height_to_timestamp(
+                        targetBlockHeight,
                         platform,
                     );
                     clockLabel = "Awaiting Resolution";
-                    clockInformation =
-                        "Participation period ended. Waiting for the creator to reveal the secret and start the resolution phase.";
+                    clockInformation = `Participation period ended. Waiting for the creator to reveal the secret and start the resolution phase. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 }
                 deadlineDateDisplay = format(
                     new Date(targetDate),
@@ -947,23 +951,26 @@
                 );
             } else if (game.status === "Resolution") {
                 const isGrace = currentHeight >= game.resolutionDeadline;
-                const height = isGrace
+                targetBlockHeight = isGrace
                     ? game.resolutionDeadline +
                       game.constants.END_GAME_AUTH_GRACE_PERIOD
                     : game.resolutionDeadline;
 
-                targetDate = await block_height_to_timestamp(height, platform);
+                targetDate = await block_height_to_timestamp(
+                    targetBlockHeight,
+                    platform,
+                );
                 clockLabel = isGrace ? "Grace Period" : "Resolution Deadline";
-                clockInformation =
-                    "Judges must resolve the game before this time.";
+                clockInformation = `Judges must resolve the game before this time. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 deadlineDateDisplay = `${clockLabel} ends ${formatDistanceToNow(new Date(targetDate), { addSuffix: true })}`;
             } else if (game.status === "Cancelled_Draining") {
+                targetBlockHeight = (game as GameCancellation).unlockHeight;
                 targetDate = await block_height_to_timestamp(
-                    (game as GameCancellation).unlockHeight,
+                    targetBlockHeight,
                     platform,
                 );
                 clockLabel = "STAKE UNLOCK DEADLINE";
-                clockInformation = "Creator stake is locked until this time.";
+                clockInformation = `Creator stake is locked until this time. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 deadlineDateDisplay = format(
                     new Date(targetDate),
                     "MMM d, yyyy 'at' HH:mm",
@@ -1841,6 +1848,11 @@
             secondsValue = Math.floor((diff % (1000 * 60)) / 1000);
         } else {
             daysValue = hoursValue = minutesValue = secondsValue = 0;
+        }
+
+        // Calculate remaining blocks
+        if (targetBlockHeight > 0 && currentHeight > 0) {
+            remainingBlocks = Math.max(0, targetBlockHeight - currentHeight);
         }
     }
 
@@ -3295,6 +3307,16 @@
                                     <span class="timeleft-label">
                                         {clockLabel}
                                     </span>
+                                    {#if remainingBlocks > 0}
+                                        <span
+                                            class="text-xs opacity-70 mt-1 block"
+                                        >
+                                            Estimated time ({remainingBlocks} blocks
+                                            remaining, ~{platform.time_per_block /
+                                                1000 /
+                                                60} min/block)
+                                        </span>
+                                    {/if}
                                     <div class="countdown-items">
                                         <div class="item">
                                             <div>{daysValue}</div>

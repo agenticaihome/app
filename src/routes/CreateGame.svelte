@@ -47,6 +47,7 @@
         FileSourceCreation,
         fetchFileSourcesByHash,
     } from "source-application";
+    import { fetchJudges } from "$lib/ergo/reputation/fetch";
 
     import { getGameConstants } from "$lib/common/constants";
     const constants = getGameConstants();
@@ -240,6 +241,9 @@
     }
 
     onMount(async () => {
+        // Load judges data first to ensure reputation calculations work correctly
+        await fetchJudges();
+
         loadUserTokens();
 
         current_height = await platform.get_current_height();

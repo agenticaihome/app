@@ -149,7 +149,7 @@
                     Check out "{projectName}" - {projectStatus} on Game of Prompts!
                 </p>
                 <p class="text-xs text-muted-foreground mt-2">
-                    Powered by Ergo Blockchain 🌐
+                    Powered by Ergo Blockchain
                 </p>
             </div>
 

@@ -514,6 +514,14 @@
     $: isSuspendedStep = currentProgressPhase === ProgressPhase.SUSPENDED;
     $: isCancelledStep = currentProgressPhase === ProgressPhase.CANCELLED;
     $: isFinalizedStep = currentProgressPhase === ProgressPhase.FINALIZED;
+    $: showCountdown =
+        !!targetDate &&
+        (game?.status === "Resolution" ||
+            game?.status === "Cancelled_Draining" ||
+            !participationIsEnded ||
+            (game?.status === "Active" &&
+                participationIsEnded &&
+                resolutionAllowed));
 
     // Reclaim after Grace Period State
     let isReclaimingGraceFor: string | null = null;
@@ -3322,7 +3330,7 @@
                             {/if}
                         </div>
 
-                        {#if targetDate && (game.status === "Resolution" || game.status === "Cancelled_Draining" || !participationIsEnded)}
+                        {#if showCountdown}
                             <div class="countdown-container mb-8">
                                 <div class="timeleft">
                                     <span class="timeleft-label">

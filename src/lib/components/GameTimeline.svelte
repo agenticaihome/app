@@ -2,6 +2,7 @@
     import {
         type AnyGame,
         GameState,
+        isGameSuspended,
         resolve_participation_commitment,
     } from "$lib/common/game";
     import { type Box, type Amount } from "@fleet-sdk/core";
@@ -50,7 +51,7 @@
     async function getEventDetails(
         box: Box<Amount> | null,
     ): Promise<{ date: string; height: number; creationHeight: number }> {
-        if (!box) return { date: "Unknown", height: 0 };
+        if (!box) return { date: "Unknown", height: 0, creationHeight: 0 };
 
         const txInfo = await getTransactionInfo(box.transactionId);
         if (txInfo && txInfo.timestamp) {
@@ -69,6 +70,7 @@
         return {
             date: new Date(ts).toLocaleString(),
             height: box.creationHeight,
+            creationHeight: box.creationHeight,
         };
     }
 
@@ -890,6 +892,8 @@
 
         // 4. Future/Current Steps (only if game is not finalized/cancelled)
         if (current) {
+            const isSuspended = isGameSuspended(current);
+
             if (current.status === GameState.Active) {
                 // Add sub-phases if active
                 if ("ceremonyDeadline" in current) {
@@ -947,7 +951,6 @@
                 const suspendedHeight =
                     current.deadlineBlock +
                     current.constants.PARTICIPATION_GRACE_PERIOD;
-                const isSuspended = isPartEnded && height >= suspendedHeight;
 
                 if (!isSuspended) {
                     newSteps.push({
@@ -1060,15 +1063,17 @@
                     },
                 });
             } else {
-                newSteps.push({
-                    id: "future_finalized",
-                    label: "Finalized",
-                    description: "Game completion and prize distribution.",
-                    status: "pending",
-                    icon: Trophy,
-                    height: 10000000,
-                    color: "text-gray-400 border-gray-400",
-                });
+                if (!isSuspended) {
+                    newSteps.push({
+                        id: "future_finalized",
+                        label: "Finalized",
+                        description: "Game completion and prize distribution.",
+                        status: "pending",
+                        icon: Trophy,
+                        height: 10000000,
+                        color: "text-gray-400 border-gray-400",
+                    });
+                }
             }
         }
 

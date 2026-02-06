@@ -3252,7 +3252,7 @@
                                         {:else if game.status === "Resolution" || (game.status === "Active" && participationIsEnded && !gameSuspended)}
                                             <Gavel class="w-5 h-5" />
                                         {:else if gameSuspended}
-                                            <XCircle class="w-5 h-5" />
+                                            <AlertTriangle class="w-5 h-5" />
                                         {:else}
                                             <span class="text-base font-bold"
                                                 >2</span
@@ -3571,16 +3571,18 @@
                                                         the secret.
                                                     </li>
                                                 {/if}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Anyone:</span
+                                                {#if !gameSuspended}
+                                                    <li
+                                                        class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
                                                     >
-                                                    Cancel the competition (if secret
-                                                    leaked).
-                                                </li>
+                                                        <span
+                                                            class="font-medium text-gray-900 dark:text-gray-100"
+                                                            >Anyone:</span
+                                                        >
+                                                        Cancel the competition (if
+                                                        secret leaked).
+                                                    </li>
+                                                {/if}
                                                 {#if gameSuspended}
                                                     <li
                                                         class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
@@ -3757,6 +3759,18 @@
                                                             Competition:</span
                                                         >
                                                         Resolution deadline has passed.
+                                                        Creator did not resolve in
+                                                        time.
+                                                    </li>
+                                                    <li
+                                                        class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
+                                                    >
+                                                        <span
+                                                            class="font-medium"
+                                                            >Cancel Game:</span
+                                                        >
+                                                        Cannot cancel after resolution
+                                                        deadline has passed.
                                                     </li>
                                                 {/if}
                                                 <li

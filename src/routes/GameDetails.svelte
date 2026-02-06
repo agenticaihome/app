@@ -522,6 +522,12 @@
             (game?.status === "Active" &&
                 participationIsEnded &&
                 resolutionAllowed));
+    $: countdownIsZero =
+        daysValue === 0 &&
+        hoursValue === 0 &&
+        minutesValue === 0 &&
+        secondsValue === 0;
+    $: shouldShowCountdown = showCountdown && !countdownIsZero;
 
     // Reclaim after Grace Period State
     let isReclaimingGraceFor: string | null = null;
@@ -3205,30 +3211,26 @@
                                     >
                                 </div>
 
-                                <!-- Step 2: Cancelled (Current State) -->
-                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
-                                    <div
-                                        class={`${progressCircleBase} ${isCancelledStep
-                                            ? progressSuspendedCircle
-                                            : progressDefaultCircle}`}
-                                    >
-                                        <XCircle class="w-6 h-6" />
-                                    </div>
-                                    <span class={`mt-2 text-xs font-bold uppercase tracking-wider ${isCancelledStep
-                                        ? 'text-red-600'
-                                        : 'text-gray-500 dark:text-gray-400'}`}
-                                        >Cancelled</span
-                                    >
-                                </div>
-
-                                <!-- Step 3: Draining -->
+                                <!-- Step 2: Cancelled (Completed Event) -->
                                 <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
                                         class={`${progressCircleBase} ${progressDefaultCircle}`}
                                     >
-                                        <ShieldCheck class="w-5 h-5" />
+                                        <XCircle class="w-6 h-6" />
                                     </div>
                                     <span class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                                        >Cancelled</span
+                                    >
+                                </div>
+
+                                <!-- Step 3: Draining (Active State) -->
+                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
+                                    <div
+                                        class={`${progressCircleBase} ${progressSuspendedCircle} animate-pulse`}
+                                    >
+                                        <ShieldCheck class="w-5 h-5" />
+                                    </div>
+                                    <span class="mt-2 text-xs font-bold uppercase tracking-wider text-red-600"
                                         >Draining</span
                                     >
                                 </div>
@@ -3334,7 +3336,7 @@
                             {/if}
                         </div>
 
-                        {#if showCountdown}
+                        {#if shouldShowCountdown}
                             <div class="countdown-container mb-8">
                                 <div class="timeleft">
                                     <span class="timeleft-label">

@@ -23,18 +23,18 @@ import { ErgoPlatform } from '../platform';
 
 declare const ergo: any;
 
-// Constante del contrato game_resolution.es
+// Constant for game_resolution.es contract
 // Moved inside function to be dynamic
 
 /**
- * Inicia la transición de un juego del estado Activo al de Resolución.
- * Esta acción consume la caja del juego y todas las participaciones válidas,
- * y crea una nueva caja 'GameResolution' y cajas 'Participation'.
- * @param game El objeto GameActive a resolver.
- * @param participations Un array de todas las participaciones enviadas (Participation).
- * @param secretS_hex El secreto 'S' en formato hexadecimal para revelar al ganador.
- * @param judgeProofBoxes Un array de las cajas de prueba de reputación de los jueces, que se usarán como dataInputs.
- * @returns El ID de la transacción si tiene éxito.
+ * Initiates the transition of a game from the Active state to Resolution.
+ * This action consumes the game box and all valid participations,
+ * and creates a new 'GameResolution' box and 'Participation' boxes.
+ * @param game The GameActive object to resolve.
+ * @param participations An array of all submitted participations (Participation).
+ * @param secretS_hex The 'S' secret in hexadecimal format to reveal to the winner.
+ * @param judgeProofs An array of the judges' reputation proof keys, which will be used to fetch data inputs.
+ * @returns The transaction ID if successful.
  */
 export async function resolve_game(
     game: GameActive,
@@ -45,7 +45,7 @@ export async function resolve_game(
 
     const JUDGE_PERIOD = getGameConstants().JUDGE_PERIOD + 10;
 
-    console.log(`Iniciando transición a resolución para el juego: ${game.boxId}`);
+    console.log(`Starting resolution transition for game: ${game.boxId}`);
 
     const dataMap = await fetchJudges();
     const judgeProofBoxes: Box<Amount>[] = judgeProofs.flatMap(key => {
@@ -56,39 +56,39 @@ export async function resolve_game(
     });
 
     if (!Array.isArray(participations)) {
-        throw new Error("El listado de participaciones proporcionado es inválido.");
+        throw new Error("The provided participation list is invalid.");
     }
     const currentHeight = await (new ErgoPlatform()).get_current_height();
     if (currentHeight < game.deadlineBlock) {
-        throw new Error("El juego no puede ser resuelto antes de su fecha límite.");
+        throw new Error("The game cannot be resolved before its deadline.");
     }
 
     const secretS_bytes = hexToBytes(secretS_hex);
-    if (!secretS_bytes) throw new Error("Formato de secretS_hex inválido.");
+    if (!secretS_bytes) throw new Error("Invalid secretS_hex format.");
 
     const hash_of_provided_secret = fleetBlake2b256(secretS_bytes);
     if (uint8ArrayToHex(hash_of_provided_secret) !== game.secretHash) {
-        throw new Error("El secreto proporcionado no coincide con el hash del juego.");
+        throw new Error("The provided secret does not match the game hash.");
     }
 
     const resolverAddressString = await ergo.get_change_address();
     const resolverPkBytes = ErgoAddress.fromBase58(resolverAddressString).getPublicKeys()[0];
 
     if (!Array.isArray(judgeProofBoxes)) {
-        throw new Error("El listado de cajas de prueba de los jueces es inválido.");
+        throw new Error("The provided judges' proof boxes list is invalid.");
     }
     if (game.judges.length !== judgeProofBoxes.length) {
-        throw new Error(`Se esperaba ${game.judges.length} prueba(s) de juez, pero se recibieron ${judgeProofBoxes.length}.`);
+        throw new Error(`Expected ${game.judges.length} judge proof(s), but received ${judgeProofBoxes.length}.`);
     }
 
     const invitedJudgesTokens = [...game.judges].sort();
     const participatingJudgesTokens = judgeProofBoxes.map(box => box.assets[0].tokenId).sort();
 
     if (JSON.stringify(invitedJudgesTokens) !== JSON.stringify(participatingJudgesTokens)) {
-        throw new Error("Los tokens de prueba de los jueces no coinciden con los jueces invitados en el contrato.");
+        throw new Error("The judges' proof tokens do not match the judges invited in the contract.");
     }
 
-    // --- 2. Determinar el ganador y filtrar participaciones (lógica off-chain) ---
+    // --- 2. Determine the winner and filter participations (off-chain logic) ---
     let maxScore = -1n;
     let winnerCandidateCommitment: string | null = null;
     let winnerCandidateBox: Box<Amount> | null = null;
@@ -97,7 +97,7 @@ export async function resolve_game(
     const participationErgoTree = getGopParticipationErgoTreeHex();
     const participationErgoTreeBytes = hexToBytes(participationErgoTree);
     if (!participationErgoTreeBytes) {
-        throw new Error("El ErgoTree del script de participación es inválido.");
+        throw new Error("The participation script ErgoTree is invalid.");
     }
     const participationScriptHash = uint8ArrayToHex(fleetBlake2b256(participationErgoTreeBytes));
 
@@ -105,29 +105,29 @@ export async function resolve_game(
     for (const p of participations) {
         const pBox = parseBox(p.box);
 
-        // Verificación 1: Script de Participación Correcto
+        // Verification 1: Correct Participation Script
         if (uint8ArrayToHex(fleetBlake2b256(hexToBytes(pBox.ergoTree) ?? "")) !== participationScriptHash) {
-            console.warn(`La participación ${p.boxId} tiene un script incorrecto. Será omitida.`);
+            console.warn(`Participation ${p.boxId} has an incorrect script. It will be skipped.`);
             continue;
         }
 
-        // Verificación 2: Referencia al NFT del Juego
+        // Verification 2: Reference to the Game NFT
         if (p.gameNftId !== game.box.assets[0].tokenId) {
-            console.warn(`La participación ${p.boxId} no apunta al NFT de este juego. Será omitida.`);
+            console.warn(`Participation ${p.boxId} does not point to this game's NFT. It will be skipped.`);
             continue;
         }
 
-        // Verificación 3: Pago de la Tarifa de Participación
+        // Verification 3: Participation Fee Payment
         if (BigInt(pBox.value) < game.participationFeeAmount) {
-            console.warn(`La participación ${p.boxId} no cumple con la tarifa mínima. Será omitida.`);
+            console.warn(`Participation ${p.boxId} does not meet the minimum fee. It will be skipped.`);
             continue;
         }
 
-        // Simulación de la validación de la puntuación
+        // Score validation simulation
         let actualScore = resolve_participation_commitment(p, secretS_hex, game.seed);
 
         if (actualScore === null) {
-            console.warn(`No se pudo encontrar una puntuación válida para la participación ${p.commitmentC_Hex}. Será omitida.`);
+            console.warn(`Could not find a valid score for participation ${p.commitmentC_Hex}. It will be skipped.`);
             continue;
         }
 
@@ -142,9 +142,9 @@ export async function resolve_game(
         }
     }
 
-    console.log(`Ganador candidato determinado con compromiso: ${winnerCandidateCommitment} y puntuación: ${maxScore}`);
+    console.log(`Candidate winner determined with commitment: ${winnerCandidateCommitment} and score: ${maxScore}`);
 
-    // --- 3. Construir las Salidas de la Transacción ---
+    // --- 3. Build Transaction Outputs ---
 
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
     const resolutionDeadline = BigInt(currentHeight + JUDGE_PERIOD);
@@ -166,17 +166,17 @@ export async function resolve_game(
     let winnerCommitmentBytes: Uint8Array;
     if (winnerCandidateCommitment) {
         const bytes = hexToBytes(winnerCandidateCommitment);
-        if (!bytes) throw new Error("Fallo al convertir commitmentC a bytes.");
+        if (!bytes) throw new Error("Failed to convert commitmentC to bytes.");
         winnerCommitmentBytes = bytes;
     }
     else {
         winnerCommitmentBytes = new Uint8Array();
     }
-    // max para BigInt
+    // max for BigInt
     const maxBigInt = (...vals: bigint[]) => vals.reduce((a, b) => a > b ? a : b, vals[0]);
 
     const seedBytes = hexToBytes(game.seed);
-    if (!seedBytes) throw new Error("No se pudo obtener el 'seed' del objeto game (game.seedHex).");
+    if (!seedBytes) throw new Error("Could not get the 'seed' from the game object (game.seedHex).");
 
     const gameDetailsBytes = stringToBytes('utf8', game.content.rawJsonString);
 
@@ -221,10 +221,10 @@ export async function resolve_game(
 
     const minRequiredValue = BigInt(boxSize) * BOX_VALUE_PER_BYTE;
 
-    // valor actual de la caja (asegurate que sea BigInt)
+    // current box value (ensure it's BigInt)
     const originalValue = BigInt(game.box.value);
 
-    // seleccionar el mayor entre originalValue, minRequiredValue y SAFE_MIN_BOX_VALUE
+    // select the maximum between originalValue, minRequiredValue, and SAFE_MIN_BOX_VALUE
     const resolutionBoxValue = maxBigInt(originalValue, minRequiredValue, SAFE_MIN_BOX_VALUE);
 
     const resolutionBoxOutput = new OutputBuilder(
@@ -241,7 +241,7 @@ export async function resolve_game(
             R9: r9Hex
         });
 
-    // --- 4. Construir y Enviar la Transacción ---    
+    // --- 4. Build and Send the Transaction ---    
 
     let dataInputs = judgeProofBoxes;
     if (winnerCandidateBox) {
@@ -263,11 +263,11 @@ export async function resolve_game(
         const signedTransaction = await ergo.sign_tx(unsignedTransaction.toEIP12Object());
         const txId = await ergo.submit_tx(signedTransaction);
 
-        console.log(`Transición a resolución enviada con éxito. ID de la transacción: ${txId}`);
+        console.log(`Resolution transition sent successfully. Transaction ID: ${txId}`);
         return txId;
 
     } catch (error) {
-        console.error("Error al construir o enviar la transacción:", error);
+        console.error("Error building or sending the transaction:", error);
         throw error;
     }
 }

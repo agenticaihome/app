@@ -16,14 +16,14 @@ import { ErgoPlatform } from '../platform';
 declare const ergo: any;
 
 /**
- * Permite a cualquier usuario incluir una participación que fue omitida
- * durante la transición inicial a la fase de Resolución.
+ * Allows any user to include a participation that was omitted
+ * during the initial transition to the Resolution phase.
  *
- * @param game El objeto GameResolution actual.
- * @param omittedParticipation La participación en estado "Submitted" a incluir.
- * @param currentWinnerParticipation La participación ya resuelta del ganador actual.
- * @param newResolverPkHex La clave pública hexadecimal del usuario que ejecuta la acción, quien se convertirá en el nuevo resolver.
- * @returns Una promesa que se resuelve con el ID de la transacción si tiene éxito.
+ * @param game The current GameResolution object.
+ * @param omittedParticipation The participation in "Submitted" state to include.
+ * @param currentWinnerParticipation The already resolved participation of the current winner.
+ * @param newResolverPkHex The hexadecimal public key of the user performing the action, who will become the new resolver.
+ * @returns A promise that resolves with the transaction ID if successful.
  */
 export async function include_omitted_participation(
     game: GameResolution,
@@ -32,17 +32,17 @@ export async function include_omitted_participation(
     newResolverPkHex: string
 ): Promise<string | null> {
 
-    console.log(`Intentando incluir la participación omitida ${omittedParticipation.boxId} en el juego: ${game.boxId}`);
+    console.log(`Attempting to include omitted participation ${omittedParticipation.boxId} in game: ${game.boxId}`);
 
-    // --- 1. Verificaciones preliminares ---
+    // --- 1. Preliminary checks ---
     const currentHeight = await (new ErgoPlatform()).get_current_height();
     if (currentHeight >= game.resolutionDeadline) {
-        throw new Error("No se pueden incluir participaciones después de que finalice el período de los jueces.");
+        throw new Error("Participations cannot be included after the judges' period ends.");
     }
 
     const resolverErgoTree = (((game.resolutionDeadline - game.constants.JUDGE_PERIOD) + game.constants.RESOLVER_OMISSION_NO_PENALTY_PERIOD) < currentHeight) ? prependHexPrefix(hexToBytes(newResolverPkHex)!) : hexToBytes(game.resolverScript_Hex)!;
 
-    // --- 3. Construir las Salidas de la Transacción ---
+    // --- 3. Build Transaction Outputs ---
 
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();;
 
@@ -52,7 +52,7 @@ export async function include_omitted_participation(
     )
         .addTokens(game.box.assets)
         .setAdditionalRegisters({
-            R4: SInt(1).toHex(), // Preservar estado (1: Resolved)
+            R4: SInt(1).toHex(), // Preserve state (1: Resolved)
 
             R5: SColl(SByte, hexToBytes(game.seed)!).toHex(),
 
@@ -78,13 +78,13 @@ export async function include_omitted_participation(
                 BigInt(game.resolutionDeadline)
             ]).toHex(),
 
-            // --- R9: gameProvenance: Coll[Coll[Byte]] (Detalles del juego en JSON/Hex, Participation token id, devScript, Script de gasto del resolvedor) ---
+            // --- R9: gameProvenance: Coll[Coll[Byte]] (Game details in JSON/Hex, Participation token id, devScript, Resolver spend script) ---
             R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", hexToBytes(game.devScript)!, resolverErgoTree]).toHex()
         });
 
     const pBox = parseBox(omittedParticipation.box);
 
-    // --- 4. Construir y Enviar la Transacción ---
+    // --- 4. Build and Send the Transaction ---
     const userAddress = pkHexToBase58Address(newResolverPkHex);
     const utxos: Box<any>[] = await ergo.get_utxos();
 
@@ -107,6 +107,6 @@ export async function include_omitted_participation(
     const signedTransaction = await ergo.sign_tx(unsignedTransaction.toEIP12Object());
     const txId = await ergo.submit_tx(signedTransaction);
 
-    console.log(`Transacción para incluir participación omitida enviada. ID: ${txId}`);
+    console.log(`Transaction to include omitted participation sent. ID: ${txId}`);
     return txId;
 }

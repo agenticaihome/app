@@ -16,14 +16,14 @@ import { ErgoPlatform } from '../platform';
 declare var ergo: any;
 
 /**
- * Construye y envía una transacción para crear una caja de participación en estado "Submitted".
- * @param gameNftIdHex - ID del NFT del juego al que se une el jugador (para R6).
- * @param scoreList - Lista de puntuaciones para ofuscar la real (para R9).
- * @param participationFeeForBox - Tarifa de participación que será el valor de la caja.
- * @param commitmentCHex - El commitment criptográfico con la puntuación real (para R5).
- * @param solverIdString - El ID/nombre del solver (para R7).
- * @param hashLogsHex - El hash de los logs del juego (para R8).
- * @returns El ID de la transacción enviada.
+ * Builds and sends a transaction to create a participation box in "Submitted" state.
+ * @param gameNftIdHex - ID of the game NFT the player is joining (for R6).
+ * @param scoreList - List of scores to obfuscate the real one (for R9).
+ * @param participationFeeForBox - Participation fee that will be the box value.
+ * @param commitmentCHex - The cryptographic commitment with the real score (for R5).
+ * @param solverIdString - The solver ID/name (for R7).
+ * @param hashLogsHex - The game logs hash (for R8).
+ * @returns The ID of the submitted transaction.
  */
 export async function submit_score(
     gameNftIdHex: string,
@@ -36,10 +36,10 @@ export async function submit_score(
 ): Promise<string | null> {
 
     if (scoreList.length > 10) {
-        throw new Error("La lista de puntuaciones no puede tener más de 10 elementos.");
+        throw new Error("The scores list cannot have more than 10 items.");
     }
 
-    console.log("Intentando enviar puntuación con los parámetros:", {
+    console.log("Attempting to submit score with parameters:", {
         gameNftIdHex,
         scoreList: scoreList.map(s => s.toString()),
         participationFeeForBox: participationFeeForBox.toString(),
@@ -54,7 +54,7 @@ export async function submit_score(
         amount: participationFeeForBox
     }];
 
-    // 1. Obtener la clave pública del jugador desde la billetera
+    // 1. Get player's public key from the wallet
     const playerAddressString = await ergo.get_change_address();
     if (!playerAddressString) {
         throw new Error("Could not get the player's address from the wallet.");
@@ -65,19 +65,19 @@ export async function submit_score(
         throw new Error(`Could not extract the public key from the player's address (${playerAddressString}).`);
     }
 
-    // 2. Obtener UTXOs del jugador para cubrir la tarifa
+    // 2. Get player's UTXOs to cover the fee
     const inputs: Box<Amount>[] = await ergo.get_utxos();
     if (!inputs || inputs.length === 0) {
         throw new Error("No UTXOs found in the wallet. Make sure you have funds.");
     }
 
-    // 3. Obtener el ErgoTree del contrato de participación
-    const participationContractErgoTree = getGopParticipationErgoTreeHex(); // <-- Uso de la función actualizada
+    // 3. Get the participation contract ErgoTree
+    const participationContractErgoTree = getGopParticipationErgoTreeHex(); // <-- Using updated function
     if (!participationContractErgoTree) {
         throw new Error("Could not get the participation contract ErgoTree.");
     }
 
-    // 4. Preparar los valores para los registros
+    // 4. Prepare values for the registers
     const commitmentC_bytes = hexToBytes(commitmentCHex);
     if (!commitmentC_bytes) throw new Error("Could not convert commitmentC to bytes.");
 
@@ -87,7 +87,7 @@ export async function submit_score(
     const hashLogs_bytes = hexToBytes(hashLogsHex);
     if (!hashLogs_bytes) throw new Error("Could not convert hashLogs to bytes.");
 
-    // 5. Construir la caja de salida (ParticipationBox)
+    // 5. Build output box (ParticipationBox)
     const participationBoxOutput = new OutputBuilder(
         gameValue,
         participationContractErgoTree
@@ -102,7 +102,7 @@ export async function submit_score(
             R9: SColl(SLong, scoreList).toHex()
         });
 
-    // 6. Construir y firmar la transacción
+    // 6. Build and sign the transaction
     const creationHeight = await (new ErgoPlatform()).get_current_height();
     const unsignedTransaction = new TransactionBuilder(creationHeight)
         .from(inputs)
@@ -116,7 +116,7 @@ export async function submit_score(
         throw new Error("The user canceled or failed to sign the transaction.");
     }
 
-    // 7. Enviar la transacción a la red
+    // 7. Send the transaction to the network
     const transactionId = await ergo.submit_tx(signedTransaction);
     if (!transactionId) {
         throw new Error("Failed to send the transaction to the network.");

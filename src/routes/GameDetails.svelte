@@ -109,21 +109,25 @@
     import { FileCard, FileSourceCreation } from "source-application";
     import { fetchFileSourcesByHash } from "source-application";
 
-    import {
-        getDisplayStake,
-        getParticipationFee,
-        formatTokenBigInt,
-        prependHexPrefix,
-    } from "$lib/utils";
+import {
+    getDisplayStake,
+    getParticipationFee,
+    formatTokenBigInt,
+    prependHexPrefix,
+} from "$lib/utils";
+import {
+    formatUserFacingError,
+    type FormatOptions,
+} from "$lib/utils/error-messages";
     import {
         fetchJudges,
         fetchReputationProofByTokenId,
     } from "$lib/ergo/reputation/fetch";
-    import { type RPBox, type ReputationProof } from "reputation-system";
-    import { Forum } from "forum-application";
-    import ShareModal from "./ShareModal.svelte";
-    import SolverSourceModal from "./SolverSourceModal.svelte";
-    import GameTimeline from "$lib/components/GameTimeline.svelte";
+import { type RPBox, type ReputationProof } from "reputation-system";
+import { Forum } from "forum-application";
+import ShareModal from "./ShareModal.svelte";
+import SolverSourceModal from "./SolverSourceModal.svelte";
+import GameTimeline from "$lib/components/GameTimeline.svelte";
 
     const strictMode = true;
 
@@ -470,6 +474,14 @@
         CANCELLED: "cancelled",
         FINALIZED: "finalized",
     } as const;
+
+    function setError(error: unknown, options: FormatOptions = {}) {
+        errorMessage = formatUserFacingError(error, options);
+    }
+
+    function setTransactionError(error: unknown, options: FormatOptions = {}) {
+        errorMessage = formatUserFacingError(error, { transaction: true, ...options });
+    }
 
     type ProgressPhaseValue =
         (typeof ProgressPhase)[keyof typeof ProgressPhase];
@@ -917,7 +929,7 @@
                 // Let's just show the txId and tell user to wait a bit.
             }
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -940,21 +952,21 @@
     });
 
     async function loadGameDetailsAndTimers() {
-        // 1. Verificación inicial y limpieza
+        // 1. Initial verification and cleanup
         if (!game) {
             cleanupTimers();
             return;
         }
 
-        cleanupTimers(); // Limpiamos una sola vez al inicio
+        cleanupTimers(); // Run cleanup once at the start
         isSubmitting = false;
         transactionId = null;
         errorMessage = null;
         warningMessage = null;
 
         try {
-            // 2. Integración de Comisiones (Lógica unificada)
-            // Solo calculamos si el estado requiere desglose de comisiones
+            // 2. Commission integration (unified logic)
+            // Only compute breakdown if the status exposes commissions
             if (game.status === "Active" || game.status === "Resolution") {
                 const denominator = game.constants.COMMISSION_DENOMINATOR / 100;
                 resolverPct =
@@ -970,10 +982,10 @@
                     totalPct > 100 ? (totalPct - 100).toFixed(2) : 0;
             }
 
-            // 3. Obtener datos de red y estado actual
+            // 3. Gather current network data and state
             currentHeight = await platform.get_current_height();
 
-            // Fetch history (sin bloquear el hilo principal)
+            // Fetch history (without blocking the main thread)
             fetchGameHistory(game.gameId).then((history) => {
                 gameHistory = history;
             });
@@ -984,7 +996,7 @@
             openCeremony = await isOpenCeremony(game);
             openSolverSubmit = await isOpenSolverSubmit(game);
 
-            // 4. Lógica de Tiempos y Deadlines (Consolidada)
+            // 4. Time and deadline logic (consolidated)
             if (game.status === "Active") {
                 if (openSolverSubmit) {
                     targetBlockHeight =
@@ -1101,7 +1113,7 @@
                     soundtrackUrl = soundtrackSources[0].sourceUrl;
             }
 
-            // 6. Detalles del Token
+            // 6. Token details
             if (game.participationTokenId) {
                 const tokenDetails = await fetch_token_details(
                     game.participationTokenId,
@@ -1113,7 +1125,7 @@
                 tokenDecimals = 9;
             }
 
-            // 7. Lógica de Participaciones y Votaciones
+            // 7. Participation and voting logic
             if (
                 game.status === GameState.Active ||
                 game.status === GameState.Resolution ||
@@ -1126,7 +1138,7 @@
                     participationBatches =
                         await fetchParticipationBatches(game);
 
-                    // Procesamiento de votos de jueces
+                    // Processing judge votes
                     for (const item of participations) {
                         const participation = item.commitmentC_Hex;
                         const allJudges = Array.from(
@@ -1164,7 +1176,7 @@
                         );
                     }
 
-                    // Cálculo de mayorías para el candidato ganador
+                    // Majority calculation for the winning candidate
                     const requiredVotes =
                         Math.floor(game.judges.length / 2) + 1;
                     if (game.winnerCandidateCommitment) {
@@ -1216,7 +1228,7 @@
                 }
             }
 
-            // 8. Fecha de Creación
+            // 8. Creation timestamp
             if (game.createdAt) {
                 const createdTimestamp = await block_height_to_timestamp(
                     game.createdAt,
@@ -1228,7 +1240,7 @@
                 );
             }
 
-            // 9. Determinar Roles del Usuario Conectado
+            // 9. Determine connected user roles
             acceptedJudgeNominations =
                 game.status === "Active"
                     ? (
@@ -1286,9 +1298,7 @@
                 updateClockCountdown();
             }
         } catch (error: any) {
-            errorMessage =
-                "Could not load game details: " +
-                (error.message || "Unknown error");
+            setError(error, { prefix: "Could not load game details:" });
             console.error(error);
         } finally {
             isLoaded = true;
@@ -1336,7 +1346,7 @@
                 donation,
             );
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1356,7 +1366,7 @@
                 hashLogs_input,
             );
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1377,7 +1387,7 @@
                 acceptedJudgeNominations,
             );
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1394,7 +1404,7 @@
                 get(address) ?? "",
             );
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1410,7 +1420,7 @@
                 get(address) ?? "",
             );
         } catch (e: any) {
-            errorMessage = e.message || "Error draining stake.";
+            setTransactionError(e, { fallback: "Error draining stake." });
         } finally {
             isSubmitting = false;
         }
@@ -1431,8 +1441,9 @@
             );
             claimRefundSuccessTxId[participation.boxId] = result;
         } catch (e: any) {
-            claimRefundError[participation.boxId] =
-                e.message || "Error claiming refund.";
+            claimRefundError[participation.boxId] = formatUserFacingError(e, {
+                fallback: "Error claiming refund.",
+            });
         } finally {
             isClaimingRefundFor = null;
         }
@@ -1453,8 +1464,9 @@
             );
             reclaimGraceSuccessTxId[participation.boxId] = result;
         } catch (e: any) {
-            reclaimGraceError[participation.boxId] =
-                e.message || "Error reclaiming participation fee.";
+            reclaimGraceError[participation.boxId] = formatUserFacingError(e, {
+                fallback: "Error reclaiming participation fee.",
+            });
         } finally {
             isReclaimingGraceFor = null;
         }
@@ -1492,7 +1504,7 @@
                 }
             }
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1512,7 +1524,7 @@
                 participationBatches,
             );
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1573,7 +1585,7 @@
                 );
             }
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1631,7 +1643,7 @@
                 );
             }
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1665,7 +1677,7 @@
                 mainBox,
             );
         } catch (e: any) {
-            errorMessage = e.message;
+            setTransactionError(e);
         } finally {
             isSubmitting = false;
         }
@@ -1680,16 +1692,16 @@
         isSubmitting = true;
 
         try {
-            // Filtrar participaciones con estado "Submitted"
+            // Filter participations with status "Submitted"
             const submittedParticipations = participations.filter(
                 (p) => p.status === "Submitted",
             ) as ValidParticipation[];
 
             if (submittedParticipations.length === 0) {
-                throw new Error("No hay participaciones enviadas.");
+                throw new Error("No submitted participations were found.");
             }
 
-            // Obtener la participación con el score más alto
+            // Select the participation with the highest score
             const omittedParticipation = submittedParticipations.reduce(
                 (best, current) => {
                     const bestEffective =
@@ -1719,29 +1731,29 @@
                 },
             );
 
-            // Buscar el ganador actual (puede no existir)
+            // Find the current winner (if any)
             const currentWinner = participations.find(
                 (p) =>
                     p.commitmentC_Hex === game.winnerCandidateCommitment &&
                     p.status === "Submitted",
             ) as ValidParticipation | undefined;
 
-            // Si ya hay ganador y es el mismo que la participación más alta, salimos
+            // If the highest score already matches the winner, skip
             if (
                 currentWinner &&
                 omittedParticipation.commitmentC_Hex ===
                     currentWinner.commitmentC_Hex
             ) {
                 console.log(
-                    "La participación con mayor score ya es el ganador actual. No se hace nada.",
+                    "Highest scoring participation is already the current winner. No action was taken.",
                 );
                 return;
             }
 
-            // Continuar con la inclusión de omitidos (tanto si no hay ganador como si el mejor no coincide)
+            // Continue with including omitted participations (even if no winner or if the best candidate differs)
             const userAddress = get(address);
             if (!userAddress) {
-                throw new Error("Cartera no conectada.");
+                throw new Error("Wallet not connected.");
             }
 
             const newResolverPkHex = uint8ArrayToHex(
@@ -1755,10 +1767,10 @@
                 newResolverPkHex,
             );
 
-            console.log("Transacción enviada:", transactionId);
+            console.log("Transaction submitted:", transactionId);
         } catch (e: any) {
-            errorMessage = e.message;
-            console.error("Error en handleIncludeOmitted:", e);
+            setTransactionError(e);
+            console.error("Error in handleIncludeOmitted:", e);
         } finally {
             isSubmitting = false;
         }
@@ -1771,7 +1783,9 @@
         try {
             transactionId = await platform.acceptJudgeNomination(game);
         } catch (e: any) {
-            errorMessage = e.message || "Error accepting judge nomination.";
+            setTransactionError(e, {
+                fallback: "Error accepting judge nomination.",
+            });
         } finally {
             isSubmitting = false;
         }
@@ -1784,7 +1798,9 @@
         try {
             transactionId = await platform.submitCreatorOpinion(game);
         } catch (e: any) {
-            errorMessage = e.message || "Error submitting opinion.";
+            setTransactionError(e, {
+                fallback: "Error submitting opinion.",
+            });
         } finally {
             isSubmitting = false;
         }
@@ -1948,13 +1964,13 @@
         unsubscribeGameDetail();
     });
 
-    // Función de utilidad para limitar los porcentajes a [0, 100]
+    // Utility to clamp percentages to [0, 100]
     function clampPct(v) {
         return Math.max(0, Math.min(100, Number.isFinite(v) ? v : 0));
     }
 
-    // === Cálculo de distribución de premios ===
-    // Datos base según el tipo de juego
+    // === Prize distribution calculations ===
+    // Base data per game type
     let totalPct = 0;
     let winnerPct = 0;
     let overAllocated = 0;

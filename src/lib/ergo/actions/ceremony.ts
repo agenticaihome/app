@@ -8,52 +8,52 @@ import { SColl, SByte, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox, uint8ArrayToHex } from '$lib/ergo/utils';
 import type { GameActive } from '$lib/common/game';
 import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
-import { getGopGameActiveErgoTreeHex } from '../contract'; // Asume que esta función existe
+import { getGopGameActiveErgoTreeHex } from '../contract'; // Assume this function exists
 import { stringToBytes } from '@scure/base';
 import { ErgoPlatform } from '../platform';
 
 declare const ergo: any;
 
 /**
- * Ejecuta la acción "Open Ceremony" (action3_openCeremony) para un juego activo.
- * * Esta acción permite a cualquiera "re-gastar" la caja del juego antes del
- * 'ceremonyDeadline' para actualizar la semilla del juego (gameSeed), 
- * añadiendo así entropía.
- * * La nueva semilla se calcula como:
+ * Executes the "Open Ceremony" action (action3_openCeremony) for an active game.
+ * * This action allows anyone to "re-spend" the game box before the
+ * 'ceremonyDeadline' to update the game seed (gameSeed), 
+ * thus adding entropy.
+ * * The new seed is calculated as:
  * updated_seed = blake2b256(old_seed ++ INPUTS(0).id)
- * * Todos los demás registros y valores de la caja se preservan.
- * * @param game El objeto GameActive (caja a consumir).
- * @returns El ID de la transacción si tiene éxito.
+ * * All other registers and box values are preserved.
+ * * @param game The GameActive object (box to be consumed).
+ * @returns The transaction ID if successful.
  */
 export async function contribute_to_ceremony(
     game: GameActive,
     donation: bigint = 0n
 ): Promise<string | null> {
 
-    console.log(`Iniciando contribución a ceremonia para el juego: ${game.boxId}`);
-    if (donation > 0n) console.log(`Donación de: ${donation.toString()} para el token ${game.participationTokenId}`);
+    console.log(`Starting ceremony contribution for game: ${game.boxId}`);
+    if (donation > 0n) console.log(`Donation of: ${donation.toString()} for token ${game.participationTokenId}`);
 
     const currentHeight = await (new ErgoPlatform()).get_current_height();
 
-    // 1. --- Validación (Pre-checks) ---
+    // 1. --- Validation (Pre-checks) ---
     if (currentHeight >= game.ceremonyDeadline) {
-        throw new Error("La ceremonia de apertura ha finalizado. No se puede agregar más entropía.");
+        throw new Error("The opening ceremony has ended. No more entropy can be added.");
     }
 
     const gameBoxToSpend = parseBox(game.box);
     if (BigInt(gameBoxToSpend.value) < SAFE_MIN_BOX_VALUE) {
-        throw new Error(`La caja del juego tiene un valor (${gameBoxToSpend.value}) inferior al mínimo seguro (${SAFE_MIN_BOX_VALUE}).`);
+        throw new Error(`The game box value (${gameBoxToSpend.value}) is lower than the safe minimum (${SAFE_MIN_BOX_VALUE}).`);
     }
 
-    // 2. --- Calcular el nuevo estado ---
+    // 2. --- Calculate the new state ---
 
     const oldSeedBytes = hexToBytes(game.seed);
-    if (!oldSeedBytes) throw new Error("Seed (R5._1) del juego inválido.");
+    if (!oldSeedBytes) throw new Error("Invalid game seed (R5._1).");
 
     const inputBoxIdBytes = hexToBytes(game.boxId);
-    if (!inputBoxIdBytes) throw new Error("Box ID del juego inválido.");
+    if (!inputBoxIdBytes) throw new Error("Invalid game box ID.");
 
-    // Calcular: updated_seed = blake2b256(old_seed ++ INPUTS(0).id)
+    // Calculate: updated_seed = blake2b256(old_seed ++ INPUTS(0).id)
     // INPUTS(0).id es game.boxId
     const combinedBytes = new Uint8Array(oldSeedBytes.length + inputBoxIdBytes.length);
     combinedBytes.set(oldSeedBytes);
@@ -61,28 +61,28 @@ export async function contribute_to_ceremony(
 
     const updatedSeedBytes = fleetBlake2b256(combinedBytes);
 
-    console.log(`Seed antiguo: ${game.seed}`);
-    console.log(`Seed nuevo: ${uint8ArrayToHex(updatedSeedBytes)}`);
+    console.log(`Old seed: ${game.seed}`);
+    console.log(`New seed: ${uint8ArrayToHex(updatedSeedBytes)}`);
 
-    // 3. --- Reconstruir Registros ---
-    // Todos los registros deben ser idénticos, excepto R5._1
+    // 3. --- Reconstruct Registers ---
+    // All registers must be identical, except R5._1
 
-    // R4: Sigue en estado 0 (Activo)
+    // R4: Still in state 0 (Active)
     const r4Hex = SInt(0).toHex();
 
     // R5: updated_seed (Coll[Byte])
     const r5Hex = SColl(SByte, updatedSeedBytes).toHex();
 
-    // R6: secretHash (se mantiene)
+    // R6: secretHash (preserved)
     const r6Hex = SColl(SByte, hexToBytes(game.secretHash)!).toHex();
 
-    // R7: invitedJudges (se mantiene)
+    // R7: invitedJudges (preserved)
     const r7Hex = SColl(
         SColl(SByte),
         game.judges.map(tokenId => hexToBytes(tokenId)!)
     ).toHex();
 
-    // R8: numericalParameters (se mantiene)
+    // R8: numericalParameters (preserved)
     const numericalParams = [
         BigInt(game.createdAt),
         game.timeWeight,
@@ -100,15 +100,15 @@ export async function contribute_to_ceremony(
 
     const r9 = [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? "", devScriptBytes];
     console.log(`R9 values (bytes):`, r9);
-    // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
+    // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId, devScript]
     const r9Hex = SColl(SColl(SByte), r9).toHex()
 
-    // 4. --- Construir la Caja de Salida ---
+    // 4. --- Build Output Box ---
 
-    // Preparar tokens
-    const currentTokens = gameBoxToSpend.assets.map(a => ({ ...a }));
+    // Prepare tokens
+    const currentTokens = gameBoxToSpend.assets.map((a: any) => ({ ...a }));
     if (donation > 0n && game.participationTokenId) {
-        const index = currentTokens.findIndex(t => t.tokenId === game.participationTokenId);
+        const index = currentTokens.findIndex((t: any) => t.tokenId === game.participationTokenId);
         if (index !== -1) {
             currentTokens[index].amount = (BigInt(currentTokens[index].amount) + donation).toString();
         } else {
@@ -133,7 +133,7 @@ export async function contribute_to_ceremony(
             R9: r9Hex
         });
 
-    // 5. --- Construir y Enviar la Transacción ---
+    // 5. --- Build and Send the Transaction ---
 
     const changeAddress = await ergo.get_change_address();
 
@@ -148,11 +148,11 @@ export async function contribute_to_ceremony(
         const signedTransaction = await ergo.sign_tx(unsignedTransaction.toEIP12Object());
         const txId = await ergo.submit_tx(signedTransaction);
 
-        console.log(`Contribución a ceremonia enviada con éxito. ID de la transacción: ${txId}`);
+        console.log(`Ceremony contribution sent successfully. Transaction ID: ${txId}`);
         return txId;
 
     } catch (error) {
-        console.error("Error al construir o enviar la transacción de ceremonia:", error);
+        console.error("Error building or sending the ceremony transaction:", error);
         throw error;
     }
 }

@@ -32,12 +32,12 @@ export async function end_game_chained(
     const currentHeight = await (new ErgoPlatform()).get_current_height();
     const userAddress = await ergo.get_change_address();
 
-    // --- 1. Validaciones Previas ---
+    // --- 1. Preliminary Validations ---
     if (currentHeight < game.resolutionDeadline) {
         throw new Error("The resolution period has not yet ended.");
     }
 
-    // --- 2. Construcción de Tx A (to_end_game) ---
+    // --- 2. Tx A Construction (to_end_game) ---
     const endGameErgoTree = getGopEndGameErgoTreeHex();
     const parsedInputBox = parseBox(game.box);
 
@@ -109,7 +109,7 @@ export async function end_game_chained(
             }
 
             if (finalDevPayout > 0n) {
-                outputs.push(buildOutput(finalDevPayout, game.constants.DEV_SCRIPT));
+                outputs.push(buildOutput(finalDevPayout, game.devScript));
             }
 
             if (finalJudgesPayout > 0n && (game.judges ?? []).length > 0) {

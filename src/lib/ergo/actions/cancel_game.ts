@@ -2,7 +2,8 @@ import {
     OutputBuilder,
     TransactionBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
-    SAFE_MIN_BOX_VALUE} from '@fleet-sdk/core';
+    SAFE_MIN_BOX_VALUE
+} from '@fleet-sdk/core';
 import { SColl, SByte, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox, uint8ArrayToHex } from '$lib/ergo/utils';
 import { type GameActive } from '$lib/common/game';
@@ -11,16 +12,18 @@ import { getGopGameCancellationErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
 import { ErgoPlatform } from '../platform';
 
-// --- Constantes del contrato game_cancellation.es ---
+declare const ergo: any;
+
+// --- Constants for game_cancellation.es contract ---
 
 /**
- * Inicia la cancelación de un juego activo, haciendo la transición de GameActive -> GameCancellation.
- * Esta acción revela el secreto 'S' antes de la fecha límite para penalizar al creador.
+ * Initiates the cancellation of an active game, transitioning from GameActive -> GameCancellation.
+ * This action reveals the 'S' secret before the deadline to penalize the creator.
  *
- * @param game El objeto GameActive a cancelar.
- * @param secretS_hex El secreto 'S' en formato hexadecimal.
- * @param claimerAddressString La dirección del usuario que inicia la cancelación y reclama la penalización.
- * @returns Una promesa que se resuelve con el ID de la transacción si tiene éxito.
+ * @param game The GameActive object to cancel.
+ * @param secretS_hex The 'S' secret in hexadecimal format.
+ * @param claimerAddressString The address of the user initiating the cancellation and claiming the penalty.
+ * @returns A promise that resolves with the transaction ID if successful.
  */
 export async function cancel_game(
     game: GameActive,
@@ -30,28 +33,28 @@ export async function cancel_game(
 
     const maxBigInt = (a: bigint, b: bigint): bigint => (a > b ? a : b);
 
-    console.warn(`Iniciando transición de cancelación para el juego: ${game.boxId}`);
-    
-    // --- 1. Obtener datos y realizar pre-chequeos ---
+    console.warn(`Starting cancellation transition for game: ${game.boxId}`);
+
+    // --- 1. Fetch data and perform pre-checks ---
     const currentHeight = await (new ErgoPlatform()).get_current_height();
 
     if (currentHeight >= game.deadlineBlock) {
-        throw new Error("La cancelación del juego solo es posible antes de la fecha límite.");
+        throw new Error("Game cancellation is only possible before the deadline.");
     }
 
     const gameBoxToSpend = game.box;
-    if (!gameBoxToSpend) throw new Error("Los datos de la GameBox no se encuentran en el objeto del juego.");
+    if (!gameBoxToSpend) throw new Error("The GameBox data is not found in the game object.");
 
     const secretS_bytes = hexToBytes(secretS_hex);
-    if (!secretS_bytes) throw new Error("Formato de secretS_hex inválido.");
+    if (!secretS_bytes) throw new Error("Invalid secretS_hex format.");
 
-    // Verificar que el secreto proporcionado coincide con el hash en la caja activa.
+    // Verify that the provided secret matches the hash in the active box.
     const hash_of_provided_secret = fleetBlake2b256(secretS_bytes);
     if (uint8ArrayToHex(hash_of_provided_secret) !== game.secretHash) {
-        throw new Error("El secreto proporcionado no coincide con el hash en la GameBox.");
+        throw new Error("The provided secret does not match the hash in the GameBox.");
     }
 
-    // --- 2. Calcular valores para la nueva caja de cancelación y la penalización ---
+    // --- 2. Calculate values for the new cancellation box and the penalty ---
     let stakePortionToClaim = game.resolverStakeAmount / BigInt(game.constants.STAKE_DENOMINATOR);
     const newValue = game.value - stakePortionToClaim;
 
@@ -60,34 +63,34 @@ export async function cancel_game(
         amount: newValue
     }];
 
-    // --- 3. Construir Salidas de la Transacción ---
-    
-    // La dirección/ErgoTree de la nueva caja será la del script de cancelación.
+    // --- 3. Build Transaction Outputs ---
+
+    // The address/ErgoTree of the new box will be that of the cancellation script.
     const cancellationContractErgoTree = getGopGameCancellationErgoTreeHex();
     const newUnlockHeight = BigInt(currentHeight + game.constants.COOLDOWN_IN_BLOCKS + 5);
 
-    // SALIDA(0): La nueva caja de cancelación (`game_cancellation.es`)
+    // OUTPUT(0): The new cancellation box (`game_cancellation.es`)
     const cancellationBoxOutput = new OutputBuilder(
         BigInt(game.box.value),
         cancellationContractErgoTree
     )
-    .addTokens([gameBoxToSpend.assets[0], ...gameTokens]) // Preservar el NFT del juego
-    .setAdditionalRegisters({
-        // R4: Estado del juego (2: Cancelado)
-        R4: SInt(2).toHex(),
-        // R5: Altura de bloque para el siguiente drenaje
-        R5: SLong(newUnlockHeight).toHex(),
-        // R6: El secreto 'S' revelado
-        R6: SColl(SByte, secretS_bytes).toHex(),
-        // R7: El stake restante del creador
-        R7: SLong(newValue).toHex(),
-        // R8: Deadline original
-        R8: SLong(BigInt(game.deadlineBlock)).toHex(),
-        // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
-        R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? ""]).toHex()
-    });
+        .addTokens([gameBoxToSpend.assets[0], ...gameTokens]) // Preserve the game NFT
+        .setAdditionalRegisters({
+            // R4: Game state (2: Cancelled)
+            R4: SInt(2).toHex(),
+            // R5: Block height for the next drain
+            R5: SLong(newUnlockHeight).toHex(),
+            // R6: The revealed 'S' secret
+            R6: SColl(SByte, secretS_bytes).toHex(),
+            // R7: The creator's remaining stake
+            R7: SLong(newValue).toHex(),
+            // R8: Original deadline
+            R8: SLong(BigInt(game.deadlineBlock)).toHex(),
+            // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]
+            R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? ""]).toHex()
+        });
 
-    // SALIDA(1): Caja que paga la penalización al claimer
+    // OUTPUT(1): Box that pays the penalty to the claimer
 
     const claimerValue = game.participationTokenId == "" ? stakePortionToClaim : maxBigInt(stakePortionToClaim, SAFE_MIN_BOX_VALUE) + SAFE_MIN_BOX_VALUE;
     const claimerTokens = game.participationTokenId == "" ? [] : [{
@@ -99,10 +102,10 @@ export async function cancel_game(
         claimerValue,
         claimerAddressString
     )
-    .addTokens(claimerTokens);
+        .addTokens(claimerTokens);
 
 
-    // --- 4. Construir y Enviar la Transacción ---
+    // --- 4. Build and Send the Transaction ---
     const utxos = await ergo.get_utxos();
     const inputs = [parseBox(gameBoxToSpend), ...utxos];
 
@@ -112,16 +115,16 @@ export async function cancel_game(
         .sendChangeTo(claimerAddressString)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
         .build();
-    
+
     try {
         const signedTransaction = await ergo.sign_tx(unsignedTransaction.toEIP12Object());
         const txId = await ergo.submit_tx(signedTransaction);
 
-        console.log(`Transición a cancelación enviada con éxito. ID de la transacción: ${txId}`);
+        console.log(`Cancellation transition sent successfully. Transaction ID: ${txId}`);
         return txId;
     }
     catch (error) {
-        console.warn("Error al firmar o enviar la transacción de cancelación:", error);
+        console.warn("Error signing or sending the cancellation transaction:", error);
         throw error;
     }
 }

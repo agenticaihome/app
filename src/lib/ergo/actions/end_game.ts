@@ -25,7 +25,7 @@ export async function end_game(
 
     const winnerParticipation = participations.find(p => p.commitmentC_Hex === game.winnerCandidateCommitment) ?? null;
 
-    // --- 3. Verificación de firma ---
+    // --- 3. Signature verification ---
     let requiredSignerAddress: string;
 
     if (winnerParticipation === null) {
@@ -40,7 +40,7 @@ export async function end_game(
         }
     }
 
-    // --- 4. Lógica de Cálculo de Pagos (Shared) ---
+    // --- 4. Payout Calculation Logic (Shared) ---
     const {
         finalWinnerPrize,
         finalResolverPayout,
@@ -48,13 +48,13 @@ export async function end_game(
         finalJudgesPayout
     } = calculatePayouts(game, participations);
 
-    // --- 5. Construcción de Outputs ---
+    // --- 5. Output Construction ---
     const outputs: OutputBuilder[] = [];
 
-    // El NFT del juego siempre se encuentra en el indice 0 de los assets
+    // The game NFT is always at index 0 of the assets
     const gameNft = game.box.assets[0];
 
-    // Helper para construir cajas (Maneja Token vs ERG)
+    // Helper to build boxes (Handles Token vs ERG)
     const buildOutput = (amount: bigint, script: string, other_tokens: any[] = []) => {
         // Token Game: Min ERG + Tokens
         return new OutputBuilder(SAFE_MIN_BOX_VALUE, script)
@@ -67,13 +67,13 @@ export async function end_game(
     }
 
     if (finalResolverPayout > 0n) {
-        // Si no hay ganador, el resolver recupera el NFT
+        // If there's no winner, the resolver recovers the NFT
         const resolverOutput = buildOutput(finalResolverPayout, game.resolverScript_Hex, winnerParticipation === null ? [gameNft] : []);
         outputs.push(resolverOutput);
     }
 
     if (finalDevPayout > 0n) {
-        outputs.push(buildOutput(finalDevPayout, game.devScript) );
+        outputs.push(buildOutput(finalDevPayout, game.devScript));
     }
 
     if (finalJudgesPayout > 0n && (game.judges ?? []).length > 0) {
@@ -91,7 +91,7 @@ export async function end_game(
         outputs.push(judgesPaidOutput);
     }
 
-    // --- 6. Transacción ---
+    // --- 6. Transaction ---
     const utxos = await ergo.get_utxos();
     const inputs = [parseBox(game.box), ...participations.map(p => parseBox(p.box)), ...utxos];
 

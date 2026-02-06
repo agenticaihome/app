@@ -148,7 +148,7 @@ export async function judges_invalidation_chained(
             const allDataInputs = [parent.outputs[0], ...dataInputsForTxB];
 
             return builder
-                .from([parsedGameBox, parsedInvalidatedBox])
+                .from([parsedGameBox, parsedInvalidatedBox], { ensureInclusion: true })
                 .to(recreatedGameBoxOutput)
                 .withDataFrom(allDataInputs)
                 .sendChangeTo(userAddress)

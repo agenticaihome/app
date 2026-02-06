@@ -69,13 +69,10 @@ export async function drain_cancelled_game_stake(
 
     // --- 3. Build and Send the Transaction ---
     const utxos: InputBox[] = await ergo.get_utxos();
-    const inputs = [parseBox(game.box), ...utxos];
-
-    console.log("R5 value of the input: ", inputs[0].additionalRegisters.R5);
-    // Shows R5 05a49ed101 (1714066)
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
-        .from(inputs)
+        .from(parseBox(game.box), { ensureInclusion: true })
+        .from(utxos)
         .to([recreatedCancellationBox])
         .sendChangeTo(claimerAddressString)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
@@ -93,9 +90,9 @@ export async function drain_cancelled_game_stake(
     }
     catch (error) {
         console.warn(error)
-         // FIRST TEST:  SELF.R5 es 1714239.
-         // SECOND TEST:  SELF.R5 es 1714260.
-         // WHY CHANGED?  Why not 1714066?
+        // FIRST TEST:  SELF.R5 es 1714239.
+        // SECOND TEST:  SELF.R5 es 1714260.
+        // WHY CHANGED?  Why not 1714066?
         throw new Error("Error: https://github.com/game-of-prompts/app/issues/3");
     }
 }

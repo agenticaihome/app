@@ -87,8 +87,6 @@ export async function include_omitted_participation(
     // --- 4. Build and Send the Transaction ---
     const userAddress = pkHexToBase58Address(newResolverPkHex);
     const utxos: Box<any>[] = await ergo.get_utxos();
-
-    const inputs = [parseBox(game.box), ...utxos];
     if (!omittedParticipation.solverIdBox) {
         throw new Error("Omitted participation does not have a solver ID box.");
     }
@@ -97,7 +95,8 @@ export async function include_omitted_participation(
     const dataInputs = currentWinnerParticipation ? [parseBox(currentWinnerParticipation.box), pBox, solverIdBox] : [pBox, solverIdBox];
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
-        .from(inputs)
+        .from(parseBox(game.box), { ensureInclusion: true })
+        .from(utxos)
         .to([recreatedGameBox])
         .withDataFrom(dataInputs)
         .sendChangeTo(userAddress)

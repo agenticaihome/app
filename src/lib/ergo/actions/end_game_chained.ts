@@ -87,7 +87,8 @@ export async function end_game_chained(
     // TODO BUG: seems that there are not participation boxes included in the chained tx B inputs?
 
     const unsignedTransactions = await new TransactionBuilder(currentHeight)
-        .from([parsedInputBox, ...utxos])
+        .from(parsedInputBox, { ensureInclusion: true })
+        .from(utxos)
         .to(endGameBoxOutput)
         .sendChangeTo(userAddress)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
@@ -137,7 +138,7 @@ export async function end_game_chained(
             ];
 
             return builder
-                .from(txBInputs)
+                .from(txBInputs, { ensureInclusion: true })
                 .to(outputs)
                 .build();
         })

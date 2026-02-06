@@ -139,7 +139,8 @@ export async function contribute_to_ceremony(
 
     try {
         const unsignedTransaction = new TransactionBuilder(currentHeight)
-            .from([gameBoxToSpend, ...await ergo.get_utxos()])
+            .from(gameBoxToSpend, { ensureInclusion: true })
+            .from(await ergo.get_utxos())
             .to([ceremonyOutputBox])
             .sendChangeTo(changeAddress)
             .payFee(RECOMMENDED_MIN_FEE_VALUE)

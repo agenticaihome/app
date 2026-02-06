@@ -1,7 +1,8 @@
 import {
     OutputBuilder,
     TransactionBuilder,
-    RECOMMENDED_MIN_FEE_VALUE} from '@fleet-sdk/core';
+    RECOMMENDED_MIN_FEE_VALUE
+} from '@fleet-sdk/core';
 import { parseBox } from '$lib/ergo/utils';
 import { type GameResolution } from '$lib/common/game';
 import { getGopEndGameErgoTreeHex } from '../contract';
@@ -44,10 +45,9 @@ export async function to_end_game(
         .setAdditionalRegisters(outputRegisters);
 
     const utxos = await ergo.get_utxos();
-    const inputs = [parsedInputBox, ...utxos];
-
     const unsignedTransaction = new TransactionBuilder(currentHeight)
-        .from(inputs)
+        .from(parsedInputBox, { ensureInclusion: true })
+        .from(utxos)
         .to(endGameBoxOutput)
         .sendChangeTo(userAddress)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)

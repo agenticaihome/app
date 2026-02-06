@@ -112,25 +112,20 @@ export async function judges_invalidate_unavailable(
     const userAddress = await ergo.get_change_address();
     const utxos: Box<Amount>[] = await ergo.get_utxos();
 
-    // Inputs: the resolution box, the invalidated participant's box, and the judge's UTXOs
-    const inputs = [parseBox(game.box), parseBox(invalidatedParticipation.box), ...utxos];
-
     try {
-
         const unsignedTransaction = new TransactionBuilder(currentHeight)
-            .from(inputs)
+            .from([parseBox(game.box), parseBox(invalidatedParticipation.box)], { ensureInclusion: true })
+            .from(utxos)
             .to(recreatedGameBox)
             .withDataFrom(dataInputs)
             .sendChangeTo(userAddress)
             .payFee(RECOMMENDED_MIN_FEE_VALUE)
             .build();
 
-
         const signedTransaction = await Promise.race([
             ergo.sign_tx(unsignedTransaction.toEIP12Object()),
             new Promise((_, reject) => setTimeout(() => reject(new Error("sign_tx timeout")), 15000))
         ]);
-
 
         const txId = await ergo.submit_tx(signedTransaction);
 

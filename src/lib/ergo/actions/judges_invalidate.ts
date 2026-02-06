@@ -112,13 +112,11 @@ export async function judges_invalidate(
     const userAddress = await ergo.get_change_address();
     const utxos: Box<Amount>[] = await ergo.get_utxos();
 
-    // Inputs: the resolution box, the invalidated participant's box, and the judge's UTXOs
-    const inputs = [parseBox(game.box), parseBox(invalidatedParticipation.box), ...utxos];
-
     try {
 
         const unsignedTransaction = new TransactionBuilder(currentHeight)
-            .from(inputs)
+            .from([parseBox(game.box), parseBox(invalidatedParticipation.box)], { ensureInclusion: true })
+            .from(utxos)
             .to(recreatedGameBox)
             .withDataFrom(dataInputs)
             .sendChangeTo(userAddress)
@@ -140,5 +138,4 @@ export async function judges_invalidate(
         console.warn(error)
         throw error;
     }
-
 }

@@ -457,7 +457,7 @@
     const progressDefaultCircle =
         "bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600";
     const progressActiveCircle =
-        "bg-green-500 border-green-500 text-white shadow-lg scale-110";
+        "bg-blue-600 border-blue-600 text-white shadow-lg scale-110";
     const progressJudgeCircle =
         "bg-blue-600 border-blue-600 text-white shadow-lg scale-110";
     const progressSuspendedCircle =
@@ -3270,7 +3270,7 @@
                                     </div>
                                     <span
                                         class={`mt-2 text-xs font-bold uppercase tracking-wider ${isActiveStep
-                                            ? 'text-green-600 dark:text-green-400'
+                                            ? 'text-blue-600 dark:text-blue-400'
                                             : 'text-gray-500 dark:text-gray-400'}`}
                                         >Active</span
                                     >
@@ -3328,7 +3328,7 @@
                                     </div>
                                     <span
                                         class={`mt-2 text-xs font-bold uppercase tracking-wider ${isFinalizedStep
-                                            ? 'text-green-500'
+                                            ? 'text-blue-600'
                                             : 'text-gray-500 dark:text-gray-400'}`}
                                         >Finalized</span
                                     >
@@ -3388,12 +3388,12 @@
                             >
                                 <div
                                     class="p-2 rounded-lg {game.status ===
-                                        'Active' && openCeremony
-                                        ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+                                        'Active' && gameSuspended
+                                        ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                                         : game.status === 'Active'
-                                          ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
                                           : game.status === 'Resolution'
-                                            ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                                            ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
                                             : game.status === 'Finalized'
                                               ? 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400'
                                               : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}"
@@ -3411,18 +3411,15 @@
                                 <div>
                                     <h3
                                         class="text-lg font-bold flex items-center gap-2 {game.status ===
-                                            'Active' && openCeremony
-                                            ? 'text-purple-600 dark:text-purple-400'
-                                            : game.status === 'Active' &&
-                                                gameSuspended
-                                              ? 'text-orange-600 dark:text-orange-400'
-                                              : game.status === 'Active'
-                                                ? 'text-green-600 dark:text-green-400'
-                                                : game.status === 'Resolution'
-                                                  ? 'text-amber-600 dark:text-amber-400'
-                                                  : game.status === 'Finalized'
-                                                    ? 'text-gray-600 dark:text-gray-400'
-                                                    : 'text-red-600 dark:text-red-400'}"
+                                            'Active' && gameSuspended
+                                            ? 'text-red-600 dark:text-red-400'
+                                            : game.status === 'Active'
+                                              ? 'text-blue-600 dark:text-blue-400'
+                                              : game.status === 'Resolution'
+                                                ? 'text-blue-600 dark:text-blue-400'
+                                                : game.status === 'Finalized'
+                                                  ? 'text-gray-600 dark:text-gray-400'
+                                                  : 'text-red-600 dark:text-red-400'}"
                                     >
                                         {#if game.status === "Active" && openCeremony}
                                             PLAYING

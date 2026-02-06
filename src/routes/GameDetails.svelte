@@ -452,6 +452,69 @@
     let claimRefundError: { [boxId: string]: string | null } = {};
     let claimRefundSuccessTxId: { [boxId: string]: string | null } = {};
 
+    const progressCircleBase =
+        "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300";
+    const progressDefaultCircle =
+        "bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600";
+    const progressActiveCircle =
+        "bg-green-500 border-green-500 text-white shadow-lg scale-110";
+    const progressJudgeCircle =
+        "bg-blue-600 border-blue-600 text-white shadow-lg scale-110";
+    const progressSuspendedCircle =
+        "bg-red-600 border-red-600 text-white shadow-lg scale-110";
+
+    const ProgressPhase = {
+        ACTIVE: "active",
+        JUDGE: "judge",
+        SUSPENDED: "suspended",
+        CANCELLED: "cancelled",
+        FINALIZED: "finalized",
+    } as const;
+
+    type ProgressPhaseValue =
+        (typeof ProgressPhase)[keyof typeof ProgressPhase];
+
+    function getCurrentProgressPhase(): ProgressPhaseValue | null {
+        if (gameSuspended) {
+            return ProgressPhase.SUSPENDED;
+        }
+
+        if (!game) {
+            return null;
+        }
+
+        if (game.status === "Cancelled_Draining") {
+            return ProgressPhase.CANCELLED;
+        }
+
+        if (game.status === "Finalized") {
+            return ProgressPhase.FINALIZED;
+        }
+
+        if (game.status === "Resolution") {
+            return ProgressPhase.JUDGE;
+        }
+
+        if (game.status === "Active" && participationIsEnded) {
+            return ProgressPhase.JUDGE;
+        }
+
+        if (game.status === "Active") {
+            return ProgressPhase.ACTIVE;
+        }
+
+        return null;
+    }
+
+    $: currentProgressPhase = getCurrentProgressPhase();
+    $: isActiveStep =
+        currentProgressPhase === ProgressPhase.ACTIVE &&
+        !gameSuspended;
+    $: isJudgeStep = currentProgressPhase === ProgressPhase.JUDGE;
+    $: isSuspendedStep = currentProgressPhase === ProgressPhase.SUSPENDED;
+    $: isCancelledStep = currentProgressPhase === ProgressPhase.CANCELLED;
+    $: isFinalizedStep = currentProgressPhase === ProgressPhase.FINALIZED;
+
     // Reclaim after Grace Period State
     let isReclaimingGraceFor: string | null = null;
     let reclaimGraceError: { [boxId: string]: string | null } = {};
@@ -2447,33 +2510,23 @@
                                 <div class="distribution-bar">
                                     <div
                                         class="bar-segment winner"
-                                        style:width="{clampPct(winnerPct)}%"
-                                        title="Winner(s): {winnerPct.toFixed(
-                                            2,
-                                        )}%"
+                                        style:width={`${clampPct(winnerPct)}%`}
+                                        title={`Winner(s): ${winnerPct.toFixed(2)}%`}
                                     ></div>
                                     <div
                                         class="bar-segment creator"
-                                        style:width="{clampPct(resolverPct)}%"
-                                        title="Creator: {resolverPct.toFixed(
-                                            2,
-                                        )}%"
+                                        style:width={`${clampPct(resolverPct)}%`}
+                                        title={`Creator: ${resolverPct.toFixed(2)}%`}
                                     ></div>
                                     <div
                                         class="bar-segment judges"
-                                        style:width="{clampPct(
-                                            judgesTotalPct,
-                                        )}%"
-                                        title="Judges Total: {judgesTotalPct.toFixed(
-                                            2,
-                                        )}%"
+                                        style:width={`${clampPct(judgesTotalPct)}%`}
+                                        title={`Judges Total: ${judgesTotalPct.toFixed(2)}%`}
                                     ></div>
                                     <div
                                         class="bar-segment developers"
-                                        style:width="{clampPct(developersPct)}%"
-                                        title="Dev Fund: {developersPct.toFixed(
-                                            2,
-                                        )}%"
+                                        style:width={`${clampPct(developersPct)}%`}
+                                        title={`Dev Fund: ${developersPct.toFixed(2)}%`}
                                     ></div>
                                 </div>
 
@@ -3122,59 +3175,48 @@
                             {#if game.status === "Cancelled_Draining"}
                                 <!-- CANCELLED FLOW: Active -> Cancelled -> Draining -->
 
-                                <!-- Line 1: Active -> Cancelled (Always Red in this state) -->
                                 <div
-                                    class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 bg-red-500"
+                                    class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 bg-gray-200 dark:bg-gray-700"
                                     style="width: 50%;"
                                 ></div>
 
-                                <!-- Line 2: Cancelled -> Draining (Orange) -->
                                 <div
-                                    class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 bg-orange-500"
+                                    class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 bg-gray-200 dark:bg-gray-700"
                                     style="width: 50%;"
                                 ></div>
 
                                 <!-- Step 1: Active (Completed) -->
-                                <div
-                                    class="flex flex-col items-center bg-transparent z-10 px-2"
-                                >
+                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class="w-10 h-10 rounded-full flex items-center justify-center border-2 bg-green-500 border-green-500 text-white"
+                                        class={`${progressCircleBase} ${progressDefaultCircle}`}
                                     >
                                         <Check class="w-6 h-6" />
                                     </div>
-                                    <span
-                                        class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                                    <span class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                                         >Active</span
                                     >
                                 </div>
 
                                 <!-- Step 2: Cancelled (Completed Event) -->
-                                <div
-                                    class="flex flex-col items-center bg-transparent z-10 px-2"
-                                >
+                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class="w-10 h-10 rounded-full flex items-center justify-center border-2 bg-red-600 border-red-600 text-white shadow-lg scale-110"
+                                        class={`${progressCircleBase} ${progressDefaultCircle}`}
                                     >
                                         <XCircle class="w-6 h-6" />
                                     </div>
-                                    <span
-                                        class="mt-2 text-xs font-bold uppercase tracking-wider text-red-600"
+                                    <span class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                                         >Cancelled</span
                                     >
                                 </div>
 
                                 <!-- Step 3: Draining (Active State) -->
-                                <div
-                                    class="flex flex-col items-center bg-transparent z-10 px-2"
-                                >
+                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class="w-10 h-10 rounded-full flex items-center justify-center border-2 bg-orange-500 border-orange-500 text-white shadow-lg scale-110 animate-pulse"
+                                        class={`${progressCircleBase} ${progressSuspendedCircle} animate-pulse`}
                                     >
                                         <ShieldCheck class="w-5 h-5" />
                                     </div>
-                                    <span
-                                        class="mt-2 text-xs font-bold uppercase tracking-wider text-orange-500"
+                                    <span class="mt-2 text-xs font-bold uppercase tracking-wider text-red-600"
                                         >Draining</span
                                     >
                                 </div>
@@ -3183,10 +3225,7 @@
 
                                 <!-- Line 1: Active -> Resolution -->
                                 <div
-                                    class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 transition-all duration-500 {game.status !==
-                                    'Active'
-                                        ? 'bg-blue-500'
-                                        : 'w-0'}"
+                                    class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 transition-all duration-500 bg-gray-200 dark:bg-gray-700"
                                     style="width: {game.status !== 'Active'
                                         ? '50%'
                                         : '0%'};"
@@ -3194,24 +3233,18 @@
 
                                 <!-- Line 2: Resolution -> Finalized -->
                                 <div
-                                    class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 transition-all duration-500 {game.status ===
-                                    'Finalized'
-                                        ? 'bg-green-500'
-                                        : 'w-0'}"
+                                    class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 transition-all duration-500 bg-gray-200 dark:bg-gray-700"
                                     style="width: {game.status === 'Finalized'
                                         ? '50%'
                                         : '0%'};"
                                 ></div>
 
                                 <!-- Step 1: Active -->
-                                <div
-                                    class="flex flex-col items-center bg-transparent z-10 px-2"
-                                >
+                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 {game.status ===
-                                            'Active' && !participationIsEnded
-                                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-110'
-                                            : 'bg-green-500 border-green-500 text-white'}"
+                                        class={`${progressCircleBase} ${isActiveStep
+                                            ? progressActiveCircle
+                                            : progressDefaultCircle}`}
                                     >
                                         {#if game.status !== "Active" || participationIsEnded}
                                             <Check class="w-6 h-6" />
@@ -3222,30 +3255,23 @@
                                         {/if}
                                     </div>
                                     <span
-                                        class="mt-2 text-xs font-bold uppercase tracking-wider {game.status ===
-                                        'Active'
-                                            ? 'text-blue-600 dark:text-blue-400'
-                                            : 'text-gray-500 dark:text-gray-400'}"
+                                        class={`mt-2 text-xs font-bold uppercase tracking-wider ${isActiveStep
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : 'text-gray-500 dark:text-gray-400'}`}
                                         >Active</span
                                     >
                                 </div>
 
                                 <!-- Step 2: Resolution -->
-                                <div
-                                    class="flex flex-col items-center bg-transparent z-10 px-2"
-                                >
+                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 {game.status ===
-                                            'Resolution' ||
-                                        (game.status === 'Active' &&
-                                            participationIsEnded &&
-                                            !gameSuspended)
-                                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-110'
-                                            : game.status === 'Finalized'
-                                              ? 'bg-green-500 border-green-500 text-white'
-                                              : gameSuspended
-                                                ? 'bg-red-500/10 border-red-500/50 text-red-500'
-                                                : 'bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600'}"
+                                        class={`${progressCircleBase} ${
+                                            isSuspendedStep
+                                                ? progressSuspendedCircle
+                                                : isJudgeStep
+                                                    ? progressJudgeCircle
+                                                    : progressDefaultCircle
+                                        }`}
                                     >
                                         {#if game.status === "Finalized"}
                                             <Check class="w-6 h-6" />
@@ -3260,12 +3286,11 @@
                                         {/if}
                                     </div>
                                     <span
-                                        class="mt-2 text-xs font-bold uppercase tracking-wider {game.status ===
-                                        'Resolution'
-                                            ? 'text-blue-600 dark:text-blue-400'
-                                            : gameSuspended
-                                              ? 'text-red-500'
-                                              : 'text-gray-500 dark:text-gray-400'}"
+                                        class={`mt-2 text-xs font-bold uppercase tracking-wider ${isSuspendedStep
+                                            ? 'text-red-500'
+                                            : isJudgeStep
+                                                ? 'text-blue-600 dark:text-blue-400'
+                                                : 'text-gray-500 dark:text-gray-400'}`}
                                         >{gameSuspended
                                             ? "Suspended"
                                             : "Resolution"}</span
@@ -3273,14 +3298,11 @@
                                 </div>
 
                                 <!-- Step 3: Finalized -->
-                                <div
-                                    class="flex flex-col items-center bg-transparent z-10 px-2"
-                                >
+                                <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 {game.status ===
-                                        'Finalized'
-                                            ? 'bg-green-500 border-green-500 text-white shadow-lg scale-110'
-                                            : 'bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600'}"
+                                        class={`${progressCircleBase} ${isFinalizedStep
+                                            ? progressActiveCircle
+                                            : progressDefaultCircle}`}
                                     >
                                         {#if game.status === "Finalized"}
                                             <Check class="w-6 h-6" />
@@ -3291,10 +3313,9 @@
                                         {/if}
                                     </div>
                                     <span
-                                        class="mt-2 text-xs font-bold uppercase tracking-wider {game.status ===
-                                        'Finalized'
+                                        class={`mt-2 text-xs font-bold uppercase tracking-wider ${isFinalizedStep
                                             ? 'text-green-500'
-                                            : 'text-gray-500 dark:text-gray-400'}"
+                                            : 'text-gray-500 dark:text-gray-400'}`}
                                         >Finalized</span
                                     >
                                 </div>

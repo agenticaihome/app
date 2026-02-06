@@ -2118,7 +2118,7 @@ import GameTimeline from "$lib/components/GameTimeline.svelte";
             : 'bg-gray-50 text-gray-800'}"
     >
         <Loader2 class="w-12 h-12 animate-spin mb-4 text-indigo-500" />
-        <p class="text-xl font-semibold opacity-80">Cargando competencia...</p>
+        <p class="text-xl font-semibold opacity-80">Loading game...</p>
     </div>
 {:else if game}
         <div

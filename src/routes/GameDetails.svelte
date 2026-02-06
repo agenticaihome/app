@@ -136,11 +136,13 @@ import GameTimeline from "$lib/components/GameTimeline.svelte";
     // --- COMPONENT STATE ---
     let game: AnyGame | null = null;
     let isLoaded = false;
+    let hasHydrated = false;
     let primaryAction: string | null = null;
 
     $: isBeforeDeadline = targetDate
         ? new Date().getTime() < targetDate
         : false;
+    $: showLoadingScreen = !hasHydrated || (game ? !isLoaded : false);
     $: primaryAction = getPrimaryAction(
         game,
         openCeremony,
@@ -1957,6 +1959,7 @@ import GameTimeline from "$lib/components/GameTimeline.svelte";
     onMount(async () => {
         await fetchJudges();
         if (game) loadGameDetailsAndTimers();
+        hasHydrated = true;
     });
 
     onDestroy(() => {
@@ -2107,20 +2110,17 @@ import GameTimeline from "$lib/components/GameTimeline.svelte";
     webExplorerUriTkn={$web_explorer_uri_tkn}
 />
 
-{#if game}
-    {#if !isLoaded}
-        <div
-            class="flex flex-col items-center justify-center min-h-screen {$mode ===
-            'dark'
-                ? 'bg-slate-900 text-gray-200'
-                : 'bg-gray-50 text-gray-800'}"
-        >
-            <Loader2 class="w-12 h-12 animate-spin mb-4 text-indigo-500" />
-            <p class="text-xl font-semibold opacity-80">
-                Loading Competition...
-            </p>
-        </div>
-    {:else}
+{#if showLoadingScreen}
+    <div
+        class="flex flex-col items-center justify-center min-h-screen {$mode ===
+        'dark'
+            ? 'bg-slate-900 text-gray-200'
+            : 'bg-gray-50 text-gray-800'}"
+    >
+        <Loader2 class="w-12 h-12 animate-spin mb-4 text-indigo-500" />
+        <p class="text-xl font-semibold opacity-80">Cargando competencia...</p>
+    </div>
+{:else if game}
         <div
             class="game-detail-page min-h-screen {$mode === 'dark'
                 ? 'bg-slate-900 text-gray-200'

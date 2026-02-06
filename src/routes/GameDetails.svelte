@@ -3205,26 +3205,30 @@
                                     >
                                 </div>
 
-                                <!-- Step 2: Cancelled (Completed Event) -->
+                                <!-- Step 2: Cancelled (Current State) -->
                                 <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class={`${progressCircleBase} ${progressDefaultCircle}`}
+                                        class={`${progressCircleBase} ${isCancelledStep
+                                            ? progressSuspendedCircle
+                                            : progressDefaultCircle}`}
                                     >
                                         <XCircle class="w-6 h-6" />
                                     </div>
-                                    <span class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                                    <span class={`mt-2 text-xs font-bold uppercase tracking-wider ${isCancelledStep
+                                        ? 'text-red-600'
+                                        : 'text-gray-500 dark:text-gray-400'}`}
                                         >Cancelled</span
                                     >
                                 </div>
 
-                                <!-- Step 3: Draining (Active State) -->
+                                <!-- Step 3: Draining -->
                                 <div class="flex flex-col items-center bg-transparent z-10 px-2">
                                     <div
-                                        class={`${progressCircleBase} ${progressSuspendedCircle} animate-pulse`}
+                                        class={`${progressCircleBase} ${progressDefaultCircle}`}
                                     >
                                         <ShieldCheck class="w-5 h-5" />
                                     </div>
-                                    <span class="mt-2 text-xs font-bold uppercase tracking-wider text-red-600"
+                                    <span class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                                         >Draining</span
                                     >
                                 </div>

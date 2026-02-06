@@ -116,7 +116,7 @@ export async function judges_invalidate(
 
         const unsignedTransaction = new TransactionBuilder(currentHeight)
             .from([parseBox(game.box), parseBox(invalidatedParticipation.box)], { ensureInclusion: true })
-            .from(utxos)
+            .and.from(utxos)
             .to(recreatedGameBox)
             .withDataFrom(dataInputs)
             .sendChangeTo(userAddress)

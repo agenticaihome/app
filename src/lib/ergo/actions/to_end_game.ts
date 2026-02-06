@@ -47,7 +47,7 @@ export async function to_end_game(
     const utxos = await ergo.get_utxos();
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(parsedInputBox, { ensureInclusion: true })
-        .from(utxos)
+        .and.from(utxos)
         .to(endGameBoxOutput)
         .sendChangeTo(userAddress)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)

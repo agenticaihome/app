@@ -254,7 +254,7 @@ export async function resolve_game(
     try {
         const unsignedTransaction = new TransactionBuilder(currentHeight)
             .from(parseBox(game.box), { ensureInclusion: true })
-            .from(await ergo.get_utxos())
+            .and.from(await ergo.get_utxos())
             .to([resolutionBoxOutput])
             .sendChangeTo(resolverAddressString)
             .payFee(RECOMMENDED_MIN_FEE_VALUE)

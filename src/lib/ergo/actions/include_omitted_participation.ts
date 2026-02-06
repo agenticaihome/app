@@ -96,7 +96,7 @@ export async function include_omitted_participation(
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(parseBox(game.box), { ensureInclusion: true })
-        .from(utxos)
+        .and.from(utxos)
         .to([recreatedGameBox])
         .withDataFrom(dataInputs)
         .sendChangeTo(userAddress)

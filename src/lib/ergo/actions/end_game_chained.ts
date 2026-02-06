@@ -88,7 +88,7 @@ export async function end_game_chained(
 
     const unsignedTransactions = await new TransactionBuilder(currentHeight)
         .from(parsedInputBox, { ensureInclusion: true })
-        .from(utxos)
+        .and.from(utxos)
         .to(endGameBoxOutput)
         .sendChangeTo(userAddress)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)

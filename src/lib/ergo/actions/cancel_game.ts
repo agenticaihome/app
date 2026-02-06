@@ -107,10 +107,10 @@ export async function cancel_game(
 
     // --- 4. Build and Send the Transaction ---
     const utxos = await ergo.get_utxos();
-    const inputs = [parseBox(gameBoxToSpend), ...utxos];
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
-        .from(inputs)
+        .from(parseBox(gameBoxToSpend), { ensureInclusion: true })
+        .and.from(utxos)
         .to([cancellationBoxOutput, claimerBoxOutput])
         .sendChangeTo(claimerAddressString)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)

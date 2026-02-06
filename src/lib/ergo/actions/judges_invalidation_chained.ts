@@ -149,6 +149,7 @@ export async function judges_invalidation_chained(
 
             return builder
                 .from([parsedGameBox, parsedInvalidatedBox], { ensureInclusion: true })
+                .and.from(utxos)
                 .to(recreatedGameBoxOutput)
                 .withDataFrom(allDataInputs)
                 .sendChangeTo(userAddress)

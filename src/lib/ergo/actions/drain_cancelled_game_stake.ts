@@ -72,7 +72,7 @@ export async function drain_cancelled_game_stake(
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(parseBox(game.box), { ensureInclusion: true })
-        .from(utxos)
+        .and.from(utxos)
         .to([recreatedCancellationBox])
         .sendChangeTo(claimerAddressString)
         .payFee(RECOMMENDED_MIN_FEE_VALUE)

@@ -1225,6 +1225,9 @@
                                 candidateUnvailVotes.entries(),
                             );
 
+                            candidateParticipationUnavailableVotes =
+                                votesArray.map(([k]) => k);
+
                             isUnavailableMajorityReached =
                                 votesArray.length >= requiredVotes;
                         }

@@ -115,7 +115,7 @@ export async function tokenCreationHeight(tokenId: string): Promise<number | nul
     return null;
 }
 
-export async function fetch_conditions(tokenId: string, createdAt?: number): Promise<boolean> {
+export async function fetch_conditions(tokenId: string, createdAt?: number, deadline?: number): Promise<boolean> {
     const url = `${get(explorer_uri)}/api/v1/tokens/${tokenId}`;
     try {
         const response = await fetch(url);
@@ -134,6 +134,16 @@ export async function fetch_conditions(tokenId: string, createdAt?: number): Pro
             if (createdAt !== undefined) {
                 if (creationHeight === undefined || createdAt < creationHeight - 5 || createdAt > creationHeight + 5) {
                     console.warn(`fetch_conditions: Token ${tokenId} has inconsistent creation height.`);
+                    return false;
+                }
+            }
+
+            // Validate Deadline (if provided)
+            if (deadline !== undefined) {
+                const constants = getGameConstants();
+                const minDeadline = constants.PARTICIPATION_TIME_WINDOW + constants.SEED_MARGIN;
+                if (deadline < minDeadline) {
+                    console.warn(`fetch_conditions: Token ${tokenId} has invalid deadline. Found: ${deadline}, Expected >= ${minDeadline}`);
                     return false;
                 }
             }
@@ -258,7 +268,7 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
         if (!numericalParams || numericalParams.length < 8) throw new Error("R8 does not contain the 8 expected numerical parameters.");
         const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission] = numericalParams;
 
-        if (!await fetch_conditions(gameId, Number(createdAt))) {
+        if (!await fetch_conditions(gameId, Number(createdAt), Number(deadlineBlock))) {
             console.warn(`parseGameActiveBox: Box ${box.boxId} failed validity conditions.`);
             return null;
         }
@@ -405,7 +415,7 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
         if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
         const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, resolutionDeadline] = numericalParams;
 
-        if (!await fetch_conditions(gameId, Number(createdAt))) {
+        if (!await fetch_conditions(gameId, Number(createdAt), Number(deadlineBlock))) {
             console.warn(`parseGameResolutionBox: Box ${box.boxId} failed validity conditions.`);
             return null;
         }
@@ -586,7 +596,7 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
 
         const participationFeeAmount = BigInt(0); // Assuming 0 in cancellation
 
-        if (!await fetch_conditions(gameId, createdAt ? Number(createdAt) : undefined)) {
+        if (!await fetch_conditions(gameId, createdAt ? Number(createdAt) : undefined, Number(originalDeadline))) {
             console.warn(`parseGameCancellationBox: Box ${box.boxId} failed validity conditions.`);
             return null;
         }

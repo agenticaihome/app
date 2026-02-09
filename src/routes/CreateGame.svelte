@@ -702,6 +702,14 @@
             isSubmitting = false;
             return;
         }
+
+        const minDeadline =
+            constants.PARTICIPATION_TIME_WINDOW + constants.SEED_MARGIN;
+        if (deadlineBlock < minDeadline) {
+            errorMessage = `The deadline is too short. It must be at least ${minDeadline} blocks.`;
+            isSubmitting = false;
+            return;
+        }
         // Removed 64-char limit check for Service ID
         if (!gameServiceId.trim()) {
             errorMessage = "Game Service ID is required.";

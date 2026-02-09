@@ -102,8 +102,7 @@ function ensureGameCancellationCompiled(): void {
     const constants = getGameConstants();
 
     let source = GAME_CANCELLATION_SOURCE
-        .replace(/`\+COOLDOWN_IN_BLOCKS\+`/g, constants.COOLDOWN_IN_BLOCKS.toString())
-        .replace(/`\+STAKE_DENOMINATOR\+`/g, constants.STAKE_DENOMINATOR.toString());
+        .replace(/`\+COOLDOWN_IN_BLOCKS\+`/g, constants.COOLDOWN_IN_BLOCKS.toString());
 
     _gameCancellation.ergoTree = compile(source, { version: ergoTreeVersion });
 }

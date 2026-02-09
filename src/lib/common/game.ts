@@ -138,7 +138,8 @@ export interface GameCancellation {
     gameId: string;
     unlockHeight: number;
     revealedS_Hex: string;
-    resolverStakeAmount: bigint;
+    portionToClaim: bigint;
+    resolverStakeAmount?: bigint;
     content: GameContent;
     participationFeeAmount: bigint;
     participationTokenId: string;
@@ -308,11 +309,23 @@ export async function isGameDrainingAllowed(game: AnyGame): Promise<boolean> {
     const currentHeight = await platform.get_current_height();
     const unlocked = currentHeight >= game.unlockHeight;
 
-    const stakeToDrain = BigInt(game.resolverStakeAmount);
-    const stakePortionToClaim = stakeToDrain / BigInt(game.constants.STAKE_DENOMINATOR);
-    const remainingStake = game.participationTokenId !== "" || (stakeToDrain - stakePortionToClaim) >= SAFE_MIN_BOX_VALUE;
+    const portionToClaim = game.portionToClaim;
+    const value = BigInt(game.box.value);
 
-    return unlocked && remainingStake;
+    let remainingValue: bigint;
+    if (game.participationTokenId === "") {
+        remainingValue = value - portionToClaim;
+    } else {
+        const token = game.box.assets.find(t => t.tokenId === game.participationTokenId);
+        const currentTokenAmount = BigInt(token ? token.amount : 0);
+        remainingValue = currentTokenAmount - portionToClaim;
+    }
+
+    // In cancellation, we can drain until the box is empty of the target asset.
+    // However, if it's ERG, we must stay above SAFE_MIN_BOX_VALUE to recreate the box.
+    const canRecreate = game.participationTokenId !== "" || remainingValue >= SAFE_MIN_BOX_VALUE;
+
+    return unlocked && canRecreate;
 }
 
 /**

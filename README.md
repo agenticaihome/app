@@ -419,7 +419,7 @@ The creator has revealed the secret `S`, moving the game to this state. Scores a
 ### 6.5. State 2 — CANCELLED_DRAINING
 
 This state is reached if the secret `S` is revealed prematurely (while the game should be ACTIVE). The game is considered invalid.
-*   **Creator Punishment**: The creator's stake is drained progressively (**1/5 every 30 blocks**), creating economic friction and public visibility of the failure. Anyone can execute this drainage action.
+*   **Creator Punishment**: The creator's stake is drained progressively (**a constant portion calculated as 1/STAKE_DENOMINATOR of the initial stake every COOLDOWN_IN_BLOCKS blocks**), creating economic friction and public visibility of the failure. Anyone can execute this drainage action until the funds are depleted.
 *   **Action: Cancellation Refund**: Players can immediately spend their Participation Boxes to get a full refund.
 
 ### 6.6. Game Box Registers
@@ -437,6 +437,17 @@ The Main Game Box uses specific registers to store critical parameters. Notably:
     *   `[5] perJudgeCommissionPercentage`: Commission for judges.
     *   `[6] resolverCommissionPercentage`: Commission for the creator.
     *   `[7] resolutionDeadline` (Only in Resolution State).
+
+### 6.7. Cancellation Box Registers (State 2)
+
+When the game is cancelled, the registers are used as follows to manage the drainage process:
+
+*   **`R4`**: Game State (2: Cancelled).
+*   **`R5`**: Unlock Height (Block height for the next drain).
+*   **`R6`**: Revealed Secret `S`.
+*   **`R7`**: **Portion To Claim** (Constant). Unlike the Active state where R7 is empty (or used for other purposes depending on the version), in the Cancelled state, R7 stores the *constant amount* of stake that is drained in each step. This value is calculated as `InitialResolverStake / STAKE_DENOMINATOR`.
+*   **`R8`**: Original Deadline (Long).
+*   **`R9`**: Game Provenance (same as Active).
 
     > **Note on `createdAt`**: This value is critical for validating the **Solver ID Box**. The protocol checks that the Solver ID Box was created between `createdAt` and `createdAt + CEREMONY_WINDOW`.
 

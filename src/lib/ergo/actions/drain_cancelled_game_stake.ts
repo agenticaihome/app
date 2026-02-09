@@ -2,8 +2,7 @@ import {
     OutputBuilder,
     TransactionBuilder,
     RECOMMENDED_MIN_FEE_VALUE,
-    SAFE_MIN_BOX_VALUE,
-    type InputBox
+    SAFE_MIN_BOX_VALUE
 } from '@fleet-sdk/core';
 import { SColl, SByte, SLong, SInt } from '@fleet-sdk/serializer';
 import { parseBox, hexToBytes } from '$lib/ergo/utils';
@@ -11,6 +10,8 @@ import { type GameCancellation } from '$lib/common/game';
 import { getGopGameCancellationErgoTreeHex } from '../contract';
 import { stringToBytes } from '@scure/base';
 import { ErgoPlatform } from '../platform';
+
+declare const ergo: any;
 
 const COOLDOWN_IN_BLOCKS_MARGIN = 10;
 
@@ -36,9 +37,17 @@ export async function drain_cancelled_game_stake(
         throw new Error(`The cooldown period has not ended. Draining is only possible after block ${game.unlockHeight}.`);
     }
 
-    const stakeToDrain = BigInt(game.resolverStakeAmount);
-    const stakePortionToClaim = stakeToDrain / BigInt(game.constants.STAKE_DENOMINATOR);
-    const remainingStake = stakeToDrain - stakePortionToClaim;
+    const portionToClaim = game.portionToClaim; // R7
+
+    let currentStake: bigint;
+    if (game.participationTokenId === "") {
+        currentStake = BigInt(game.box.value);
+    } else {
+        const token = game.box.assets.find(t => t.tokenId === game.participationTokenId);
+        currentStake = BigInt(token ? token.amount : 0);
+    }
+
+    const remainingStake = currentStake - portionToClaim;
 
     // --- 2. Build Outputs ---
     const cancellationContractErgoTree = getGopGameCancellationErgoTreeHex();
@@ -62,13 +71,13 @@ export async function drain_cancelled_game_stake(
             R4: SInt(2).toHex(), // State: Cancelled
             R5: SLong(newUnlockHeight).toHex(),
             R6: SColl(SByte, revealedSecretBytes).toHex(),
-            R7: SLong(remainingStake).toHex(), // R7 always tracks the relevant stake amount (ERG or Token)
+            R7: SLong(portionToClaim).toHex(), // R7 always tracks the portion to claim (constant)
             R8: SLong(BigInt(game.deadlineBlock)).toHex(),
             R9: SColl(SColl(SByte), [stringToBytes('utf8', game.content.rawJsonString), hexToBytes(game.participationTokenId) ?? ""]).toHex()
         });
 
     // --- 3. Build and Send the Transaction ---
-    const utxos: InputBox[] = await ergo.get_utxos();
+    const utxos = await ergo.get_utxos();
 
     const unsignedTransaction = new TransactionBuilder(currentHeight)
         .from(parseBox(game.box), { ensureInclusion: true })

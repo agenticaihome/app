@@ -561,21 +561,24 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
         // R6: revealedSecret (Coll[Byte]). The revealed secret 'S'.
         const revealedS_Hex = parseCollByteToHex(box.additionalRegisters.R6?.renderedValue);
 
-        // R7: resolverStake (Long). The resolver's current stake.
-        const resolverStakeAmount = BigInt(parseInt(box.additionalRegisters.R7?.renderedValue, 10))
+        // R7: portionToClaim (Long).
+        const portionToClaim = BigInt(box.additionalRegisters.R7?.renderedValue || 0);
 
-        // R8: Original deadline (Long).
+        // R8: Original deadline (Long) or Coll[Long]
         const r8Value = box.additionalRegisters.R8?.renderedValue;
-        let createdAt: number | undefined;
         let originalDeadline = 0;
+        let createdAt: number | undefined;
+
         if (r8Value) {
-            const numericalParams = parseLongColl(getArrayFromValue(r8Value));
-            if (numericalParams && numericalParams.length >= 1) {
-                createdAt = Number(numericalParams[0]);
-                // In cancellation, R8 might just be the deadline or the full list.
-                // Based on the contract, it seems it's usually just the deadline if it's a single Long,
-                // but if it's a Coll[Long], it follows the same pattern as Active/Resolution.
-                originalDeadline = numericalParams.length > 2 ? Number(numericalParams[2]) : Number(numericalParams[0]);
+            const parsedR8 = getArrayFromValue(r8Value);
+            if (Array.isArray(parsedR8)) {
+                const numericalParams = parseLongColl(parsedR8);
+                if (numericalParams && numericalParams.length >= 1) {
+                    createdAt = Number(numericalParams[0]);
+                    originalDeadline = numericalParams.length > 2 ? Number(numericalParams[2]) : Number(numericalParams[0]);
+                }
+            } else {
+                originalDeadline = parseInt(r8Value, 10);
             }
         }
 
@@ -590,7 +593,7 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
         const content = parseGameContent(gameDetailsJson, box.boxId, box.assets[0]);
 
         // Validate that essential registers were parsed correctly
-        if (isNaN(unlockHeight) || !revealedS_Hex || resolverStakeAmount === undefined) {
+        if (isNaN(unlockHeight) || !revealedS_Hex || portionToClaim === undefined) {
             throw new Error("Invalid or missing registers R5, R6, or R7.");
         }
 
@@ -609,7 +612,7 @@ export async function parseGameCancellationBox(box: any): Promise<GameCancellati
             gameId,
             unlockHeight,
             revealedS_Hex,
-            resolverStakeAmount,
+            portionToClaim,
             content,
             participationFeeAmount,
             participationTokenId: participationTokenId ?? "",

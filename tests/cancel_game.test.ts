@@ -139,7 +139,7 @@ describe.each(baseModes)("Game Cancellation (cancel_game) - (%s)", (mode) => {
                         R4: SInt(2).toHex(), // Estado: Cancelado
                         R5: SLong(newUnlockHeight).toHex(),
                         R6: SColl(SByte, secret).toHex(), // Secreto revelado
-                        R7: SLong(stakePortionForGame).toHex(),
+                        R7: SLong(stakePortionForClaimer).toHex(),
                         R8: SLong(BigInt(deadlineBlock)).toHex(),
                         R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex(),
                     }),
@@ -152,7 +152,7 @@ describe.each(baseModes)("Game Cancellation (cancel_game) - (%s)", (mode) => {
             .payFee(RECOMMENDED_MIN_FEE_VALUE)
             .build();
 
-        const executionResult = mockChain.execute(transaction, { signers: [claimer] });
+        const executionResult = mockChain.execute(transaction, { signers: [claimer as any] });
 
         // --- Assert ---
         expect(executionResult, "La transacción debería ejecutarse correctamente").to.be.true;
@@ -180,7 +180,7 @@ describe.each(baseModes)("Game Cancellation (cancel_game) - (%s)", (mode) => {
             .payFee(RECOMMENDED_MIN_FEE_VALUE)
             .build();
 
-        const executionResult = mockChain.execute(transaction, { signers: [claimer], throw: false });
+        const executionResult = mockChain.execute(transaction, { signers: [claimer as any], throw: false });
         expect(executionResult).to.be.false;
     });
 });
@@ -271,7 +271,7 @@ describe("Game Cancellation (Low Stake) - (%s)", () => {
         const MIN_BOX_VALUE = 1_000_000n;
 
         // Verificamos que el stake restante (960,000n) es menor que el valor mínimo (1,000,000n).
-        expect(newResolverStake).to.be.lessThan(MIN_BOX_VALUE);
+        expect(newResolverStake).to.be.lessThan(MIN_BOX_VALUE as any);
 
         // --- Act ---
         const cancellationBoxValue = mode.token === ERG_BASE_TOKEN ? newResolverStake : RECOMMENDED_MIN_FEE_VALUE;
@@ -296,7 +296,7 @@ describe("Game Cancellation (Low Stake) - (%s)", () => {
                         R4: SInt(2).toHex(),
                         R5: SLong(newUnlockHeight).toHex(),
                         R6: SColl(SByte, secret).toHex(),
-                        R7: SLong(newResolverStake).toHex(),
+                        R7: SLong(stakePortionToClaim).toHex(),
                         R8: SLong(BigInt(deadlineBlock)).toHex(),
                         R9: gameBox.additionalRegisters.R9,
                     }),
@@ -310,7 +310,7 @@ describe("Game Cancellation (Low Stake) - (%s)", () => {
         // --- Assert ---
         // La ejecución de la transacción debe fallar. En ERG Mode, esto es por la regla de Min Box Value.
         // En Token Mode, esto pasaría si no se hiciera la verificación dentro del contrato.
-        const executionResult = mockChain.execute(transaction, { signers: [claimer], throw: false });
+        const executionResult = mockChain.execute(transaction, { signers: [claimer as any], throw: false });
         expect(executionResult, "La cancelación debe fallar cuando el nanoERG restante es menor al Min Box Value de 1,000,000n.").to.be.false;
     });
 });

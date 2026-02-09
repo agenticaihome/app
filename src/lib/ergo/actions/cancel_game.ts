@@ -82,8 +82,8 @@ export async function cancel_game(
             R5: SLong(newUnlockHeight).toHex(),
             // R6: The revealed 'S' secret
             R6: SColl(SByte, secretS_bytes).toHex(),
-            // R7: The creator's remaining stake
-            R7: SLong(newValue).toHex(),
+            // R7: The portion to claim (constant)
+            R7: SLong(stakePortionToClaim).toHex(),
             // R8: Original deadline
             R8: SLong(BigInt(game.deadlineBlock)).toHex(),
             // R9: Coll[Coll[Byte]] -> [gameDetailsJSON, participationTokenId]

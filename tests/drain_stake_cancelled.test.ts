@@ -39,6 +39,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
     const gameNftId = "11bbcc11bbcc11bbcc11bbcc11bbcc11bbcc11bbcc11bbcc11bbcc11bbcc11";
     const revealedSecret = stringToBytes("utf8", "the-secret-is-out");
     const originalDeadline = 600_000;
+    const portionToClaim = initialCancelledStake / 5n;
 
     let cancelledGameBox: Box;
 
@@ -68,7 +69,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
                 R4: SInt(2).toHex(),
                 R5: SLong(BigInt(unlockHeight)).toHex(),
                 R6: SColl(SByte, revealedSecret).toHex(),
-                R7: SLong(initialCancelledStake).toHex(),
+                R7: SLong(portionToClaim).toHex(),
                 R8: SLong(BigInt(originalDeadline)).toHex(),
                 R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex(),
             }
@@ -83,11 +84,11 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
 
     it("should successfully drain a portion of the stake after the cooldown period", () => {
         const claimerInitialBalance = claimer.balance.nanoergs;
-        const unlockHeightFromRegister = parseInt(cancelledGameBox.additionalRegisters.R5.substring(4), 16);
+        const unlockHeightFromRegister = parseInt(cancelledGameBox.additionalRegisters.R5!.substring(4), 16);
         expect(mockChain.height).to.be.greaterThan(unlockHeightFromRegister);
 
-        const stakePortionToClaim = initialCancelledStake / 5n;
-        const remainingStake = initialCancelledStake - stakePortionToClaim;
+        const currentStake = initialCancelledStake;
+        const remainingStake = currentStake - portionToClaim;
         const cooldownBlocks = 30;
         const cooldownMargin = 10;
         const newUnlockHeight = BigInt(mockChain.height + cooldownBlocks + cooldownMargin);
@@ -98,9 +99,9 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
             ...(mode.token !== ERG_BASE_TOKEN ? [{ tokenId: mode.token, amount: remainingStake }] : [])
         ];
 
-        const claimValue = mode.token === ERG_BASE_TOKEN ? stakePortionToClaim : SAFE_BOX_VALUE;
+        const claimValue = mode.token === ERG_BASE_TOKEN ? portionToClaim : SAFE_BOX_VALUE;
         const claimAssets = mode.token !== ERG_BASE_TOKEN
-            ? [{ tokenId: mode.token, amount: stakePortionToClaim }]
+            ? [{ tokenId: mode.token, amount: portionToClaim }]
             : [];
 
         const transaction = new TransactionBuilder(mockChain.height)
@@ -112,7 +113,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
                         R4: SInt(2).toHex(),
                         R5: SLong(newUnlockHeight).toHex(),
                         R6: SColl(SByte, revealedSecret).toHex(),
-                        R7: SLong(remainingStake).toHex(),
+                        R7: SLong(portionToClaim).toHex(),
                         R8: SLong(BigInt(originalDeadline)).toHex(),
                         R9: cancelledGameBox.additionalRegisters.R9,
                     }),
@@ -122,7 +123,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
             .payFee(RECOMMENDED_MIN_FEE_VALUE)
             .build();
 
-        const executionResult = mockChain.execute(transaction, { signers: [claimer] });
+        const executionResult = mockChain.execute(transaction, { signers: [claimer as any] });
 
         expect(executionResult).to.be.true;
 
@@ -141,14 +142,14 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
 
         expect(newCancellationBox.assets[0].tokenId).to.equal(gameNftId);
         expect(newCancellationBox.additionalRegisters.R5).to.equal(SLong(newUnlockHeight).toHex());
-        expect(newCancellationBox.additionalRegisters.R7).to.equal(SLong(remainingStake).toHex());
+        expect(newCancellationBox.additionalRegisters.R7).to.equal(SLong(portionToClaim).toHex());
 
         if (mode.token === ERG_BASE_TOKEN) {
-            const expectedFinalBalance = claimerInitialBalance + stakePortionToClaim - RECOMMENDED_MIN_FEE_VALUE;
+            const expectedFinalBalance = claimerInitialBalance + portionToClaim - RECOMMENDED_MIN_FEE_VALUE;
             expect(claimer.balance.nanoergs).to.equal(expectedFinalBalance);
         } else {
             const claimerTokenBalance = claimer.balance.tokens.find(t => t.tokenId === mode.token)?.amount || 0n;
-            expect(claimerTokenBalance).to.equal(stakePortionToClaim);
+            expect(claimerTokenBalance).to.equal(portionToClaim);
         }
     });
 
@@ -172,7 +173,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
                 R4: SInt(2).toHex(),
                 R5: SLong(BigInt(futureUnlockHeight)).toHex(),
                 R6: SColl(SByte, revealedSecret).toHex(),
-                R7: SLong(initialCancelledStake).toHex(),
+                R7: SLong(portionToClaim).toHex(),
                 R8: SLong(BigInt(originalDeadline)).toHex(),
                 R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex()
             }
@@ -192,7 +193,7 @@ describe.each(baseModes)("Game Stake Draining (drain_cancelled_game) - (%s)", (m
             .build();
 
         // --- Assert ---
-        const executionResult = mockChain.execute(transaction, { signers: [claimer], throw: false });
+        const executionResult = mockChain.execute(transaction, { signers: [claimer as any], throw: false });
         expect(executionResult).to.be.false;
 
         expect(gameCancellationContract.utxos.toArray()).to.have.length(1);

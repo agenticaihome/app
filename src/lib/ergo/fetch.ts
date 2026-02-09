@@ -1051,7 +1051,10 @@ export async function fetchParticipations(game: AnyGame): Promise<AnyParticipati
                     const max_scores_exceeded = p_base.scoreList.length > 10;
 
                     const solverDeadline = gameDeadline - game.constants.PARTICIPATION_TIME_WINDOW - game.constants.SEED_MARGIN;
-                    const invalid_solver = !p_base.solverIdBox || p_base.solverIdBox.creationHeight >= solverDeadline;
+
+                    const botHeight = p_base.solverIdBox?.creationHeight || 0;
+                    const effectiveBotHeight = Math.max(botHeight, game.createdAt || 0);
+                    const invalid_solver = !p_base.solverIdBox || effectiveBotHeight >= solverDeadline;
 
                     const wrong_commitment = (game.status == GameState.Resolution || game.status == GameState.Finalized) && resolve_participation_commitment(p_base as AnyParticipation, (game as GameResolution).revealedS_Hex, (game as GameResolution).seed) === null;
                     if (wrong_commitment) {

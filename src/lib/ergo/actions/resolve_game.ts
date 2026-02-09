@@ -132,6 +132,7 @@ export async function resolve_game(
         }
 
         const pBoxCreationHeight = pBox.creationHeight;
+
         const effectiveScore = calculateEffectiveScore(game, actualScore, p.solverIdBox?.creationHeight ?? 0);
 
         if (effectiveScore > maxScore || (effectiveScore === maxScore && pBoxCreationHeight < (winnerCandidateBox ? parseBox(winnerCandidateBox).creationHeight : Infinity))) {

@@ -19,7 +19,7 @@ export interface GameConstants {
 }
 
 const DevelopmentMode: GameConstants = {
-    JUDGE_PERIOD: 5,
+    JUDGE_PERIOD: 30,
     RESOLVER_OMISSION_NO_PENALTY_PERIOD: 5,
     MAX_SCORE_LIST: 10,
     STAKE_DENOMINATOR: 5,

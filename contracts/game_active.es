@@ -234,8 +234,8 @@
       val cancellationBox = outs(0)
 
       // Calcular los valores iniciales.
-      val initialStakePortionToClaim = resolverStake / STAKE_DENOMINATOR
-      val remainingValue = box_value(SELF) - initialStakePortionToClaim
+      val portionToClaim = resolverStake / STAKE_DENOMINATOR
+      val remainingValue = box_value(SELF) - portionToClaim
 
       val cancellationBoxIsValid = {
           box_value(cancellationBox) >= remainingValue &&
@@ -243,7 +243,7 @@
           cancellationBox.R4[Int].get == 2 && // Game state is "Cancelled" (2)
           cancellationBox.R5[Long].get >= HEIGHT + COOLDOWN_IN_BLOCKS &&
           blake2b256(cancellationBox.R6[Coll[Byte]].get) == secretHash &&
-          cancellationBox.R7[Long].get == remainingValue &&
+          cancellationBox.R7[Long].get == portionToClaim &&
           cancellationBox.R8[Long].get == deadline &&
           cancellationBox.R9[Coll[Coll[Byte]]].get.size == 2 &&
           cancellationBox.R9[Coll[Coll[Byte]]].get(0) == gameDetailsJsonHex &&

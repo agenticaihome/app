@@ -1278,6 +1278,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Game Title",
@@ -1307,6 +1308,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Indetermism Index",
@@ -1337,6 +1339,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Game Service ID (Hash)",
@@ -1378,6 +1381,7 @@
                                             <div class="group relative">
                                                 <button
                                                     type="button"
+                                                    tabindex="-1"
                                                     on:click={() =>
                                                         openDidacticModal(
                                                             "Game Secret (S)",
@@ -1467,6 +1471,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Game Time",
@@ -1735,6 +1740,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Resolver Stake",
@@ -1767,6 +1773,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Participation Fee",
@@ -1802,6 +1809,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Resolver Commission",
@@ -1844,6 +1852,7 @@
                                         <div class="group relative">
                                             <button
                                                 type="button"
+                                                tabindex="-1"
                                                 on:click={() =>
                                                     openDidacticModal(
                                                         "Judge Commission",
@@ -1934,6 +1943,7 @@
                                                 <div class="group relative">
                                                     <button
                                                         type="button"
+                                                        tabindex="-1"
                                                         on:click={() =>
                                                             openDidacticModal(
                                                                 "Invited Judges",

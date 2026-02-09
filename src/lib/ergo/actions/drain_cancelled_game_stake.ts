@@ -78,9 +78,6 @@ export async function drain_cancelled_game_stake(
         .payFee(RECOMMENDED_MIN_FEE_VALUE)
         .build();
 
-    console.log(unsignedTransaction.inputs[0].additionalRegisters)
-    // Here stills R5 == 05a49ed101
-
     try {
         const signedTransaction = await ergo.sign_tx(unsignedTransaction.toEIP12Object());
         const txId = await ergo.submit_tx(signedTransaction);
@@ -89,10 +86,6 @@ export async function drain_cancelled_game_stake(
         return txId;
     }
     catch (error) {
-        console.warn(error)
-        // FIRST TEST:  SELF.R5 es 1714239.
-        // SECOND TEST:  SELF.R5 es 1714260.
-        // WHY CHANGED?  Why not 1714066?
         throw new Error("Error: https://github.com/game-of-prompts/app/issues/3");
     }
 }

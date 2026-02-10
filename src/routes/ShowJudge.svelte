@@ -9,6 +9,7 @@
 	import { onDestroy } from "svelte";
 	import { explorer_uri } from "$lib/ergo/envs";
 	import { GAME, JUDGE, PARTICIPATION } from "$lib/ergo/reputation/types";
+	import { mode } from "mode-watcher";
 
 	let proof: ReputationProof | undefined = undefined;
 
@@ -21,6 +22,38 @@
 	});
 
 	$: displayProof = proof ?? get(reputation_proof);
+
+	// Premium Palette: Zinc (Neutrals) + Amber (Reputation/Gold)
+
+	const lightTheme = {
+		textPrimary: "#09090b", // Zinc 950 - Sharp contrast
+		textSecondary: "#52525b", // Zinc 600 - Readable secondary
+		textMuted: "#a1a1aa", // Zinc 400 - Subtle labels
+		bgCard: "#ffffff", // Pure White - Clean surface
+		bgInput: "#f4f4f5", // Zinc 100 - Distinct input area
+		bgHover: "rgba(0,0,0,0.03)", // Very subtle hover
+		borderColor: "#e4e4e7", // Zinc 200 - Crisp borders
+		borderSubtle: "rgba(0,0,0,0.04)", // Light dividers
+		accentPrimary: "#d97706", // Amber 600 - Deep, rich gold for white bg
+		accentSecondary: "#b45309", // Amber 700 - Interaction state
+		scoreGlow: "rgba(217, 119, 6, 0.15)", // Warm, inviting glow
+	};
+
+	const darkTheme = {
+		textPrimary: "#fafafa", // Zinc 50 - High legibility
+		textSecondary: "#a1a1aa", // Zinc 400 - Soft secondary
+		textMuted: "#52525b", // Zinc 600 - De-emphasized
+		bgCard: "#18181b", // Zinc 900 - Deep, neutral dark
+		bgInput: "#27272a", // Zinc 800 - Slightly lighter interactive areas
+		bgHover: "rgba(255,255,255,0.03)", // Delicate overlay
+		borderColor: "#3f3f46", // Zinc 700 - Soft boundaries
+		borderSubtle: "rgba(255,255,255,0.05)", // Ghostly dividers
+		accentPrimary: "#f59e0b", // Amber 500 - Vibrant gold pop on dark
+		accentSecondary: "#d97706", // Amber 600 - Interaction state
+		scoreGlow: "rgba(245, 158, 11, 0.15)", // Ethereal gold glow
+	};
+
+	$: profileTheme = $mode === "light" ? lightTheme : darkTheme;
 </script>
 
 <div class="show-judge-container">
@@ -29,6 +62,7 @@
 			reputationProof={displayProof}
 			userProfiles={[]}
 			connected={$connected}
+			theme={profileTheme}
 			title={proof ? "Judge Details" : "My Reputation"}
 			subtitle={proof
 				? "Details of the selected judge."

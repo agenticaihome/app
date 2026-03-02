@@ -268,7 +268,7 @@
                 actions.push({
                     id: "accept_judge_nomination",
                     label: isJudge
-                        ? "Update Judge Reference"
+                        ? "Update Judge Reference Participation"
                         : "Accept Judge Nomination",
                     icon: isJudge ? Edit : Gavel,
                     variant: "outline",
@@ -1939,7 +1939,7 @@
             judge_unavailable: `Judge Mark Unavailable`,
             include_omitted: `Include Omitted Participation`,
             accept_judge_nomination: isJudge
-                ? "Update Judge Reference"
+                ? "Update Judge Reference Participation"
                 : "Accept Judge Nomination",
             open_ceremony: "Add Entropy",
             batch_participations: "Batch Participations",
@@ -6562,7 +6562,7 @@
                                 >
                                     <strong
                                         >Action: {isJudge
-                                            ? "Update Judge Reference"
+                                            ? "Update Judge Reference Participation"
                                             : "Accept Judge Nomination"}</strong
                                     ><br />
                                     {#if isJudge}
@@ -6696,7 +6696,7 @@
                                     {isSubmitting
                                         ? "Processing..."
                                         : isJudge
-                                          ? "Update Judge Reference"
+                                          ? "Update Judge Reference Participation"
                                           : "Confirm Judge Nomination"}
                                 </Button>
                             </div>

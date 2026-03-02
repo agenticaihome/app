@@ -176,9 +176,21 @@ export interface Platform {
     ): Promise<string | null>;
 
     /**
-     * 
+     * Allows a nominated judge to accept their role in an active game.
+     * The judge must provide their reference participation data from running the game,
+     * which is stored in R9 as Coll[Coll[Byte]] = [commitment, preimage].
+     * During resolution, the contract verifies blake2b256(preimage ++ revealedS) == commitment.
      */
-    acceptJudgeNomination(game: GameActive): Promise<string | null>;
+    acceptJudgeNomination(
+        game: GameActive,
+        referenceParticipation: {
+            commitmentC_hex: string;
+            solverId_hex: string;
+            score: bigint;
+            hashLogs_hex: string;
+            ergoTree_hex: string;
+        }
+    ): Promise<string | null>;
 
     /*
     *

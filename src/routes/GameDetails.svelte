@@ -1785,10 +1785,32 @@
 
     async function handleJudgeNomination() {
         if (game?.status !== "Active") return;
+
+        if (
+            !solverId_input ||
+            !hashLogs_input ||
+            !commitmentC_input ||
+            scores_list.length === 0
+        ) {
+            errorMessage =
+                "Missing reference participation data. Please upload your participation JSON file.";
+            return;
+        }
+
         errorMessage = null;
         isSubmitting = true;
         try {
-            transactionId = await platform.acceptJudgeNomination(game);
+            transactionId = await platform.acceptJudgeNomination(game, {
+                commitmentC_hex: commitmentC_input,
+                solverId_hex: solverId_input,
+                score: BigInt(scores_list[0]),
+                hashLogs_hex: hashLogs_input,
+                ergoTree_hex: get(address)
+                    ? uint8ArrayToHex(
+                          ErgoAddress.fromBase58(get(address)!).ergoTree,
+                      )
+                    : "",
+            });
         } catch (e: any) {
             setTransactionError(e, {
                 fallback: "Error accepting judge nomination.",
@@ -6522,10 +6544,52 @@
                                     By accepting, you agree to participate as a judge
                                     in this game, with the responsibility to review
                                     and potentially invalidate the winner if necessary.
+                                    <br /><br />
+                                    <strong>Important:</strong> You must upload your
+                                    reference participation JSON file to prove you
+                                    executed the game successfully.
                                 </p>
+
+                                <div
+                                    class="grid w-full max-w-sm items-center gap-1.5"
+                                >
+                                    <Label for="json-upload"
+                                        >Reference Participation JSON</Label
+                                    >
+                                    <Input
+                                        id="json-upload"
+                                        type="file"
+                                        accept=".json"
+                                        on:change={handleJsonFileUpload}
+                                    />
+                                    {#if jsonUploadError}
+                                        <p class="text-sm text-red-500">
+                                            {jsonUploadError}
+                                        </p>
+                                    {/if}
+                                    {#if commitmentC_input}
+                                        <div
+                                            class="text-sm text-muted-foreground break-all bg-muted p-2 rounded"
+                                        >
+                                            <span class="font-semibold"
+                                                >Commitment:</span
+                                            >
+                                            {commitmentC_input.substring(
+                                                0,
+                                                16,
+                                            )}...<br />
+                                            <span class="font-semibold"
+                                                >Score:</span
+                                            >
+                                            {user_score}
+                                        </div>
+                                    {/if}
+                                </div>
+
                                 <Button
                                     on:click={handleJudgeNomination}
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting ||
+                                        !commitmentC_input}
                                     class="w-full md:w-auto md:min-w-[200px] mt-3 py-2.5 text-base {$mode ===
                                     'dark'
                                         ? 'bg-blue-600 hover:bg-blue-700 text-white'

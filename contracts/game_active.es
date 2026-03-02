@@ -178,8 +178,8 @@
               box.tokens.size > 0 &&
               box.R4[Coll[Byte]].get == ACCEPT_GAME_INVITATION_TYPE_ID &&
               box.R5[Coll[Byte]].get == gameNftId &&
-              box.R6[Boolean].get && // Is locked
               box.R8[Boolean].get && // Positive vote, judge accepts the game invitation
+              box.R9[Coll[Coll[Byte]]].isDefined && // R9 must contain judge reference participation data
               invitedJudges.exists({(tokenId: Coll[Byte]) => tokenId == box.tokens(0)._1})  // Is nominated
             })
 
@@ -214,7 +214,18 @@
               resolutionBox.R9[Coll[Coll[Byte]]].get.size == 4
             }
 
-          resolutionBoxIsValid && allVotesAreUnique
+          // Verify judge reference participations: each judge's R9 contains
+          // [commitment, preimage] where blake2b256(preimage ++ revealedS) == commitment.
+          // This ensures: 1. the game-service's blake2b256 commitment engine is correct,
+          // and 2. all judges have the capability to execute and test the game.
+          val allJudgeCommitmentsValid = judgeProofDataInputs.forall({(box: Box) =>
+            val judgeRefData = box.R9[Coll[Coll[Byte]]].get
+            val judgeCommitment = judgeRefData(0)
+            val judgePreimage = judgeRefData(1)
+            blake2b256(judgePreimage ++ revealedS) == judgeCommitment
+          })
+
+          resolutionBoxIsValid && allVotesAreUnique && allJudgeCommitmentsValid
         } else { false }  // Invalid revealed secret, invalid transition script or invalid participation boxes.
       } else { false }  // There should be exactly one resolution box.
     } else { false }  // Deadline not reached.

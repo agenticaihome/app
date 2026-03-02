@@ -1811,16 +1811,21 @@
         errorMessage = null;
         isSubmitting = true;
         try {
+            const userAddress = get(address);
+            const walletErgoTree = userAddress
+                ? ErgoAddress.fromBase58(userAddress).ergoTree
+                : "";
+            const walletErgoTreeHex =
+                typeof walletErgoTree === "string"
+                    ? walletErgoTree
+                    : uint8ArrayToHex(walletErgoTree);
+
             transactionId = await platform.acceptJudgeNomination(game, {
-                commitmentC_hex: commitmentC_input,
-                solverId_hex: solverId_input,
+                commitmentC_hex: commitmentC_input.trim(),
+                solverId_hex: solverId_input.trim(),
                 score: referenceScore,
-                hashLogs_hex: hashLogs_input,
-                ergoTree_hex: get(address)
-                    ? uint8ArrayToHex(
-                          ErgoAddress.fromBase58(get(address)!).ergoTree,
-                      )
-                    : "",
+                hashLogs_hex: hashLogs_input.trim(),
+                ergoTree_hex: walletErgoTreeHex.trim(),
             });
         } catch (e: any) {
             setTransactionError(e, {

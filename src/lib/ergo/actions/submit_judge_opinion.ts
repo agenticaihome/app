@@ -19,6 +19,11 @@ import type { GameActive } from '$lib/common/game';
 
 declare const ergo: any;
 
+function normalizeHex(value: string | null | undefined): string {
+    if (typeof value !== "string") return "";
+    return value.trim().replace(/^0x/i, "");
+}
+
 /**
  * Builds and submits a reputation opinion transaction specifically for a judge accepting a nomination.
  * This manually builds the transaction to store `R9` as `Coll[Coll[Byte]] = [commitment, preimage]`.
@@ -54,15 +59,21 @@ export async function submit_judge_opinion(
     if (!mainBox) throw new Error("No main reputation box found for the judge.");
 
     // Build the pre-image
-    const solverIdBytes = hexToBytes(referenceParticipation.solverId_hex);
-    const seedBytes = hexToBytes(game.seed);
-    const scoreBytes = bigintToLongByteArray(referenceParticipation.score);
-    const hashLogsBytes = hexToBytes(referenceParticipation.hashLogs_hex);
-    const ergoTreeBytes = hexToBytes(referenceParticipation.ergoTree_hex);
+    const solverIdHex = normalizeHex(referenceParticipation.solverId_hex);
+    const seedHex = normalizeHex(game.seed);
+    const hashLogsHex = normalizeHex(referenceParticipation.hashLogs_hex);
+    const ergoTreeHex = normalizeHex(referenceParticipation.ergoTree_hex);
 
-    if (!solverIdBytes || !seedBytes || !hashLogsBytes || !ergoTreeBytes) {
-        throw new Error("Failed to parse hexadecimal strings into bytes");
-    }
+    const solverIdBytes = hexToBytes(solverIdHex);
+    const seedBytes = hexToBytes(seedHex);
+    const scoreBytes = bigintToLongByteArray(referenceParticipation.score);
+    const hashLogsBytes = hexToBytes(hashLogsHex);
+    const ergoTreeBytes = hexToBytes(ergoTreeHex);
+
+    if (!solverIdBytes) throw new Error("Invalid solver ID hex.");
+    if (!seedBytes) throw new Error("Invalid game seed hex.");
+    if (!hashLogsBytes) throw new Error("Invalid hash logs hex.");
+    if (!ergoTreeBytes) throw new Error("Invalid ergoTree hex.");
 
     const preimage = new Uint8Array([
         ...solverIdBytes,
@@ -72,7 +83,8 @@ export async function submit_judge_opinion(
         ...ergoTreeBytes,
     ]);
 
-    const commitmentBytes = hexToBytes(referenceParticipation.commitmentC_hex);
+    const commitmentHex = normalizeHex(referenceParticipation.commitmentC_hex);
+    const commitmentBytes = hexToBytes(commitmentHex);
     if (!commitmentBytes) {
         throw new Error("Failed to parse commitment hexadecimal string");
     }

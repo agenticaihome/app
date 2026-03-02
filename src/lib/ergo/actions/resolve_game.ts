@@ -96,24 +96,29 @@ export async function resolve_game(
         }
 
         try {
-            // TODO
-            // R9 is Coll[Coll[Byte]] encoded as hex string
-            // We need to decode it to extract the commitment and preimage
-            // using fleet-sdk utils or manual parsing if SColl(SColl(SByte)) deserialization is tricky
-            // A simpler way for offchain validation in TS is to use the same logic as the contract:
-            // Since we don't have a full Ergo tree evaluator here, we'll extract the two byte arrays.
-            // SColl(SColl(SByte)) hex representation starts with the number of elements.
-            // Since fleet-sdk doesn't have a direct deserializer for nested colls yet in this version,
-            // we'll use a hack or skip strict off-chain validation if it's too complex to parse, 
-            // relying on the on-chain contract to fail.
-            // BUT, we can actually parse it if we use `@fleet-sdk/serializer`.
+            if (typeof r9 !== "string" || r9.length < 10) {
+                throw new Error("Invalid R9 format");
+            }
 
-            // Actually, to keep it simple and safe, we'll let the contract handle the strict validation. 
-            // In a production app, we would deserialize `r9` into `[commitmentBytes, preimageBytes]`,
-            // concatenate `preimageBytes` and `secretS_bytes`, hash it with blake2b256,
-            // and compare it to `commitmentBytes`. 
-            // For now, we at least check R9 is present since the contract requires it.
-            if (r9.length < 10) throw new Error("Invalid R9 format");
+            // R9: Coll[Coll[Byte]] = [commitmentBytes, preimageBytes]
+            const r9Value = SConstant.fromHex(r9).data as unknown;
+            if (!Array.isArray(r9Value) || r9Value.length !== 2) {
+                throw new Error("Invalid R9 structure");
+            }
+
+            const [commitmentBytes, preimageBytes] = r9Value;
+            if (!(commitmentBytes instanceof Uint8Array) || !(preimageBytes instanceof Uint8Array)) {
+                throw new Error("Invalid R9 payload types");
+            }
+
+            const hashInput = new Uint8Array(preimageBytes.length + secretS_bytes.length);
+            hashInput.set(preimageBytes, 0);
+            hashInput.set(secretS_bytes, preimageBytes.length);
+
+            const computedCommitment = fleetBlake2b256(hashInput);
+            if (uint8ArrayToHex(computedCommitment) !== uint8ArrayToHex(commitmentBytes)) {
+                throw new Error("R9 commitment mismatch");
+            }
         } catch (e) {
             throw new Error(`Judge box ${judgeBox.boxId} has invalid R9 commitment data execution.`);
         }

@@ -29,8 +29,7 @@ import { GAME, PARTICIPATION } from '$lib/ergo/reputation/types';
 import { current_height, reputation_proof } from '$lib/common/store';
 import { OutputBuilder, TransactionBuilder, ErgoAddress, SAFE_MIN_BOX_VALUE, RECOMMENDED_MIN_FEE_VALUE, SColl, SByte, SBool } from '@fleet-sdk/core';
 import { hexToBytes, uint8ArrayToHex, bigintToLongByteArray } from '$lib/ergo/utils';
-// @ts-ignore
-import { reputationProofAddress } from 'reputation-system/dist/envs';
+// the reputation proof contract address is obtained via our compiled script when needed (see $lib/ergo/contract)
 import { submit_judge_opinion } from './actions/submit_judge_opinion';
 import { get } from 'svelte/store';
 import { contribute_to_ceremony } from './actions/ceremony';

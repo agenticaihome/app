@@ -9,8 +9,8 @@ import {
     SBool
 } from '@fleet-sdk/core';
 import { hexToBytes, bigintToLongByteArray } from '$lib/ergo/utils';
-// @ts-ignore
-import { reputationProofAddress } from 'reputation-system/dist/envs';
+// we compute the reputation proof contract address from our compiled script
+import { getReputationProofAddress } from '$lib/ergo/contract';
 import { get } from 'svelte/store';
 import { current_height, reputation_proof } from '$lib/common/store';
 import { explorer_uri } from '$lib/ergo/envs';
@@ -108,8 +108,8 @@ export async function submit_judge_opinion(
         throw new Error("Not enough reputation tokens in main box.");
     }
 
-    // Target address for reputation proofs
-    const ergoTreeAddress = reputationProofAddress;
+    // Target address for reputation proofs (derived from our compiled contract)
+    const ergoTreeAddress = getReputationProofAddress().toString();
 
     // MAIN BOX OUTPUT
     const main_box_output = new OutputBuilder(mainBox.box.value, ergoTreeAddress)

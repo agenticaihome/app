@@ -25,8 +25,9 @@ function normalizeHex(value: string | null | undefined): string {
 }
 
 /**
- * Builds and submits a reputation opinion transaction specifically for a judge accepting a nomination.
- * This manually builds the transaction to store `R9` as `Coll[Coll[Byte]] = [commitment, preimage]`.
+ * Builds and submits (or updates) a judge nomination reputation opinion.
+ * It stores `R9` as `Coll[Coll[Byte]] = [commitment, preimage]`.
+ * If an opinion for this game already exists, it is respent and recreated with updated R9.
  * 
  * @param game The active game object
  * @param referenceParticipation The reference participation data used to verify the game execution
@@ -51,12 +52,11 @@ export async function submit_judge_opinion(
     if (!proof) throw new Error("User has no reputation proof");
 
     const existingOpinion = proof.current_boxes.find(b => b.type.tokenId === typeId && b.object_pointer === object_pointer);
-    if (existingOpinion) {
-        throw new Error("Judge already accepted nomination. Updating is not supported for judge R9 commitments because the API requires creating a new opinion.");
-    }
-
     const mainBox = proof.current_boxes.find(b => b.is_locked === false && b.object_pointer === b.token_id);
-    if (!mainBox) throw new Error("No main reputation box found for the judge.");
+
+    if (!existingOpinion && !mainBox) {
+        throw new Error("No updatable opinion box or main reputation box found for the judge.");
+    }
 
     // Build the pre-image
     const solverIdHex = normalizeHex(referenceParticipation.solverId_hex);
@@ -105,44 +105,65 @@ export async function submit_judge_opinion(
         throw new Error(`Could not get proposition bytes from address ${creatorAddressString}.`);
     }
 
-    const reputationTokenId = mainBox.token_id;
-    const token_amount = 1n; // 1 token for the opinion box
-
-    let totalReputationAvailable = mainBox.box.assets.reduce((sum, asset) => {
-        if (asset.tokenId === reputationTokenId) {
-            return sum + BigInt(asset.amount);
-        } else {
-            return sum;
-        }
-    }, 0n) - token_amount;
-
-    if (totalReputationAvailable < 0n) {
-        throw new Error("Not enough reputation tokens in main box.");
-    }
-
     // Target address for reputation proofs (derived from our compiled contract)
     const ergoTreeAddress = getReputationProofAddress().toString();
 
-    // MAIN BOX OUTPUT
-    const main_box_output = new OutputBuilder(mainBox.box.value, ergoTreeAddress)
-        .addTokens([{ tokenId: reputationTokenId, amount: totalReputationAvailable.toString() }, ...mainBox.box.assets.filter(a => a.tokenId !== reputationTokenId)])
-        .setAdditionalRegisters(mainBox.box.additionalRegisters);
-
-    // OPINION BOX OUTPUT
-    const opinion_box_output = new OutputBuilder(BigInt(SAFE_MIN_BOX_VALUE), ergoTreeAddress);
-    opinion_box_output.addTokens({ tokenId: reputationTokenId, amount: token_amount.toString() });
-
-    opinion_box_output.setAdditionalRegisters({
+    const opinionRegisters = {
         R4: SColl(SByte, hexToBytes(typeId) ?? new Uint8Array(0)).toHex(),
         R5: SColl(SByte, hexToBytes(object_pointer) ?? new Uint8Array(0)).toHex(),
         R6: SBool(is_locked).toHex(),
         R7: SColl(SByte, propositionBytes).toHex(),
         R8: SBool(polarization).toHex(),
         R9: r9Value.toHex(),
-    });
+    };
 
-    // Fetch Data Input (Type NFT)
-    const typeTokenIds = new Set([mainBox.type.tokenId]);
+    const outputs: OutputBuilder[] = [];
+    let inputs: any[] = [];
+    const typeTokenIds = new Set<string>([typeId]);
+
+    if (existingOpinion) {
+        if (existingOpinion.is_locked) {
+            throw new Error("Cannot update a locked judge opinion.");
+        }
+
+        const opinion_box_output = new OutputBuilder(BigInt(existingOpinion.box.value), ergoTreeAddress)
+            .addTokens(existingOpinion.box.assets.map(a => ({ tokenId: a.tokenId, amount: a.amount.toString() })))
+            .setAdditionalRegisters(opinionRegisters);
+
+        outputs.push(opinion_box_output);
+        inputs = [existingOpinion.box];
+    } else {
+        const reputationTokenId = mainBox!.token_id;
+        const token_amount = 1n; // 1 token for the opinion box
+
+        const totalReputationAvailable = mainBox!.box.assets.reduce((sum, asset) => {
+            if (asset.tokenId === reputationTokenId) {
+                return sum + BigInt(asset.amount);
+            } else {
+                return sum;
+            }
+        }, 0n) - token_amount;
+
+        if (totalReputationAvailable < 0n) {
+            throw new Error("Not enough reputation tokens in main box.");
+        }
+
+        // MAIN BOX OUTPUT
+        const main_box_output = new OutputBuilder(mainBox!.box.value, ergoTreeAddress)
+            .addTokens([{ tokenId: reputationTokenId, amount: totalReputationAvailable.toString() }, ...mainBox!.box.assets.filter(a => a.tokenId !== reputationTokenId)])
+            .setAdditionalRegisters(mainBox!.box.additionalRegisters);
+
+        // OPINION BOX OUTPUT
+        const opinion_box_output = new OutputBuilder(BigInt(SAFE_MIN_BOX_VALUE), ergoTreeAddress)
+            .addTokens({ tokenId: reputationTokenId, amount: token_amount.toString() })
+            .setAdditionalRegisters(opinionRegisters);
+
+        outputs.push(main_box_output, opinion_box_output);
+        inputs = [mainBox!.box];
+        typeTokenIds.add(mainBox!.type.tokenId);
+    }
+
+    // Fetch Data Inputs (Type NFTs)
     const dataInputs = [];
     const explorerUrl = get(explorer_uri);
 
@@ -155,8 +176,7 @@ export async function submit_judge_opinion(
     }
 
     const utxos = await ergo.get_utxos();
-    const inputs = [mainBox.box, ...utxos];
-    const outputs = [main_box_output, opinion_box_output];
+    inputs = [...inputs, ...utxos];
 
     const currentHeight = get(current_height) || await ergo.get_current_height();
 

@@ -27,15 +27,12 @@ import { reclaim_after_grace } from './actions/reclaim_after_grace';
 import { create_opinion, update_opinion } from 'reputation-system';
 import { GAME, PARTICIPATION } from '$lib/ergo/reputation/types';
 import { current_height, reputation_proof } from '$lib/common/store';
-import { OutputBuilder, TransactionBuilder, ErgoAddress, SAFE_MIN_BOX_VALUE, RECOMMENDED_MIN_FEE_VALUE, SColl, SByte, SBool } from '@fleet-sdk/core';
-import { hexToBytes, uint8ArrayToHex, bigintToLongByteArray } from '$lib/ergo/utils';
 // the reputation proof contract address is obtained via our compiled script when needed (see $lib/ergo/contract)
 import { submit_judge_opinion } from './actions/submit_judge_opinion';
 import { get } from 'svelte/store';
 import { contribute_to_ceremony } from './actions/ceremony';
 import { batch_participations } from './actions/batch_participations';
 import { publish_solver_id } from './actions/publish_solver_id';
-import { th } from 'date-fns/locale';
 
 interface CreateGoPGamePlatformParams {
     gameServiceId: string;
@@ -382,6 +379,7 @@ export class ErgoPlatform implements Platform {
 
     /**
      * Allows a nominated judge to accept their role in an active game.
+     * If the opinion already exists, this call updates it with new reference data.
      * @param game The Game object in 'Active' state.
      * @returns A promise that resolves to the transaction ID.
      */
@@ -399,20 +397,6 @@ export class ErgoPlatform implements Platform {
         if (game.status !== 'Active') {
             throw new Error("The game is not in an active state.");
         }
-
-        const typeId = GAME;
-        const object_pointer = game.gameId;
-
-        const proof = get(reputation_proof);
-        if (!proof) throw new Error("User has no reputation proof");
-
-        const existingOpinion = proof.current_boxes.find(b => b.type.tokenId === typeId && b.object_pointer === object_pointer);
-        if (existingOpinion) {
-            throw new Error("Judge already accepted nomination. Updating is not supported for judge R9 commitments because the API requires creating a new opinion.");
-        }
-
-        const mainBox = proof.current_boxes.find(b => b.is_locked === false && b.object_pointer === b.token_id);
-        if (!mainBox) throw new Error("No main reputation box found for the judge.");
 
         try {
             return await submit_judge_opinion(game, referenceParticipation);

@@ -264,11 +264,13 @@
                     variant: "destructive",
                 });
             }
-            if (isNominatedJudge && !isJudge) {
+            if (isNominatedJudge) {
                 actions.push({
                     id: "accept_judge_nomination",
-                    label: "Accept Judge Nomination",
-                    icon: Gavel,
+                    label: isJudge
+                        ? "Update Judge Reference"
+                        : "Accept Judge Nomination",
+                    icon: isJudge ? Edit : Gavel,
                     variant: "outline",
                 });
             }
@@ -1936,7 +1938,9 @@
             invalidate_winner: `Judge Invalidation`,
             judge_unavailable: `Judge Mark Unavailable`,
             include_omitted: `Include Omitted Participation`,
-            accept_judge_nomination: "Accept Judge Nomination",
+            accept_judge_nomination: isJudge
+                ? "Update Judge Reference"
+                : "Accept Judge Nomination",
             open_ceremony: "Add Entropy",
             batch_participations: "Batch Participations",
             submit_creator_opinion: "Verify Competition (Creator Opinion)",
@@ -6557,11 +6561,20 @@
                                         : 'bg-blue-100 text-blue-700 border border-blue-200'}"
                                 >
                                     <strong
-                                        >Action: Accept Judge Nomination</strong
+                                        >Action: {isJudge
+                                            ? "Update Judge Reference"
+                                            : "Accept Judge Nomination"}</strong
                                     ><br />
-                                    By accepting, you agree to participate as a judge
-                                    in this game, with the responsibility to review
-                                    and potentially invalidate the winner if necessary.
+                                    {#if isJudge}
+                                        You can update your reference participation
+                                        data. This will respend your current judge
+                                        opinion and recreate it with the new values.
+                                    {:else}
+                                        By accepting, you agree to participate as a
+                                        judge in this game, with the responsibility to
+                                        review and potentially invalidate the winner if
+                                        necessary.
+                                    {/if}
                                     <br /><br />
                                     <strong>Important:</strong> Provide your reference
                                     participation data by uploading the JSON file or
@@ -6682,7 +6695,9 @@
                                 >
                                     {isSubmitting
                                         ? "Processing..."
-                                        : "Confirm Judge Nomination"}
+                                        : isJudge
+                                          ? "Update Judge Reference"
+                                          : "Confirm Judge Nomination"}
                                 </Button>
                             </div>
                         {:else if currentActionType === "open_ceremony"}

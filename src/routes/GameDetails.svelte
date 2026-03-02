@@ -706,6 +706,7 @@
     let solverId_check_loading = false;
     let solverId_check_error: string | null = null;
     let hashLogs_input = "";
+    let judgeReferenceScore_input = "";
     let user_score: number | null = null;
     let scores_list: number[] = [];
     let secret_S_input_resolve = "";
@@ -1786,14 +1787,24 @@
     async function handleJudgeNomination() {
         if (game?.status !== "Active") return;
 
+        const scoreRaw = judgeReferenceScore_input.trim();
         if (
             !solverId_input ||
             !hashLogs_input ||
             !commitmentC_input ||
-            scores_list.length === 0
+            !scoreRaw
         ) {
             errorMessage =
-                "Missing reference participation data. Please upload your participation JSON file.";
+                "Missing reference participation data. Please upload the JSON file or complete the form.";
+            return;
+        }
+
+        let referenceScore: bigint;
+        try {
+            referenceScore = BigInt(scoreRaw);
+        } catch {
+            errorMessage =
+                "Invalid reference score. Please enter an integer value.";
             return;
         }
 
@@ -1803,7 +1814,7 @@
             transactionId = await platform.acceptJudgeNomination(game, {
                 commitmentC_hex: commitmentC_input,
                 solverId_hex: solverId_input,
-                score: BigInt(scores_list[0]),
+                score: referenceScore,
                 hashLogs_hex: hashLogs_input,
                 ergoTree_hex: get(address)
                     ? uint8ArrayToHex(
@@ -1877,6 +1888,7 @@
                         );
                         if (scores_list.length > 0) {
                             user_score = scores_list[0];
+                            judgeReferenceScore_input = String(scores_list[0]);
                         }
                     } else throw new Error("Missing or invalid 'score_list'");
                 } catch (e: any) {
@@ -1884,6 +1896,7 @@
                     commitmentC_input = "";
                     solverId_input = "";
                     hashLogs_input = "";
+                    judgeReferenceScore_input = "";
                     user_score = null;
                     scores_list = [];
                 }
@@ -6545,14 +6558,12 @@
                                     in this game, with the responsibility to review
                                     and potentially invalidate the winner if necessary.
                                     <br /><br />
-                                    <strong>Important:</strong> You must upload your
-                                    reference participation JSON file to prove you
-                                    executed the game successfully.
+                                    <strong>Important:</strong> Provide your reference
+                                    participation data by uploading the JSON file or
+                                    filling the form below.
                                 </p>
 
-                                <div
-                                    class="grid w-full max-w-sm items-center gap-1.5"
-                                >
+                                <div class="grid w-full items-center gap-1.5">
                                     <Label for="json-upload"
                                         >Reference Participation JSON</Label
                                     >
@@ -6567,6 +6578,72 @@
                                             {jsonUploadError}
                                         </p>
                                     {/if}
+                                    <p class="text-xs text-muted-foreground">
+                                        Optional. If provided, fields below will be
+                                        auto-filled.
+                                    </p>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-px flex-1 bg-border"></span>
+                                        <span
+                                            class="text-xs uppercase text-muted-foreground"
+                                            >Or complete manually</span
+                                        >
+                                        <span class="h-px flex-1 bg-border"></span>
+                                    </div>
+
+                                    <div>
+                                        <Label for="judge-solver-id"
+                                            >Reference Solver ID</Label
+                                        >
+                                        <Input
+                                            id="judge-solver-id"
+                                            type="text"
+                                            bind:value={solverId_input}
+                                            placeholder="Hex solver id"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label for="judge-hash-logs"
+                                            >Reference Logs Hash</Label
+                                        >
+                                        <Input
+                                            id="judge-hash-logs"
+                                            type="text"
+                                            bind:value={hashLogs_input}
+                                            placeholder="Hex hash logs"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label for="judge-commitment"
+                                            >Reference Commitment</Label
+                                        >
+                                        <Textarea
+                                            id="judge-commitment"
+                                            bind:value={commitmentC_input}
+                                            rows={2}
+                                            placeholder="Hex commitment"
+                                            class="font-mono text-xs"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label for="judge-reference-score"
+                                            >Reference Score</Label
+                                        >
+                                        <Input
+                                            id="judge-reference-score"
+                                            type="number"
+                                            step="1"
+                                            bind:value={judgeReferenceScore_input}
+                                            placeholder="Ej. 98"
+                                        />
+                                    </div>
+
                                     {#if commitmentC_input}
                                         <div
                                             class="text-sm text-muted-foreground break-all bg-muted p-2 rounded"
@@ -6581,7 +6658,7 @@
                                             <span class="font-semibold"
                                                 >Score:</span
                                             >
-                                            {user_score}
+                                            {judgeReferenceScore_input}
                                         </div>
                                     {/if}
                                 </div>
@@ -6589,7 +6666,10 @@
                                 <Button
                                     on:click={handleJudgeNomination}
                                     disabled={isSubmitting ||
-                                        !commitmentC_input}
+                                        !solverId_input ||
+                                        !hashLogs_input ||
+                                        !commitmentC_input ||
+                                        !judgeReferenceScore_input.trim()}
                                     class="w-full md:w-auto md:min-w-[200px] mt-3 py-2.5 text-base {$mode ===
                                     'dark'
                                         ? 'bg-blue-600 hover:bg-blue-700 text-white'

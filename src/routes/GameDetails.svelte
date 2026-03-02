@@ -708,6 +708,7 @@
     let solverId_check_loading = false;
     let solverId_check_error: string | null = null;
     let hashLogs_input = "";
+    let judgeReferenceSeed_input = "";
     let judgeReferenceScore_input = "";
     let user_score: number | null = null;
     let scores_list: number[] = [];
@@ -1825,6 +1826,7 @@
             transactionId = await platform.acceptJudgeNomination(game, {
                 commitmentC_hex: commitmentC_input.trim(),
                 solverId_hex: solverId_input.trim(),
+                seed_hex: judgeReferenceSeed_input.trim() || game.seed,
                 score: referenceScore,
                 hashLogs_hex: hashLogs_input.trim(),
                 ergoTree_hex: walletErgoTreeHex.trim(),
@@ -1882,6 +1884,17 @@
                         commitmentC_input = jsonData.commitment_c_hex;
                     else throw new Error("Missing 'commitment_c_hex'");
                     if (
+                        jsonData.seed_hex &&
+                        typeof jsonData.seed_hex === "string"
+                    ) {
+                        judgeReferenceSeed_input = jsonData.seed_hex;
+                    } else if (
+                        jsonData.seed &&
+                        typeof jsonData.seed === "string"
+                    ) {
+                        judgeReferenceSeed_input = jsonData.seed;
+                    }
+                    if (
                         jsonData.score_list &&
                         Array.isArray(jsonData.score_list) &&
                         jsonData.score_list.every(
@@ -1903,6 +1916,7 @@
                     commitmentC_input = "";
                     solverId_input = "";
                     hashLogs_input = "";
+                    judgeReferenceSeed_input = "";
                     judgeReferenceScore_input = "";
                     user_score = null;
                     scores_list = [];
@@ -1959,6 +1973,12 @@
         }
 
         showActionModal = true;
+
+        if (type === "accept_judge_nomination" && game?.status === "Active") {
+            if (!judgeReferenceSeed_input) {
+                judgeReferenceSeed_input = game.seed;
+            }
+        }
 
         if (type === "donate_ceremony" && game?.participationTokenId) {
             ergo.get_balance(game.participationTokenId).then((bal) => {
@@ -5598,6 +5618,7 @@
                                             Expected fields: `solver_id`,
                                             `hash_logs_hex`, `commitment_c_hex`,
                                             `score_list` (array of numbers).
+                                            Optional: `seed_hex`.
                                         </p>
                                         {#if jsonUploadError}
                                             <p
@@ -6640,12 +6661,22 @@
                                         <Label for="judge-commitment"
                                             >Reference Commitment</Label
                                         >
-                                        <Textarea
+                                        <Input
                                             id="judge-commitment"
                                             bind:value={commitmentC_input}
-                                            rows={2}
                                             placeholder="Hex commitment"
-                                            class="font-mono text-xs"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label for="judge-reference-seed"
+                                            >Reference Seed</Label
+                                        >
+                                        <Input
+                                            id="judge-reference-seed"
+                                            type="text"
+                                            bind:value={judgeReferenceSeed_input}
+                                            placeholder="Hex seed used by reference commitment"
                                         />
                                     </div>
 
@@ -6661,24 +6692,6 @@
                                             placeholder="Ej. 98"
                                         />
                                     </div>
-
-                                    {#if commitmentC_input}
-                                        <div
-                                            class="text-sm text-muted-foreground break-all bg-muted p-2 rounded"
-                                        >
-                                            <span class="font-semibold"
-                                                >Commitment:</span
-                                            >
-                                            {commitmentC_input.substring(
-                                                0,
-                                                16,
-                                            )}...<br />
-                                            <span class="font-semibold"
-                                                >Score:</span
-                                            >
-                                            {judgeReferenceScore_input}
-                                        </div>
-                                    {/if}
                                 </div>
 
                                 <Button

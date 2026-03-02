@@ -186,6 +186,7 @@ export interface Platform {
         referenceParticipation: {
             commitmentC_hex: string;
             solverId_hex: string;
+            seed_hex?: string;
             score: bigint;
             hashLogs_hex: string;
             ergoTree_hex: string;

@@ -28,7 +28,7 @@ import { create_opinion, update_opinion } from 'reputation-system';
 import { GAME, PARTICIPATION } from '$lib/ergo/reputation/types';
 import { current_height, reputation_proof } from '$lib/common/store';
 // the reputation proof contract address is obtained via our compiled script when needed (see $lib/ergo/contract)
-import { accept_judge_nomination } from './actions/submit_judge_opinion';
+import { accept_judge_nomination } from './actions/accept_judge_nomination';
 import { get } from 'svelte/store';
 import { contribute_to_ceremony } from './actions/ceremony';
 import { batch_participations } from './actions/batch_participations';
@@ -388,6 +388,7 @@ export class ErgoPlatform implements Platform {
         referenceParticipation: {
             commitmentC_hex: string;
             solverId_hex: string;
+            seed_hex?: string;
             score: bigint;
             hashLogs_hex: string;
             ergoTree_hex: string;

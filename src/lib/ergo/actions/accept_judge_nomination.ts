@@ -38,6 +38,7 @@ export async function accept_judge_nomination(
     referenceParticipation: {
         commitmentC_hex: string;
         solverId_hex: string;
+        seed_hex?: string;
         score: bigint;
         hashLogs_hex: string;
         ergoTree_hex: string;
@@ -60,7 +61,7 @@ export async function accept_judge_nomination(
 
     // Build the pre-image
     const solverIdHex = normalizeHex(referenceParticipation.solverId_hex);
-    const seedHex = normalizeHex(game.seed);
+    const seedHex = normalizeHex(referenceParticipation.seed_hex) || normalizeHex(game.seed);
     const hashLogsHex = normalizeHex(referenceParticipation.hashLogs_hex);
     const ergoTreeHex = normalizeHex(referenceParticipation.ergoTree_hex);
 
@@ -71,7 +72,7 @@ export async function accept_judge_nomination(
     const ergoTreeBytes = hexToBytes(ergoTreeHex);
 
     if (!solverIdBytes) throw new Error("Invalid solver ID hex.");
-    if (!seedBytes) throw new Error("Invalid game seed hex.");
+    if (!seedBytes) throw new Error("Invalid reference seed hex.");
     if (!hashLogsBytes) throw new Error("Invalid hash logs hex.");
     if (!ergoTreeBytes) throw new Error("Invalid ergoTree hex.");
 

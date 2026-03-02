@@ -28,7 +28,7 @@ import { create_opinion, update_opinion } from 'reputation-system';
 import { GAME, PARTICIPATION } from '$lib/ergo/reputation/types';
 import { current_height, reputation_proof } from '$lib/common/store';
 // the reputation proof contract address is obtained via our compiled script when needed (see $lib/ergo/contract)
-import { submit_judge_opinion } from './actions/submit_judge_opinion';
+import { accept_judge_nomination } from './actions/submit_judge_opinion';
 import { get } from 'svelte/store';
 import { contribute_to_ceremony } from './actions/ceremony';
 import { batch_participations } from './actions/batch_participations';
@@ -399,7 +399,7 @@ export class ErgoPlatform implements Platform {
         }
 
         try {
-            return await submit_judge_opinion(game, referenceParticipation);
+            return await accept_judge_nomination(game, referenceParticipation);
 
         } catch (error) {
             console.error("Error in platform method acceptJudgeNomination:", error);

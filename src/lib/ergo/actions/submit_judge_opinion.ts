@@ -33,7 +33,7 @@ function normalizeHex(value: string | null | undefined): string {
  * @param referenceParticipation The reference participation data used to verify the game execution
  * @returns The transaction ID if successful
  */
-export async function submit_judge_opinion(
+export async function accept_judge_nomination(
     game: GameActive,
     referenceParticipation: {
         commitmentC_hex: string;

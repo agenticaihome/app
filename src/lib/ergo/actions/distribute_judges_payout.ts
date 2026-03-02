@@ -38,12 +38,12 @@ export async function distribute_judges_payout(
 
     // Decode R4 (Participating Judges Token IDs)
     // @ts-ignore
-    const participatingJudgesBytes = SConstant.fromHex(r4).data as Uint8Array[];
+    const participatingJudgesBytes = SConstant.from(r4).data as Uint8Array[];
     const participatingJudgesTokenIds = participatingJudgesBytes.map(b => uint8ArrayToHex(b));
 
     // Decode R5 (Participation Token ID)
     // @ts-ignore
-    const participationTokenIdBytes = SConstant.fromHex(r5).data as Uint8Array;
+    const participationTokenIdBytes = SConstant.from(r5).data as Uint8Array;
     const participationTokenId = uint8ArrayToHex(participationTokenIdBytes);
     const isTokenGame = participationTokenId.length > 0;
 

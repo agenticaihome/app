@@ -8,7 +8,7 @@ import {
     BOX_VALUE_PER_BYTE,
     SAFE_MIN_BOX_VALUE
 } from '@fleet-sdk/core';
-import { SColl, SByte, SPair, SLong, SInt, serializeBox } from '@fleet-sdk/serializer';
+import { SColl, SByte, SPair, SLong, SInt, serializeBox, SConstant } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox, uint8ArrayToHex } from '$lib/ergo/utils';
 import { resolve_participation_commitment, calculateEffectiveScore, type GameActive, type ValidParticipation } from '$lib/common/game';
 import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
@@ -92,22 +92,26 @@ export async function resolve_game(
     for (const judgeBox of judgeProofBoxes) {
         const r9 = judgeBox.additionalRegisters.R9;
         if (!r9) {
+            console.warn(`Judge box ${judgeBox.boxId} is missing R9 data. `);
             throw new Error(`Judge box ${judgeBox.boxId} is missing R9 data.`);
         }
 
         try {
             if (typeof r9 !== "string" || r9.length < 10) {
+                console.warn(`Judge box ${judgeBox.boxId} has invalid R9 format. `);
                 throw new Error("Invalid R9 format");
             }
 
             // R9: Coll[Coll[Byte]] = [commitmentBytes, preimageBytes]
-            const r9Value = SConstant.fromHex(r9).data as unknown;
+            const r9Value = SConstant.from(r9).data as unknown;
             if (!Array.isArray(r9Value) || r9Value.length !== 2) {
+                console.warn(`Judge box ${judgeBox.boxId} has invalid R9 structure. `);
                 throw new Error("Invalid R9 structure");
             }
 
             const [commitmentBytes, preimageBytes] = r9Value;
             if (!(commitmentBytes instanceof Uint8Array) || !(preimageBytes instanceof Uint8Array)) {
+                console.warn(`Judge box ${judgeBox.boxId} has invalid R9 payload types. `);
                 throw new Error("Invalid R9 payload types");
             }
 
@@ -117,9 +121,11 @@ export async function resolve_game(
 
             const computedCommitment = fleetBlake2b256(hashInput);
             if (uint8ArrayToHex(computedCommitment) !== uint8ArrayToHex(commitmentBytes)) {
+                console.warn(`Judge box ${judgeBox.boxId} has an R9 commitment mismatch. `);
                 throw new Error("R9 commitment mismatch");
             }
         } catch (e) {
+            console.warn(e)
             throw new Error(`Judge box ${judgeBox.boxId} has invalid R9 commitment data execution.`);
         }
     }

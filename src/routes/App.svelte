@@ -383,6 +383,7 @@
                 variant="ghost"
                 size="icon"
                 on:click={() => muted.set(!$muted)}
+                title={$muted ? "Unmute card scroll sounds" : "Mute card scroll sounds"}
             >
                 {#if $muted}
                     <VolumeX class="h-[1.2rem] w-[1.2rem]" />
@@ -394,6 +395,7 @@
                 variant="ghost"
                 size="icon"
                 on:click={() => (showSettings = true)}
+                title="Settings"
             >
                 <Settings class="h-[1.2rem] w-[1.2rem]" />
             </Button>
@@ -610,7 +612,7 @@
     .navbar-container {
         @apply sticky top-0 z-50 w-full backdrop-blur-lg;
         background-color: hsl(var(--background) / 0.85);
-        border-bottom: 1px solid rgba(74, 222, 128, 0.06);
+        border-bottom: 1px solid rgba(74, 222, 128, 0.08);
     }
 
     .navbar-content {
@@ -713,7 +715,6 @@
         @apply flex items-center;
         @apply h-12 px-6 gap-6;
         @apply text-sm;
-        color: hsl(var(--muted-foreground));
         background-color: hsl(var(--background) / 0.85);
         border-top: 1px solid rgba(74, 222, 128, 0.06);
         backdrop-filter: blur(8px);
@@ -754,7 +755,6 @@
         @apply inline-block whitespace-nowrap;
         animation: scroll-left 40s linear infinite;
         transition: animation-duration 0.5s ease;
-        color: hsl(var(--muted-foreground));
     }
 
     @keyframes scroll-left {

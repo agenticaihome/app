@@ -296,8 +296,14 @@
         </h2>
         <p class="subtitle">Compete, demonstrate your skill, and win prizes.</p>
         <div class="counts-row">
-            <div class="badge">Total games: {totalGamesCount}</div>
-            {#if listedItems}
+            <div class="badge">
+                {#if isLoadingApi || $isLoadingGames}
+                    Total games: <Loader2 class="inline-block h-3 w-3 animate-spin ml-1" style="vertical-align: middle;" />
+                {:else}
+                    Total games: {totalGamesCount}
+                {/if}
+            </div>
+            {#if listedItems && !(isLoadingApi || $isLoadingGames)}
                 <div class="badge muted">
                     Showing: {Array.from(listedItems).length}
                 </div>
@@ -360,19 +366,25 @@
         <div class="loading-state">
             <div class="loading-content">
                 <Loader2 class="h-10 w-10 animate-spin text-primary mb-4" />
-                <p class="text-lg font-medium text-muted-foreground">
+                <p class="text-lg font-medium text-muted-foreground" style="font-family: var(--font-mono);">
                     Fetching competitions from Ergo...
                 </p>
             </div>
-            <div class="game-list-container opacity-40">
+            <div class="game-list-container opacity-30">
                 {#each Array(3) as _, i}
-                    <div class="skeleton-row" class:reverse={i % 2 !== 0}>
-                        <div class="skeleton-image-large"></div>
-                        <div class="skeleton-content">
-                            <div class="skeleton-line title"></div>
-                            <div class="skeleton-line text"></div>
-                            <div class="skeleton-line text short"></div>
-                            <div class="skeleton-button"></div>
+                    <div class="skeleton-card gop-game-card" style="border-radius: 16px; overflow: hidden;">
+                        <div class="flex flex-col lg:flex-row {i % 2 !== 0 ? 'lg:flex-row-reverse' : ''} gap-0">
+                            <div class="skeleton-image-large lg:w-2/5"></div>
+                            <div class="skeleton-content flex-1 p-6 lg:p-8">
+                                <div class="skeleton-line title"></div>
+                                <div class="skeleton-line text"></div>
+                                <div class="skeleton-line text short"></div>
+                                <div class="flex gap-3 mt-4">
+                                    <div class="skeleton-badge"></div>
+                                    <div class="skeleton-badge wide"></div>
+                                </div>
+                                <div class="skeleton-button"></div>
+                            </div>
                         </div>
                     </div>
                 {/each}
@@ -388,8 +400,12 @@
             {/each}
         </div>
     {:else}
-        <div class="no-items-container">
-            <p class="no-items-text">No competitions found.</p>
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: rgba(74, 222, 128, 0.3);"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            </div>
+            <p class="empty-state-title">No competitions found on-chain yet</p>
+            <p class="empty-state-text">Check back soon — new competitions appear as they're created on the Ergo blockchain.</p>
         </div>
     {/if}
 </div>
@@ -411,7 +427,7 @@
     }
     .subtitle {
         font-size: 1.1rem;
-        color: var(--muted-foreground);
+        color: hsl(var(--muted-foreground));
         max-width: 500px;
         margin: 0 auto;
     }
@@ -477,22 +493,60 @@
         border-radius: 1rem;
         transition: outline 0.3s ease;
     }
+    /* ===== Empty state ===== */
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 4rem 2rem;
+        min-height: 300px;
+    }
+    .empty-state-icon {
+        margin-bottom: 1.5rem;
+        opacity: 0.7;
+    }
+    .empty-state-title {
+        font-family: var(--font-heading);
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: hsl(var(--foreground));
+        margin-bottom: 0.5rem;
+    }
+    .empty-state-text {
+        font-size: 0.95rem;
+        color: hsl(var(--muted-foreground));
+        max-width: 400px;
+        line-height: 1.6;
+    }
+
+    /* ===== Loading state ===== */
+    .loading-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+        width: 100%;
+    }
+    .loading-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 1rem 0;
+    }
+
     @keyframes pulse {
         50% {
             opacity: 0.6;
         }
     }
-    .skeleton-row {
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
     .skeleton-image-large {
         height: 16rem;
         width: 100%;
-        background-color: var(--muted);
-        border-radius: 0.75rem;
+        background-color: hsl(var(--muted));
+        border-radius: 0;
     }
     .skeleton-content {
         flex: 1;
@@ -500,7 +554,7 @@
     .skeleton-line {
         height: 1rem;
         border-radius: 0.25rem;
-        background-color: var(--muted);
+        background-color: hsl(var(--muted));
         margin-bottom: 1rem;
     }
     .skeleton-line.title {
@@ -514,23 +568,29 @@
     .skeleton-line.text.short {
         width: 70%;
     }
+    .skeleton-badge {
+        height: 1.5rem;
+        width: 80px;
+        background-color: hsl(var(--muted));
+        border-radius: 999px;
+    }
+    .skeleton-badge.wide {
+        width: 120px;
+    }
+    .skeleton-card {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
     .skeleton-button {
         height: 3rem;
         width: 180px;
-        background-color: var(--muted);
+        background-color: hsl(var(--muted));
         border-radius: 0.5rem;
         margin-top: 2rem;
     }
     @media (min-width: 768px) {
-        .skeleton-row {
-            flex-direction: row;
-            align-items: center;
-        }
         .skeleton-image-large {
-            width: 45%;
-        }
-        .skeleton-row.reverse {
-            flex-direction: row-reverse;
+            height: 100%;
+            min-height: 16rem;
         }
     }
 </style>

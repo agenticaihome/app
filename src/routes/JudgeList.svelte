@@ -90,7 +90,7 @@
 <div class="items-container">
     <div class="hero-section">
         <h2
-            class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent inline-block"
+            class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 gop-gradient-text inline-block"
         >
             {showPendingPayouts ? "Pending Payouts" : "Explore Judges"}
         </h2>

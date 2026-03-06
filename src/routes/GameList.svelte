@@ -287,8 +287,10 @@
 
 <div class="items-container">
     <div class="hero-section">
+        <span class="gop-section-label">Competitions</span>
         <h2
-            class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent inline-block"
+            class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 mt-3 gop-gradient-text inline-block"
+            style="font-family: var(--font-heading);"
         >
             Explore Competitions
         </h2>
@@ -309,17 +311,20 @@
         >
             <div class="relative flex-1 w-full">
                 <Search
-                    class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500/70 h-4 w-4"
+                    class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4"
+                    style="color: rgba(74, 222, 128, 0.5);"
                 />
                 <Input
                     type="text"
                     placeholder="Search games..."
                     bind:value={searchQuery}
-                    class="pl-10 w-full bg-background/80 backdrop-blur-lg border-slate-500/20 focus:border-slate-500/40 focus:ring-slate-500/20 focus:ring-1 rounded-lg transition-all duration-200"
+                    class="pl-10 w-full bg-background/80 backdrop-blur-lg rounded-lg transition-all duration-200"
+                    style="border: 1px solid rgba(74, 222, 128, 0.15); font-family: var(--font-mono); font-size: 0.9rem;"
                 />
                 {#if isFiltering}
                     <Loader2
-                        class="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-slate-500"
+                        class="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin"
+                        style="color: #4ade80;"
                     />
                 {/if}
             </div>
@@ -417,14 +422,20 @@
         margin-top: 0.75rem;
     }
     .badge {
-        padding: 0.35rem 0.6rem;
+        padding: 0.35rem 0.75rem;
         border-radius: 999px;
-        background: var(--muted);
-        color: var(--foreground);
+        background: rgba(74, 222, 128, 0.08);
+        color: #4ade80;
         font-weight: 600;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        border: 1px solid rgba(74, 222, 128, 0.15);
     }
     .badge.muted {
-        opacity: 0.8;
+        opacity: 0.7;
+        color: hsl(var(--muted-foreground));
+        background: rgba(74, 222, 128, 0.04);
+        border-color: rgba(74, 222, 128, 0.08);
     }
 
     .search-container {
@@ -432,16 +443,26 @@
     }
     .status-filter select {
         padding: 0.5rem 0.75rem;
-        border-radius: 0.5rem;
-        border: 1px solid var(--border);
-        background: var(--input);
-        color: var(--foreground);
+        border-radius: 0.75rem;
+        border: 1px solid rgba(74, 222, 128, 0.15);
+        background: hsl(var(--card));
+        color: hsl(var(--foreground));
         cursor: pointer;
         height: 40px;
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        transition: border-color 0.2s;
+    }
+
+    .status-filter select:hover,
+    .status-filter select:focus {
+        border-color: rgba(74, 222, 128, 0.4);
+        outline: none;
     }
 
     .status-filter select option {
-        color: #0f172a;
+        background: #161616;
+        color: #f5f5f5;
     }
 
     .game-list-container {

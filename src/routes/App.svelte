@@ -606,10 +606,11 @@
         background-color: hsl(var(--background));
     }
 
+    /* ===== Navbar — Dark Cyberpunk ===== */
     .navbar-container {
-        @apply sticky top-0 z-50 w-full border-b backdrop-blur-lg;
-        background-color: hsl(var(--background) / 0.8);
-        border-bottom-color: hsl(var(--border));
+        @apply sticky top-0 z-50 w-full backdrop-blur-lg;
+        background-color: hsl(var(--background) / 0.85);
+        border-bottom: 1px solid rgba(74, 222, 128, 0.06);
     }
 
     .navbar-content {
@@ -625,6 +626,7 @@
         height: 2rem;
         width: auto;
         margin-right: 2rem;
+        filter: drop-shadow(0 0 8px rgba(74, 222, 128, 0.3));
     }
 
     .desktop-nav {
@@ -632,34 +634,47 @@
     }
 
     .nav-links {
-        @apply flex items-center gap-4 text-sm;
+        @apply flex items-center gap-1 text-sm;
     }
 
     .nav-links li a {
-        @apply transition-colors text-muted-foreground;
+        @apply transition-colors px-3 py-1.5 rounded-lg;
+        color: hsl(var(--muted-foreground));
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        letter-spacing: 0.01em;
     }
 
     .nav-links li a:hover {
-        @apply text-foreground;
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.06);
     }
 
     .nav-links li.active a {
-        @apply text-foreground font-semibold;
+        color: #4ade80;
+        font-weight: 600;
+        background: rgba(74, 222, 128, 0.08);
+        border: 1px solid rgba(74, 222, 128, 0.15);
     }
 
     .user-section {
-        @apply items-center gap-4;
+        @apply items-center gap-3;
     }
 
     .mobile-menu-button {
-        @apply md:hidden p-2 rounded-md hover:bg-accent hover:text-accent-foreground;
+        @apply md:hidden p-2 rounded-md;
+        color: hsl(var(--foreground));
+    }
+    .mobile-menu-button:hover {
+        background: rgba(74, 222, 128, 0.08);
+        color: #4ade80;
     }
 
     .mobile-nav {
-        @apply md:hidden fixed left-0 right-0 z-40 border-b shadow-lg flex flex-col;
+        @apply md:hidden fixed left-0 right-0 z-40 shadow-lg flex flex-col;
         top: 4rem;
         background-color: hsl(var(--background));
-        border-bottom-color: hsl(var(--border));
+        border-bottom: 1px solid rgba(74, 222, 128, 0.08);
         max-height: calc(100vh - 4rem);
         overflow-y: auto;
     }
@@ -669,34 +684,52 @@
     }
 
     .mobile-nav-links li a {
-        @apply block text-base font-medium transition-colors hover:text-primary;
+        @apply block text-base font-medium transition-colors;
+        color: hsl(var(--foreground));
+        font-family: var(--font-mono);
+    }
+
+    .mobile-nav-links li a:hover {
+        color: #4ade80;
     }
 
     .mobile-nav-links li.active a {
-        @apply text-primary font-bold;
+        color: #4ade80;
+        font-weight: 700;
     }
 
     .mobile-user-controls {
-        @apply p-4 bg-accent/10;
+        @apply p-4;
+        background: rgba(74, 222, 128, 0.03);
     }
 
     main {
         @apply pb-16;
     }
 
+    /* ===== Footer — Cyberpunk ===== */
     .page-footer {
         @apply fixed bottom-0 left-0 right-0 z-40;
         @apply flex items-center;
         @apply h-12 px-6 gap-6;
-        @apply border-t text-sm text-muted-foreground;
-        background-color: hsl(var(--background) / 0.8);
-        border-top-color: hsl(var(--border));
-        backdrop-filter: blur(4px);
+        @apply text-sm;
+        color: hsl(var(--muted-foreground));
+        background-color: hsl(var(--background) / 0.85);
+        border-top: 1px solid rgba(74, 222, 128, 0.06);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
     }
 
     .footer-left,
     .footer-right {
         @apply flex items-center gap-2 flex-shrink-0;
+    }
+
+    .footer-left a:hover,
+    .footer-right a:hover {
+        color: #4ade80 !important;
     }
 
     .footer-center {
@@ -721,6 +754,7 @@
         @apply inline-block whitespace-nowrap;
         animation: scroll-left 40s linear infinite;
         transition: animation-duration 0.5s ease;
+        color: hsl(var(--muted-foreground));
     }
 
     @keyframes scroll-left {

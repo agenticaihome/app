@@ -2,85 +2,84 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== GoP Design System — Dark Cyberpunk Theme ===== */
+/* Matching the landing page at game-of-prompts.github.io */
+
 @layer base {
   :root {
-    /* Variables de fuente basadas en tu tema */
-    --font-heading: 'Montserrat', sans-serif;
-    --font-body: 'Inconsolata', monospace;
+    /* Typography — matching landing page */
+    --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
 
-    /* Tema de colores basado en las imágenes */
-    /* Colores principales: Un fondo crema claro y un texto casi negro para un contraste alto y elegante. */
-    --background: 33 60% 98%; /* Crema claro, aprox #FDFBF8 */
-    --foreground: 210 4% 9%;   /* Negro suave, #151617 */
+    /* GoP Green Palette */
+    --gop-green-400: #4ade80;
+    --gop-green-500: #22c55e;
+    --gop-green-600: #16a34a;
+    --gop-green-glow: rgba(74, 222, 128, 0.15);
 
-    /* Tarjetas: Un tono melocotón pálido para los recuadros. */
-    --card: #fdfaf780;         /* #F2DED0 */
-    --card-foreground: 210 4% 9%; /* #151617 */
+    /* Light mode (kept for completeness but dark is default) */
+    --background: 210 20% 98%;
+    --foreground: 142 76% 36%;
 
-    --popover: 33 60% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 4% 9%;
+
+    --popover: 0 0% 100%;
     --popover-foreground: 210 4% 9%;
 
-    /* Primario: Se usa el color del texto como acento principal para botones y enlaces. */
-    --primary: 210 4% 9%;         /* #151617 */
-    --primary-foreground: 0 0% 100%; /* Blanco, para el texto sobre el botón primario */
+    --primary: 142 71% 45%;
+    --primary-foreground: 0 0% 0%;
 
-    /* Secundario: El fondo de la tarjeta puede funcionar como fondo secundario. */
-    --secondary: 28 55% 91%;        /* #F2DED0 */
-    --secondary-foreground: 210 4% 9%; /* #151617 */
+    --secondary: 142 76% 36%;
+    --secondary-foreground: 0 0% 100%;
 
-    /* Muted: El segundo color de acento opcional para elementos discretos. */
-    --muted: 40 9% 72%;           /* #BAB6AA */
-    --muted-foreground: 210 4% 15%; /* Un poco más claro que el texto principal */
+    --muted: 210 10% 90%;
+    --muted-foreground: 210 4% 40%;
 
-    /* Acento: Se alinea con el color primario, ya que el tema es minimalista. */
-    --accent: 210 4% 9%;          /* #151617 */
-    --accent-foreground: 0 0% 100%;
+    --accent: 142 71% 45%;
+    --accent-foreground: 0 0% 0%;
 
-    /* Destructivo: Un rojo estándar que no desentona. */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Bordes e Inputs: El color de texto se usa para los bordes, creando un look definido. */
-    --border: 210 4% 9%;         /* #151617 */
-    --input: 28 55% 91%;          /* #F2DED0 - para el fondo del input */
-    --ring: 40 9% 72%;            /* #BAB6AA - para el anillo de foco */
+    --border: 142 20% 80%;
+    --input: 142 20% 90%;
+    --ring: 142 71% 45%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 
   .dark {
-    /* --- CORRECCIÓN --- */
-    /* Se aumentó la luminosidad de la tarjeta para mayor contraste. */
-    --background: 210 4% 9%;         /* #151617 */
-    --foreground: 33 60% 98%;         /* #FDFBF8 */
+    /* Dark Cyberpunk — matching landing page */
+    --background: 0 0% 2%;          /* #050505 */
+    --foreground: 0 0% 96%;          /* #f5f5f5 */
 
-    --card: #252628;
-    --card-foreground: 33 60% 98%;
+    --card: 0 0% 9%;                 /* #161616 */
+    --card-foreground: 0 0% 96%;     /* #f5f5f5 */
 
-    --popover: 210 4% 9%;
-    --popover-foreground: 33 60% 98%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 96%;
 
-    /* En modo oscuro, el primario es el color claro del texto. */
-    --primary: 33 60% 98%;
-    --primary-foreground: 210 4% 9%;
+    /* Primary = Green accent */
+    --primary: 142 71% 45%;          /* #22c55e */
+    --primary-foreground: 0 0% 0%;   /* Black text on green */
 
-    /* Actualizado para coincidir con el color de la tarjeta. */
-    --secondary: 210 4% 15%;
-    --secondary-foreground: 33 60% 98%;
+    --secondary: 0 0% 12%;           /* Slightly lighter than bg */
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 40 9% 25%;
-    --muted-foreground: 40 9% 72%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 42%;    /* #6b6b6b */
 
-    --accent: 33 60% 98%;
-    --accent-foreground: 210 4% 9%;
+    --accent: 142 71% 45%;
+    --accent-foreground: 0 0% 0%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 33 60% 98%;
-    /* Actualizado para coincidir con el color de la tarjeta. */
-    --input: 210 4% 15%;
-    --ring: 40 9% 72%;
+    --border: 142 60% 47% / 0.08;
+    --input: 0 0% 12%;
+    --ring: 142 71% 45%;
   }
 }
 
@@ -88,24 +87,272 @@
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+    line-height: 1.6;
   }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
-    font-weight: 900; /* Corresponde a la variante "Negro" de Montserrat */
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
     @apply text-foreground;
+  }
+
+  /* Selection — green tint */
+  ::selection {
+    background: rgba(74, 222, 128, 0.3);
+    color: #f5f5f5;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #444;
+  }
+
+  /* Links */
+  a {
+    transition: color 0.2s;
   }
 }
 
-  /* --- Menú de filtros --- */
-  .filter-menu { @apply flex items-center gap-2 md:gap-3 mb-6 flex-wrap px-2 md:px-0; }
-  .filter-badge {
-      @apply px-4 py-1.5 text-sm font-medium border rounded-full transition-colors duration-200;
-      @apply border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+/* ===== Scanline Overlay (subtle cyberpunk effect) ===== */
+.dark body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9997;
+}
+
+/* ===== Noise Texture Overlay ===== */
+.dark body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.4;
+}
+
+/* ===== GoP Component Styles ===== */
+
+/* Green gradient text utility */
+.gop-gradient-text {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Section label (mono badge) */
+.gop-section-label {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--gop-green-400);
+  padding: 4px 12px;
+  background: var(--gop-green-glow);
+  border-radius: 100px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+/* ===== GoP Card (Glassmorphism) ===== */
+.gop-game-card {
+  background: rgba(22, 22, 22, 0.7) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(74, 222, 128, 0.08) !important;
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.gop-game-card:hover {
+  background: rgba(26, 26, 26, 0.85) !important;
+  border-color: rgba(74, 222, 128, 0.2) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(74, 222, 128, 0.03);
+}
+
+/* ===== GoP Primary Button ===== */
+.gop-btn-primary {
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  color: #000 !important;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  border: none !important;
+}
+
+.gop-btn-primary:hover {
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.5) !important;
+  transform: translateY(-2px);
+}
+
+/* ===== Filter Menu ===== */
+.filter-menu { @apply flex items-center gap-2 md:gap-3 mb-6 flex-wrap px-2 md:px-0; }
+.filter-badge {
+  @apply px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200;
+  font-family: var(--font-mono);
+  border: 1px solid rgba(74, 222, 128, 0.15);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+.filter-badge:hover {
+  border-color: var(--gop-green-400);
+  color: var(--gop-green-400);
+}
+.filter-badge.active {
+  background: linear-gradient(135deg, var(--gop-green-500), var(--gop-green-600));
+  color: #000;
+  border-color: transparent;
+  cursor: default;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+}
+
+/* ===== Global Blue→Green / Purple→Green / Slate→Neutral Remapping ===== */
+/* This transforms the existing blue/purple accents into the green cyberpunk palette */
+
+/* Blue → Green remapping for dark mode */
+.dark .bg-blue-600 { background-color: #16a34a !important; }
+.dark .bg-blue-500 { background-color: #22c55e !important; }
+.dark .bg-blue-700 { background-color: #15803d !important; }
+.dark .hover\:bg-blue-600:hover { background-color: #16a34a !important; }
+.dark .hover\:bg-blue-700:hover { background-color: #15803d !important; }
+.dark .text-blue-500 { color: #4ade80 !important; }
+.dark .text-blue-400 { color: #4ade80 !important; }
+.dark .text-blue-300 { color: #86efac !important; }
+.dark .text-blue-600 { color: #22c55e !important; }
+.dark .text-blue-700 { color: #22c55e !important; }
+.dark .border-blue-600 { border-color: #16a34a !important; }
+.dark .border-blue-500 { border-color: #22c55e !important; }
+.dark .border-blue-200 { border-color: rgba(74, 222, 128, 0.2) !important; }
+.dark .border-blue-100 { border-color: rgba(74, 222, 128, 0.15) !important; }
+
+/* Blue alpha variants */
+.dark .bg-blue-500\/10 { background-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .bg-blue-500\/80 { background-color: rgba(34, 197, 94, 0.8) !important; }
+.dark .bg-blue-600\/20 { background-color: rgba(34, 197, 94, 0.15) !important; }
+.dark .bg-blue-600\/30 { background-color: rgba(34, 197, 94, 0.2) !important; }
+.dark .bg-blue-900\/10 { background-color: rgba(74, 222, 128, 0.06) !important; }
+.dark .bg-blue-900\/20 { background-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .bg-blue-900\/30 { background-color: rgba(74, 222, 128, 0.15) !important; }
+.dark .bg-blue-100 { background-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .bg-blue-200 { background-color: rgba(74, 222, 128, 0.15) !important; }
+.dark .border-blue-500\/20 { border-color: rgba(74, 222, 128, 0.15) !important; }
+.dark .border-blue-500\/30 { border-color: rgba(74, 222, 128, 0.2) !important; }
+.dark .border-blue-500\/50 { border-color: rgba(74, 222, 128, 0.35) !important; }
+.dark .border-blue-800 { border-color: rgba(74, 222, 128, 0.15) !important; }
+.dark .border-blue-800\/30 { border-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .text-blue-800 { color: #22c55e !important; }
+
+/* Purple → Green remapping */
+.dark .bg-purple-600 { background-color: #16a34a !important; }
+.dark .bg-purple-500 { background-color: #22c55e !important; }
+.dark .bg-purple-700 { background-color: #15803d !important; }
+.dark .hover\:bg-purple-600:hover { background-color: #16a34a !important; }
+.dark .hover\:bg-purple-700:hover { background-color: #15803d !important; }
+.dark .text-purple-500 { color: #4ade80 !important; }
+.dark .text-purple-400 { color: #4ade80 !important; }
+.dark .text-purple-300 { color: #86efac !important; }
+.dark .text-purple-600 { color: #22c55e !important; }
+.dark .text-purple-700 { color: #22c55e !important; }
+.dark .border-purple-500 { border-color: #22c55e !important; }
+.dark .border-purple-200 { border-color: rgba(74, 222, 128, 0.2) !important; }
+.dark .bg-purple-500\/10 { background-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .bg-purple-600\/20 { background-color: rgba(34, 197, 94, 0.15) !important; }
+.dark .bg-purple-100 { background-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .border-purple-500\/30 { border-color: rgba(74, 222, 128, 0.2) !important; }
+.dark .text-purple-800 { color: #22c55e !important; }
+
+/* Slate → Neutral dark remapping */
+.dark .bg-slate-600 { background-color: rgba(74, 222, 128, 0.15) !important; }
+.dark .bg-slate-700 { background-color: #1a1a1a !important; }
+.dark .bg-slate-800 { background-color: #161616 !important; }
+.dark .bg-slate-900 { background-color: #0a0a0a !important; }
+.dark .hover\:bg-slate-600:hover { background-color: rgba(74, 222, 128, 0.2) !important; }
+.dark .hover\:bg-slate-700:hover { background-color: #222 !important; }
+.dark .text-slate-300 { color: #c0c0c0 !important; }
+.dark .text-slate-400 { color: #6b6b6b !important; }
+.dark .text-slate-500 { color: #6b6b6b !important; }
+.dark .text-slate-200 { color: #f5f5f5 !important; }
+.dark .text-slate-900 { color: #000 !important; }
+.dark .border-slate-600 { border-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .border-slate-700 { border-color: rgba(74, 222, 128, 0.08) !important; }
+.dark .placeholder-slate-400::placeholder { color: #6b6b6b !important; }
+.dark .placeholder-slate-500::placeholder { color: #6b6b6b !important; }
+.dark .bg-slate-500\/5 { background-color: rgba(255, 255, 255, 0.02) !important; }
+.dark .bg-slate-500\/10 { background-color: rgba(255, 255, 255, 0.04) !important; }
+.dark .bg-slate-500\/20 { border-color: rgba(74, 222, 128, 0.08) !important; }
+.dark .bg-slate-500\/50 { background-color: rgba(255, 255, 255, 0.06) !important; }
+.dark .border-slate-500\/10 { border-color: rgba(74, 222, 128, 0.06) !important; }
+.dark .border-slate-500\/20 { border-color: rgba(74, 222, 128, 0.1) !important; }
+.dark .bg-slate-800\/50 { background-color: rgba(22, 22, 22, 0.5) !important; }
+.dark .bg-slate-900\/50 { background-color: rgba(10, 10, 10, 0.5) !important; }
+.dark .bg-slate-900\/40 { background-color: rgba(10, 10, 10, 0.4) !important; }
+.dark .bg-slate-900\/80 { background-color: rgba(10, 10, 10, 0.8) !important; }
+.dark .bg-slate-900\/60 { background-color: rgba(10, 10, 10, 0.6) !important; }
+.dark .bg-slate-100 { background-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .bg-slate-50 { background-color: rgba(255, 255, 255, 0.03) !important; }
+.dark .bg-slate-200 { background-color: rgba(255, 255, 255, 0.08) !important; }
+.dark .bg-slate-300 { background-color: rgba(74, 222, 128, 0.15) !important; }
+.dark .hover\:bg-slate-200:hover { background-color: rgba(74, 222, 128, 0.2) !important; }
+.dark .hover\:bg-slate-100:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+
+/* Blue/Purple gradient overrides */
+.dark .from-blue-500 { --tw-gradient-from: #4ade80 !important; }
+.dark .to-purple-600 { --tw-gradient-to: #22c55e !important; }
+.dark .from-blue-500.to-purple-600 {
+  --tw-gradient-from: #4ade80 !important;
+  --tw-gradient-to: #22c55e !important;
+}
+
+/* Orange→Green remapping for judge page */
+.dark .from-orange-500 { --tw-gradient-from: #4ade80 !important; }
+.dark .to-red-600 { --tw-gradient-to: #16a34a !important; }
+
+/* Blue-50 alpha */
+.dark .bg-blue-50\/50 { background-color: rgba(74, 222, 128, 0.04) !important; }
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
-  .filter-badge.active {
-      @apply bg-primary text-primary-foreground border-transparent hover:bg-primary/90;
-      cursor: default;
+  html {
+    scroll-behavior: auto;
   }
+}

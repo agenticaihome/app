@@ -18,9 +18,9 @@
 </script>
 
 <div
-  class="group relative overflow-hidden rounded-xl bg-card border border-border/50 shadow-md
+  class="group relative overflow-hidden rounded-xl shadow-md
   transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-4 sm:p-5 flex flex-col
-  justify-between max-w-sm w-full"
+  justify-between max-w-sm w-full gop-game-card"
 >
   <div class="space-y-4">
     <!-- Header: Title + Badge -->
@@ -68,9 +68,7 @@
   >
     <Button
       size="sm"
-      class="w-full sm:w-auto transition-all duration-150 hover:scale-[1.02] 
-      bg-slate-600 hover:bg-slate-700 text-white dark:bg-slate-300 
-      dark:hover:bg-slate-200 dark:text-slate-900 font-semibold"
+      class="w-full sm:w-auto transition-all duration-150 hover:scale-[1.02] font-semibold gop-btn-primary"
       on:click={handleViewDetails}
       disabled={!judge}
     >

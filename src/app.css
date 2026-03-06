@@ -18,34 +18,34 @@
     --gop-green-600: #16a34a;
     --gop-green-glow: rgba(74, 222, 128, 0.15);
 
-    /* Light mode (kept for completeness but dark is default) */
-    --background: 210 20% 98%;
-    --foreground: 142 76% 36%;
+    /* Light mode */
+    --background: 0 0% 98%;          /* #fafafa */
+    --foreground: 0 0% 9%;           /* #171717 — dark text */
 
     --card: 0 0% 100%;
-    --card-foreground: 210 4% 9%;
+    --card-foreground: 0 0% 9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 210 4% 9%;
+    --popover-foreground: 0 0% 9%;
 
-    --primary: 142 71% 45%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 142 71% 38%;          /* darker green for light bg */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 142 76% 36%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 210 10% 90%;
-    --muted-foreground: 210 4% 40%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 142 71% 45%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 142 71% 38%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 142 20% 80%;
-    --input: 142 20% 90%;
-    --ring: 142 71% 45%;
+    --border: 0 0% 85%;
+    --input: 0 0% 90%;
+    --ring: 142 71% 38%;
 
     --radius: 0.75rem;
   }
@@ -355,4 +355,107 @@
   html {
     scroll-behavior: auto;
   }
+}
+
+/* ===== Light mode: green remapping (mirrors .dark overrides) ===== */
+:root:not(.dark) .bg-blue-600 { background-color: #15803d !important; }
+:root:not(.dark) .bg-blue-500 { background-color: #16a34a !important; }
+:root:not(.dark) .bg-blue-700 { background-color: #14532d !important; }
+:root:not(.dark) .hover\:bg-blue-600:hover { background-color: #15803d !important; }
+:root:not(.dark) .hover\:bg-blue-700:hover { background-color: #14532d !important; }
+:root:not(.dark) .text-blue-500 { color: #16a34a !important; }
+:root:not(.dark) .text-blue-400 { color: #15803d !important; }
+:root:not(.dark) .text-blue-600 { color: #15803d !important; }
+:root:not(.dark) .border-blue-600 { border-color: #15803d !important; }
+:root:not(.dark) .border-blue-500 { border-color: #16a34a !important; }
+
+/* Light mode body bg */
+:root:not(.dark) body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Light mode navbar */
+:root:not(.dark) .navbar-container,
+:root:not(.dark) nav {
+  background: rgba(255,255,255,0.9) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+  backdrop-filter: blur(12px);
+}
+
+/* Light mode cards */
+:root:not(.dark) .card-container,
+:root:not(.dark) [class*="rounded"][class*="border"] {
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.08);
+}
+
+/* ===== Modal overlay fixes ===== */
+[data-state="open"] {
+  --tw-bg-opacity: 0.95 !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+:root:not(.dark) [data-state="open"] {
+  background-color: hsl(var(--background) / 0.95) !important;
+}
+
+/* Ensure navbar stays above the overlay */
+nav, .navbar-container {
+  z-index: 51 !important;
+}
+
+/* ===== Light mode: targeted fixes ===== */
+:root:not(.dark) {
+  /* Stronger borders on inputs and UI elements */
+  --border: 0 0% 75%;
+  --input: 0 0% 75%;
+}
+
+/* Navbar separator in light mode */
+:root:not(.dark) nav,
+:root:not(.dark) header {
+  border-bottom: 1px solid hsl(0 0% 88%) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Footer bar in light mode */
+:root:not(.dark) footer,
+:root:not(.dark) .footer-bar {
+  background: hsl(0 0% 95%) !important;
+  border-top: 1px solid hsl(0 0% 88%) !important;
+}
+
+/* Footer text legibility */
+:root:not(.dark) .footer-bar *,
+:root:not(.dark) footer * {
+  color: hsl(0 0% 40%) !important;
+}
+
+/* Badges/pills — more visible borders in light */
+:root:not(.dark) .badge,
+:root:not(.dark) [class*="badge"] {
+  border-color: hsl(0 0% 70%) !important;
+}
+
+/* Nav links — darker in light mode */
+:root:not(.dark) nav a {
+  color: hsl(0 0% 25%) !important;
+}
+:root:not(.dark) nav a:hover {
+  color: hsl(142 71% 35%) !important;
+}
+
+/* Spinner track visible in light */
+:root:not(.dark) .animate-spin {
+  opacity: 0.8;
+}
+
+/* Input fields — visible borders */
+:root:not(.dark) input,
+:root:not(.dark) select,
+:root:not(.dark) [role="combobox"] {
+  border-color: hsl(0 0% 70%) !important;
+  background: hsl(0 0% 100%) !important;
 }

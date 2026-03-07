@@ -2186,7 +2186,7 @@
             ? 'bg-slate-900 text-gray-200'
             : 'bg-gray-50 text-gray-800'}"
     >
-        <Loader2 class="w-12 h-12 animate-spin mb-4 text-indigo-500" />
+        <Loader2 class="w-12 h-12 animate-spin mb-4 text-green-500" />
         <p class="text-xl font-semibold opacity-80">Loading game...</p>
     </div>
 {:else if game}
@@ -2366,7 +2366,7 @@
 
                             <Button
                                 on:click={shareGame}
-                                class="w-full sm:w-auto text-sm text-white bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 py-2 px-4 transition-all"
+                                class="w-full sm:w-auto text-sm dark:text-white dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 text-gray-800 bg-gray-100 hover:bg-gray-200 border border-gray-300 backdrop-blur-md py-2 px-4 transition-all"
                             >
                                 <Share2 class="mr-2 h-4 w-4" />
                                 Share Game

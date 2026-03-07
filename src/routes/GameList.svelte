@@ -287,7 +287,6 @@
 
 <div class="items-container">
     <div class="hero-section">
-        <span class="gop-section-label">Competitions</span>
         <h2
             class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 mt-3 gop-gradient-text inline-block"
             style="font-family: var(--font-heading);"

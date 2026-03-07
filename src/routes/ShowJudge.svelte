@@ -34,9 +34,9 @@
 		bgHover: "rgba(0,0,0,0.03)", // Very subtle hover
 		borderColor: "#e4e4e7", // Zinc 200 - Crisp borders
 		borderSubtle: "rgba(0,0,0,0.04)", // Light dividers
-		accentPrimary: "#d97706", // Amber 600 - Deep, rich gold for white bg
-		accentSecondary: "#b45309", // Amber 700 - Interaction state
-		scoreGlow: "rgba(217, 119, 6, 0.15)", // Warm, inviting glow
+		accentPrimary: "#16a34a", // Green 600 - Brand green for light bg
+		accentSecondary: "#15803d", // Green 700 - Interaction state
+		scoreGlow: "rgba(22, 163, 74, 0.15)", // Green glow
 	};
 
 	const darkTheme = {
@@ -48,9 +48,9 @@
 		bgHover: "rgba(255,255,255,0.03)", // Delicate overlay
 		borderColor: "#3f3f46", // Zinc 700 - Soft boundaries
 		borderSubtle: "rgba(255,255,255,0.05)", // Ghostly dividers
-		accentPrimary: "#f59e0b", // Amber 500 - Vibrant gold pop on dark
-		accentSecondary: "#d97706", // Amber 600 - Interaction state
-		scoreGlow: "rgba(245, 158, 11, 0.15)", // Ethereal gold glow
+		accentPrimary: "#4ade80", // Green 400 - Brand green pop on dark
+		accentSecondary: "#22c55e", // Green 500 - Interaction state
+		scoreGlow: "rgba(74, 222, 128, 0.15)", // Green glow
 	};
 
 	$: profileTheme = $mode === "light" ? lightTheme : darkTheme;

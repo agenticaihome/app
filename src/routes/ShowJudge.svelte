@@ -53,7 +53,8 @@
 		scoreGlow: "rgba(74, 222, 128, 0.15)", // Green glow
 	};
 
-	$: profileTheme = $mode === "light" ? lightTheme : darkTheme;
+	// Always use dark theme for Profile (preferred by design)
+	$: profileTheme = darkTheme;
 </script>
 
 <div class="show-judge-container">

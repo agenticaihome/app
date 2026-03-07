@@ -2181,19 +2181,14 @@
 
 {#if showLoadingScreen}
     <div
-        class="flex flex-col items-center justify-center min-h-screen {$mode ===
-        'dark'
-            ? 'bg-slate-900 text-gray-200'
-            : 'bg-gray-50 text-gray-800'}"
+        class="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-gray-200"
     >
         <Loader2 class="w-12 h-12 animate-spin mb-4 text-green-500" />
         <p class="text-xl font-semibold opacity-80">Loading game...</p>
     </div>
 {:else if game}
     <div
-        class="game-detail-page min-h-screen {$mode === 'dark'
-            ? 'bg-slate-900 text-gray-200'
-            : 'bg-gray-50 text-gray-800'}"
+        class="game-detail-page min-h-screen bg-slate-900 text-gray-200"
     >
         <div
             class="game-container w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8 py-0 md:py-8"

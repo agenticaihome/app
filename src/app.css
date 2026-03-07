@@ -573,3 +573,37 @@ nav, .navbar-container {
 :root:not(.dark) .empty-state-icon svg {
   color: rgba(22, 163, 74, 0.4) !important;
 }
+
+/* ===== Light mode: GameDetails stat cards fix ===== */
+/* The hero banner uses bg-white/10 + text-white — invisible on light */
+:root:not(.dark) .stat-blocks-grid .group,
+:root:not(.dark) .stat-blocks-grid > div {
+  background: rgba(0, 0, 0, 0.55) !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+:root:not(.dark) .stat-blocks-grid .text-white\/90,
+:root:not(.dark) .stat-blocks-grid [class*="text-white"] {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Game hero banner — ensure text always readable regardless of mode */
+:root:not(.dark) .stat-blocks-grid span,
+:root:not(.dark) .stat-blocks-grid div[class*="font-bold"],
+:root:not(.dark) .stat-blocks-grid div[class*="text-2xl"],
+:root:not(.dark) .stat-blocks-grid div[class*="text-xl"] {
+  color: #ffffff !important;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+
+/* Info button in light mode */
+:root:not(.dark) .stat-blocks-grid button {
+  color: rgba(255,255,255,0.7) !important;
+}
+
+/* Game info section below banner */
+:root:not(.dark) .game-info-section {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+}

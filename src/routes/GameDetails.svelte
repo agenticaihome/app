@@ -2241,7 +2241,7 @@
                         >
                             {#each [{ label: "Reputation", value: game.reputation.toFixed(4), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commissions", value: `${totalPct}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool that goes to commissions" }] as stat}
                                 <div
-                                    class="group relative flex flex-col justify-between p-5 rounded-xl border border-white/20 bg-white/10 backdrop-blur-md transition-all duration-300 hover:bg-white/20"
+                                    class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                                 >
                                     <div
                                         class="relative z-10 flex items-center justify-between mb-3"
@@ -2282,7 +2282,7 @@
 
                             {#if createdDateDisplay}
                                 <div
-                                    class="flex flex-col justify-between p-5 rounded-xl border border-white/20 bg-white/10 backdrop-blur-md"
+                                    class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
                                 >
                                     <div class="flex items-center gap-2 mb-3">
                                         <Calendar
@@ -2302,7 +2302,7 @@
                             {/if}
 
                             <div
-                                class="flex flex-col justify-between p-5 rounded-xl border border-indigo-400/40 bg-indigo-500/10 backdrop-blur-md"
+                                class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
                             >
                                 <div
                                     class="flex items-center justify-between mb-3"
@@ -2356,7 +2356,7 @@
                                     class="w-full sm:w-auto"
                                 >
                                     <Button
-                                        class="w-full text-base bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-md border border-white/20 py-6 px-8 transition-all"
+                                        class="w-full text-base bg-slate-800/80 hover:bg-slate-700/80 text-white font-bold backdrop-blur-md border border-slate-600/50 py-6 px-8 transition-all"
                                     >
                                         <ExternalLink class="mr-2 h-5 w-5" />
                                         Visit Game Site

@@ -460,8 +460,8 @@
     }
 
     .game-card-active {
-        outline: 2px solid #22c55e;
-        outline-offset: 4px;
+        border-color: rgba(74, 222, 128, 0.7) !important;
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.4), 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(74, 222, 128, 0.04) !important;
     }
 
     /* Cyberpunk Game Card */
@@ -474,8 +474,8 @@
 
     :global(.gop-game-card:hover) {
         background: rgba(26, 26, 26, 0.85);
-        border-color: rgba(74, 222, 128, 0.2);
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(74, 222, 128, 0.03);
+        border-color: rgba(74, 222, 128, 0.5);
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.25), 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(74, 222, 128, 0.03);
     }
 
     /* Green primary button */

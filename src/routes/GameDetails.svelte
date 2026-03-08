@@ -7304,16 +7304,22 @@
     }
 
     /* Override source-application FileCard hardcoded green → purple for Game Service Sources */
+    /* Tailwind class overrides */
     .service-file-card-wrapper :global(.text-green-500),
     .service-file-card-wrapper :global([class*="text-green"]) {
         color: #a855f7 !important; /* purple-500 */
     }
+    .service-file-card-wrapper :global(.bg-green-500\/10),
+    .service-file-card-wrapper :global([class*="bg-green"]) {
+        background-color: rgb(168 85 247 / 0.1) !important;
+    }
+    /* Inline style overrides — Timeline dot (background-color) and label (color) */
     .service-file-card-wrapper :global([style*="color: #22c55e"]),
     .service-file-card-wrapper :global([style*="color:#22c55e"]) {
         color: #a855f7 !important;
     }
-    .service-file-card-wrapper :global(.bg-green-500\/10),
-    .service-file-card-wrapper :global([class*="bg-green"]) {
-        background-color: rgb(168 85 247 / 0.1) !important;
+    .service-file-card-wrapper :global([style*="background-color: #22c55e"]),
+    .service-file-card-wrapper :global([style*="background-color:#22c55e"]) {
+        background-color: #a855f7 !important;
     }
 </style>

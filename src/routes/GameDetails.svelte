@@ -3098,14 +3098,16 @@
                                             </p>
                                         {/if}
 
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.paper}
-                                            sources={paperSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
+                                        <div class="service-file-card-wrapper">
+                                            <FileCard
+                                                profile={$reputation_proof}
+                                                fileHash={game.content.paper}
+                                                sources={paperSources}
+                                                explorerUri={$explorer_uri}
+                                                source_explorer_url={$source_explorer_url}
+                                                webExplorerUriTkn={$web_explorer_uri_tkn}
+                                            />
+                                        </div>
                                     </div>
                                 </details>
                             </div>
@@ -3126,7 +3128,7 @@
                                     >
                                         <div class="flex items-center gap-2">
                                             <Music
-                                                class="w-5 h-5 text-green-500"
+                                                class="w-5 h-5 text-purple-500"
                                             />
                                             <span>Game Soundtrack Sources</span>
                                         </div>
@@ -3174,14 +3176,16 @@
                                             </p>
                                         {/if}
 
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.soundtrack}
-                                            sources={soundtrackSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
+                                        <div class="service-file-card-wrapper">
+                                            <FileCard
+                                                profile={$reputation_proof}
+                                                fileHash={game.content.soundtrack}
+                                                sources={soundtrackSources}
+                                                explorerUri={$explorer_uri}
+                                                source_explorer_url={$source_explorer_url}
+                                                webExplorerUriTkn={$web_explorer_uri_tkn}
+                                            />
+                                        </div>
                                     </div>
                                 </details>
                             </div>

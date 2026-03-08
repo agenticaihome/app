@@ -2181,19 +2181,14 @@
 
 {#if showLoadingScreen}
     <div
-        class="flex flex-col items-center justify-center min-h-screen {$mode ===
-        'dark'
-            ? 'bg-slate-900 text-gray-200'
-            : 'bg-gray-50 text-gray-800'}"
+        class="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-gray-200"
     >
-        <Loader2 class="w-12 h-12 animate-spin mb-4 text-indigo-500" />
+        <Loader2 class="w-12 h-12 animate-spin mb-4 text-green-500" />
         <p class="text-xl font-semibold opacity-80">Loading game...</p>
     </div>
 {:else if game}
     <div
-        class="game-detail-page min-h-screen {$mode === 'dark'
-            ? 'bg-slate-900 text-gray-200'
-            : 'bg-gray-50 text-gray-800'}"
+        class="game-detail-page min-h-screen bg-slate-900 text-gray-200"
     >
         <div
             class="game-container w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8 py-0 md:py-8"
@@ -2241,7 +2236,7 @@
                         >
                             {#each [{ label: "Reputation", value: game.reputation.toFixed(4), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commissions", value: `${totalPct}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool that goes to commissions" }] as stat}
                                 <div
-                                    class="group relative flex flex-col justify-between p-5 rounded-xl border border-white/20 bg-white/10 backdrop-blur-md transition-all duration-300 hover:bg-white/20"
+                                    class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                                 >
                                     <div
                                         class="relative z-10 flex items-center justify-between mb-3"
@@ -2282,7 +2277,7 @@
 
                             {#if createdDateDisplay}
                                 <div
-                                    class="flex flex-col justify-between p-5 rounded-xl border border-white/20 bg-white/10 backdrop-blur-md"
+                                    class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
                                 >
                                     <div class="flex items-center gap-2 mb-3">
                                         <Calendar
@@ -2302,7 +2297,7 @@
                             {/if}
 
                             <div
-                                class="flex flex-col justify-between p-5 rounded-xl border border-indigo-400/40 bg-indigo-500/10 backdrop-blur-md"
+                                class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
                             >
                                 <div
                                     class="flex items-center justify-between mb-3"
@@ -2356,7 +2351,7 @@
                                     class="w-full sm:w-auto"
                                 >
                                     <Button
-                                        class="w-full text-base bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-md border border-white/20 py-6 px-8 transition-all"
+                                        class="w-full text-base bg-slate-800/80 hover:bg-slate-700/80 text-white font-bold backdrop-blur-md border border-slate-600/50 py-6 px-8 transition-all"
                                     >
                                         <ExternalLink class="mr-2 h-5 w-5" />
                                         Visit Game Site
@@ -2366,7 +2361,7 @@
 
                             <Button
                                 on:click={shareGame}
-                                class="w-full sm:w-auto text-sm text-white bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 py-2 px-4 transition-all"
+                                class="w-full sm:w-auto text-sm dark:text-white dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 text-gray-800 bg-gray-100 hover:bg-gray-200 border border-gray-300 backdrop-blur-md py-2 px-4 transition-all"
                             >
                                 <Share2 class="mr-2 h-4 w-4" />
                                 Share Game

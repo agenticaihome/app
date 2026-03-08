@@ -272,13 +272,14 @@
 
 <div
     bind:this={cardEl}
-    class="group relative overflow-hidden rounded-2xl bg-card border border-border/50 shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 will-change-transform {isActive
+    class="group relative overflow-hidden rounded-2xl shadow-lg transition-all duration-300 hover:-translate-y-1 will-change-transform gop-game-card {isActive
         ? 'game-card-active'
         : ''}"
     style="transform-origin:center center; transform: translateZ(0) scale({scale});"
 >
     <div
-        class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+        class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+        style="background: linear-gradient(135deg, rgba(74, 222, 128, 0.04) 0%, transparent 60%);"
     />
 
     <div
@@ -435,7 +436,7 @@
 
                     <Button
                         size="lg"
-                        class="w-full sm:w-auto transition-all duration-200 hover:scale-[1.03] bg-slate-600 hover:bg-slate-700 text-white dark:bg-slate-300 dark:hover:bg-slate-200 dark:text-slate-900 font-semibold"
+                        class="w-full sm:w-auto transition-all duration-200 hover:scale-[1.03] font-semibold gop-btn-primary"
                         on:click={handleViewDetails}
                         disabled={!game}
                     >
@@ -459,7 +460,33 @@
     }
 
     .game-card-active {
-        outline: 2px solid var(--color-primary);
-        outline-offset: 4px;
+        border-color: rgba(74, 222, 128, 0.7) !important;
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.4), 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(74, 222, 128, 0.04) !important;
+    }
+
+    /* Cyberpunk Game Card */
+    :global(.gop-game-card) {
+        background: rgba(22, 22, 22, 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(74, 222, 128, 0.08);
+    }
+
+    :global(.gop-game-card:hover) {
+        background: rgba(26, 26, 26, 0.85);
+        border-color: rgba(74, 222, 128, 0.5);
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.25), 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(74, 222, 128, 0.03);
+    }
+
+    /* Green primary button */
+    :global(.gop-btn-primary) {
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+        color: #000 !important;
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+        border: none !important;
+    }
+
+    :global(.gop-btn-primary:hover) {
+        box-shadow: 0 0 30px rgba(34, 197, 94, 0.5) !important;
     }
 </style>

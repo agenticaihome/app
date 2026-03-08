@@ -825,7 +825,7 @@
         >
             <div class="text-center mb-6">
                 <h2
-                    class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-2 bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent inline-block"
+                    class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-2 gop-gradient-text inline-block"
                 >
                     Create a Challenge
                 </h2>
@@ -935,7 +935,7 @@
     {:else}
         <div class="hero-section text-center">
             <h2
-                class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent inline-block"
+                class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 gop-gradient-text inline-block"
             >
                 Create a New Competition
             </h2>

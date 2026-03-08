@@ -37,7 +37,7 @@
 	}
 </script>
 
-<ModeWatcher />
+<ModeWatcher defaultMode="dark" />
 
 {#if $isDevMode}
 	<div

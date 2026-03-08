@@ -3019,14 +3019,17 @@
                                             </p>
                                         {/if}
 
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.serviceId}
-                                            sources={serviceSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
+                                        <!-- service-purple: override source-application's hardcoded green with purple -->
+                                        <div class="service-file-card-wrapper">
+                                            <FileCard
+                                                profile={$reputation_proof}
+                                                fileHash={game.content.serviceId}
+                                                sources={serviceSources}
+                                                explorerUri={$explorer_uri}
+                                                source_explorer_url={$source_explorer_url}
+                                                webExplorerUriTkn={$web_explorer_uri_tkn}
+                                            />
+                                        </div>
                                     </div>
                                 </details>
                             </div>
@@ -7298,5 +7301,19 @@
     }
     .legend-color.developers {
         background-color: #a855f7;
+    }
+
+    /* Override source-application FileCard hardcoded green → purple for Game Service Sources */
+    .service-file-card-wrapper :global(.text-green-500),
+    .service-file-card-wrapper :global([class*="text-green"]) {
+        color: #a855f7 !important; /* purple-500 */
+    }
+    .service-file-card-wrapper :global([style*="color: #22c55e"]),
+    .service-file-card-wrapper :global([style*="color:#22c55e"]) {
+        color: #a855f7 !important;
+    }
+    .service-file-card-wrapper :global(.bg-green-500\/10),
+    .service-file-card-wrapper :global([class*="bg-green"]) {
+        background-color: rgb(168 85 247 / 0.1) !important;
     }
 </style>

@@ -26,27 +26,29 @@
 	// Premium Palette: Zinc (Neutrals) + Amber (Reputation/Gold)
 
 	const lightTheme = {
-		textPrimary: "#09090b", // Zinc 950 - Sharp contrast
+		textPrimary: "#151617", // GoP near-black
 		textSecondary: "#52525b", // Zinc 600 - Readable secondary
 		textMuted: "#a1a1aa", // Zinc 400 - Subtle labels
-		bgCard: "#ffffff", // Pure White - Clean surface
-		bgInput: "#f4f4f5", // Zinc 100 - Distinct input area
+		bgPage: "#fdfbf8", // GoP cream background (matches --background)
+		bgCard: "#fdfaf7", // GoP card surface (matches --card)
+		bgInput: "#f2ded0", // GoP secondary/input (matches --secondary)
 		bgHover: "rgba(0,0,0,0.03)", // Very subtle hover
-		borderColor: "#e4e4e7", // Zinc 200 - Crisp borders
-		borderSubtle: "rgba(0,0,0,0.04)", // Light dividers
+		borderColor: "#151617", // GoP border (matches --border)
+		borderSubtle: "rgba(0,0,0,0.06)", // Light dividers
 		accentPrimary: "#16a34a", // Green 600 - Brand green for light bg
 		accentSecondary: "#15803d", // Green 700 - Interaction state
 		scoreGlow: "rgba(22, 163, 74, 0.15)", // Green glow
 	};
 
 	const darkTheme = {
-		textPrimary: "#fafafa", // Zinc 50 - High legibility
+		textPrimary: "#fdfbf8", // GoP cream (matches dark --foreground)
 		textSecondary: "#a1a1aa", // Zinc 400 - Soft secondary
 		textMuted: "#52525b", // Zinc 600 - De-emphasized
-		bgCard: "#18181b", // Zinc 900 - Deep, neutral dark
-		bgInput: "#27272a", // Zinc 800 - Slightly lighter interactive areas
+		bgPage: "#151617", // GoP dark background (matches dark --background)
+		bgCard: "#252628", // GoP dark card (matches dark --card)
+		bgInput: "#1e2022", // GoP dark secondary (matches dark --secondary)
 		bgHover: "rgba(255,255,255,0.03)", // Delicate overlay
-		borderColor: "#3f3f46", // Zinc 700 - Soft boundaries
+		borderColor: "#fdfbf8", // GoP dark border (matches dark --border)
 		borderSubtle: "rgba(255,255,255,0.05)", // Ghostly dividers
 		accentPrimary: "#4ade80", // Green 400 - Brand green pop on dark
 		accentSecondary: "#22c55e", // Green 500 - Interaction state

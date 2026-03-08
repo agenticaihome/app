@@ -2304,16 +2304,16 @@
                                 >
                                     <div class="flex items-center gap-2">
                                         <Calendar
-                                            class="w-5 h-5 md:w-4 md:h-4 text-indigo-300"
+                                            class="w-5 h-5 md:w-4 md:h-4 text-purple-300"
                                         />
                                         <span
-                                            class="text-[11px] md:text-[10px] uppercase tracking-[0.2em] font-black text-indigo-100/90"
+                                            class="text-[11px] md:text-[10px] uppercase tracking-[0.2em] font-black text-white/90"
                                             >{clockLabel}</span
                                         >
                                     </div>
                                     <button
                                         type="button"
-                                        class="text-indigo-300/40 hover:text-indigo-100 p-2 -mr-2 -mt-2"
+                                        class="text-white/40 hover:text-white p-2 -mr-2 -mt-2"
                                         on:click|stopPropagation={() =>
                                             openDidacticModal(
                                                 clockLabel,
@@ -2330,7 +2330,7 @@
                                         {deadlineDateDisplay.split(" at ")[0]}
                                     </span>
                                     <span
-                                        class="text-[10px] md:text-[9px] font-mono text-indigo-200/60 mt-1 uppercase tracking-tighter"
+                                        class="text-[10px] md:text-[9px] font-mono text-white/40 mt-1 uppercase tracking-tighter"
                                     >
                                         Block: {game.status == "Active"
                                             ? game.deadlineBlock

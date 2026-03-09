@@ -103,6 +103,45 @@
     let steps: TimelineStep[] = [];
     let filteredSteps: TimelineStep[] = [];
 
+    const TIMELINE_ACCENT_COLORS: Record<string, string> = {
+        "blue-400": "#60a5fa",
+        "blue-500": "#3b82f6",
+        "blue-600": "#2563eb",
+        "purple-400": "#c084fc",
+        "purple-500": "#a855f7",
+        "yellow-500": "#eab308",
+        "orange-500": "#f97316",
+        "orange-600": "#ea580c",
+        "red-500": "#ef4444",
+        "red-600": "#dc2626",
+        "lime-500": "#84cc16",
+        "emerald-400": "#34d399",
+        "emerald-500": "#10b981",
+        "amber-500": "#f59e0b",
+        "indigo-500": "#6366f1",
+        "green-500": "#22c55e",
+        "gray-400": "#9ca3af",
+    };
+
+    function getStepAccentColor(step: TimelineStep): string {
+        if (step.status === "active") return "#3b82f6";
+        if (step.status === "cancelled") return "#ef4444";
+
+        // Extract token from classes like "text-purple-500 border-purple-500"
+        const match = step.color?.match(/(?:text|border)-([a-z]+-\d{3})/);
+        if (match?.[1] && TIMELINE_ACCENT_COLORS[match[1]]) {
+            return TIMELINE_ACCENT_COLORS[match[1]];
+        }
+
+        return "hsl(var(--muted-foreground))";
+    }
+
+    function getStepDotStyle(step: TimelineStep): string {
+        if (step.status === "pending") return "";
+        const color = getStepAccentColor(step);
+        return `color: ${color}; border-color: ${color};`;
+    }
+
     $: if (currentGame || history.length > 0 || participations.length > 0) {
         isLoadingTimeline = true;
         buildSteps(history, currentGame, currentHeight, participations).then(
@@ -1117,12 +1156,13 @@
                     <div
                         class="absolute -left-[45px] top-0 flex items-center justify-center w-8 h-8 rounded-full bg-background border-2
                     {step.status === 'completed'
-                            ? step.color
+                            ? 'border-current text-current'
                             : step.status === 'active'
-                              ? 'border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                              ? 'border-current text-current shadow-[0_0_10px_rgba(59,130,246,0.5)]'
                               : step.status === 'cancelled'
-                                ? 'border-red-500 text-red-500'
+                                ? 'border-current text-current'
                                 : 'border-muted text-muted-foreground'}"
+                        style={getStepDotStyle(step)}
                     >
                         {#if step.icon}
                             <svelte:component
@@ -1140,7 +1180,7 @@
                     >
                         <div class="flex items-center justify-between gap-2">
                             <span
-                                class="font-bold text-lg {step.status ===
+                                class="font-bold text-lg text-foreground {step.status ===
                                 'active'
                                     ? 'text-blue-500'
                                     : ''} {step.status === 'cancelled'

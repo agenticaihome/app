@@ -294,9 +294,11 @@
                 <img
                     src={game.content.imageURL}
                     alt={game.content.title}
-                    class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    class="game-card-image w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
                 />
+                <div class="game-card-image-cyber absolute inset-0" />
+                <div class="game-card-image-scanlines absolute inset-0" />
                 <div
                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
                 />
@@ -488,5 +490,47 @@
 
     :global(.gop-btn-primary:hover) {
         box-shadow: 0 0 30px rgba(34, 197, 94, 0.5) !important;
+    }
+
+    .game-card-image-cyber {
+        pointer-events: none;
+        background:
+            radial-gradient(
+                circle at 18% 20%,
+                rgba(34, 197, 94, 0.22),
+                transparent 48%
+            ),
+            linear-gradient(
+                135deg,
+                rgba(16, 185, 129, 0.12),
+                rgba(15, 23, 42, 0.2)
+            );
+        mix-blend-mode: overlay;
+        opacity: 0.32;
+    }
+
+    .game-card-image-scanlines {
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0),
+            rgba(0, 0, 0, 0) 2px,
+            rgba(74, 222, 128, 0.04) 2px,
+            rgba(74, 222, 128, 0.04) 4px
+        );
+        mix-blend-mode: soft-light;
+        opacity: 0.45;
+    }
+
+    :global(.light) .game-card-image {
+        filter: saturate(1.16) contrast(1.08) hue-rotate(-5deg);
+    }
+
+    :global(.light) .game-card-image-cyber {
+        opacity: 0.42;
+    }
+
+    :global(.light) .game-card-image-scanlines {
+        opacity: 0.58;
     }
 </style>

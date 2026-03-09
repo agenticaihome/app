@@ -2196,12 +2196,12 @@
             <section
                 class="hero-section relative md:rounded-xl md:shadow-2xl overflow-hidden mb-6 md:mb-12"
             >
-                <div class="hero-bg-image">
+                <div class="hero-bg-image absolute inset-0">
                     {#if resolvedImageSrc}
                         <img
                             src={resolvedImageSrc}
                             alt=""
-                            class="absolute inset-0 w-full h-full object-cover blur-md scale-110"
+                            class="hero-bg-layer absolute inset-0 w-full h-full object-cover blur-md scale-110"
                         />
                     {/if}
                     <div
@@ -2217,7 +2217,7 @@
                             <img
                                 src={resolvedImageSrc}
                                 alt="{game.content.title} banner"
-                                class="w-full h-auto max-h-64 md:max-h-96 object-contain rounded-lg shadow-2xl border border-white/10"
+                                class="hero-main-image w-full h-auto max-h-64 md:max-h-96 object-contain rounded-lg shadow-2xl border border-white/10"
                             />
                         </div>
                     {/if}
@@ -2226,7 +2226,7 @@
                         class="flex-1 text-center md:text-left w-full mt-6 md:mt-0"
                     >
                         <h1
-                            class="text-3xl sm:text-4xl lg:text-5xl font-bold font-['Russo_One'] mb-8 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)] tracking-tight"
+                            class="text-3xl sm:text-4xl lg:text-5xl font-bold font-['Russo_One'] mb-8 tracking-tight text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)]"
                         >
                             {game.content.title}
                         </h1>
@@ -2361,7 +2361,7 @@
 
                             <Button
                                 on:click={shareGame}
-                                class="w-full sm:w-auto text-sm dark:text-white dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 text-gray-800 bg-gray-100 hover:bg-gray-200 border border-gray-300 backdrop-blur-md py-2 px-4 transition-all"
+                                class="w-full sm:w-auto text-sm text-white bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md py-2 px-4 transition-all"
                             >
                                 <Share2 class="mr-2 h-4 w-4" />
                                 Share Game

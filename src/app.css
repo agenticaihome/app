@@ -400,6 +400,22 @@
 :root:not(.dark) .text-blue-600 { color: #15803d !important; }
 :root:not(.dark) .border-blue-600 { border-color: #15803d !important; }
 :root:not(.dark) .border-blue-500 { border-color: #16a34a !important; }
+:root:not(.dark) .bg-purple-600 { background-color: #15803d !important; }
+:root:not(.dark) .bg-purple-500 { background-color: #16a34a !important; }
+:root:not(.dark) .bg-purple-700 { background-color: #14532d !important; }
+:root:not(.dark) .hover\:bg-purple-600:hover { background-color: #15803d !important; }
+:root:not(.dark) .hover\:bg-purple-700:hover { background-color: #14532d !important; }
+:root:not(.dark) .text-purple-500 { color: #16a34a !important; }
+:root:not(.dark) .text-purple-400 { color: #15803d !important; }
+:root:not(.dark) .text-purple-600 { color: #15803d !important; }
+:root:not(.dark) .border-purple-600 { border-color: #15803d !important; }
+:root:not(.dark) .border-purple-500 { border-color: #16a34a !important; }
+:root:not(.dark) .from-blue-500 { --tw-gradient-from: #22c55e !important; }
+:root:not(.dark) .to-purple-600 { --tw-gradient-to: #15803d !important; }
+:root:not(.dark) .from-blue-500.to-purple-600 {
+  --tw-gradient-from: #22c55e !important;
+  --tw-gradient-to: #15803d !important;
+}
 
 /* Light mode body bg */
 :root:not(.dark) body {
@@ -616,4 +632,55 @@ nav, .navbar-container {
 :root:not(.dark) .game-info-section {
   background: hsl(var(--card)) !important;
   color: hsl(var(--foreground)) !important;
+}
+
+/* ===== Light mode: cyber visual parity ===== */
+:root:not(.dark) body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(34, 197, 94, 0.02) 2px,
+      rgba(34, 197, 94, 0.02) 4px
+    );
+  pointer-events: none;
+  z-index: 9997;
+}
+
+:root:not(.dark) body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.25;
+}
+
+:root:not(.dark) .hero-bg-image {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+:root:not(.dark) .hero-bg-image::after {
+  content: none;
+}
+
+:root:not(.dark) .hero-bg-layer {
+  filter: blur(12px);
+}
+
+:root:not(.dark) .hero-main-image {
+  border-color: rgba(34, 197, 94, 0.25) !important;
+  box-shadow:
+    0 0 0 1px rgba(34, 197, 94, 0.2),
+    0 20px 60px rgba(2, 6, 23, 0.22),
+    0 0 48px rgba(34, 197, 94, 0.14) !important;
 }

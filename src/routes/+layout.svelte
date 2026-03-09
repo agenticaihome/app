@@ -2,6 +2,8 @@
 	import "../app.css";
 	import { ModeWatcher } from "mode-watcher";
 	import { isDevMode } from "$lib/ergo/envs";
+	import CustomCursor from "$lib/CustomCursor.svelte";
+	import HoverCornersAuto from "$lib/HoverCornersAuto.svelte";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -38,6 +40,8 @@
 </script>
 
 <ModeWatcher defaultMode="dark" />
+<CustomCursor />
+<HoverCornersAuto />
 
 {#if $isDevMode}
 	<div

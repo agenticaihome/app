@@ -48,6 +48,7 @@
         VolumeX,
         Music,
         Github,
+        Globe,
         Send,
     } from "lucide-svelte";
     import SettingsModal from "./SettingsModal.svelte";
@@ -565,6 +566,15 @@
             title="GitHub Repository"
         >
             <Github class="h-4 w-4" />
+        </a>
+        <a
+            href="https://game-of-prompts.github.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-foreground transition-colors ml-2"
+            title="GoP Landing"
+        >
+            <Globe class="h-4 w-4" />
         </a>
         <a
             href="https://t.me/unstopbots"

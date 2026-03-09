@@ -529,6 +529,80 @@ nav, .navbar-container {
   color: #171717;
 }
 
+/* Hover-corners targets in light mode: keep contrast readable */
+:root:not(.dark) .hc-target.hc-active {
+  color: hsl(var(--foreground)) !important;
+}
+
+:root:not(.dark) .nav-links li a.hc-active,
+:root:not(.dark) .mobile-nav-links li a.hc-active {
+  color: hsl(142 71% 28%) !important;
+  background: rgba(34, 197, 94, 0.1) !important;
+}
+
+:root:not(.dark) .search-container input.hc-active,
+:root:not(.dark) .search-container select.hc-active,
+:root:not(.dark) .status-filter select.hc-active {
+  border-color: rgba(34, 197, 94, 0.45) !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.14);
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Wallet component contrast in light mode */
+:root:not(.dark) .wallet-connect-button,
+:root:not(.dark) .wallet-connect-button.hc-active {
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  border-color: rgba(22, 163, 74, 0.45) !important;
+  color: #04110a !important;
+}
+
+:root:not(.dark) .wallet-connected-button,
+:root:not(.dark) .wallet-connected-button.hc-active {
+  background: #ffffff !important;
+  border-color: hsl(0 0% 75%) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+:root:not(.dark) .wallet-dropdown-content {
+  background: #ffffff !important;
+  border-color: hsl(0 0% 82%) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+:root:not(.dark) .wallet-dropdown-content .wallet-header,
+:root:not(.dark) .wallet-dropdown-content .wallet-section,
+:root:not(.dark) .wallet-dropdown-content .address-code,
+:root:not(.dark) .wallet-dropdown-content .balance-row,
+:root:not(.dark) .wallet-dropdown-content .token-row {
+  color: hsl(var(--foreground)) !important;
+}
+
+:root:not(.dark) .wallet-dropdown-content .section-label,
+:root:not(.dark) .wallet-dropdown-content .text-muted-foreground {
+  color: hsl(0 0% 38%) !important;
+}
+
+:root:not(.dark) .wallet-dropdown-content .icon-button:hover,
+:root:not(.dark) .wallet-dropdown-content .icon-button.hc-active {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* Pending payouts (daisy classes) contrast in light mode */
+:root:not(.dark) .btn.btn-primary,
+:root:not(.dark) .btn.btn-primary.hc-active {
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  border-color: rgba(22, 163, 74, 0.45) !important;
+  color: #04110a !important;
+}
+
+:root:not(.dark) .btn.btn-secondary,
+:root:not(.dark) .btn.btn-secondary.hc-active {
+  background: #f8fafc !important;
+  border-color: hsl(0 0% 75%) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
 /* GoP cards in light mode */
 :root:not(.dark) .gop-game-card {
   background: rgba(255, 255, 255, 0.9) !important;

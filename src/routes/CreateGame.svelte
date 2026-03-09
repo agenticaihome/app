@@ -914,7 +914,7 @@
                     <BookOpen class="w-6 h-6 flex-shrink-0" />
                     <p class="text-sm">
                         Check the <a
-                            href="https://github.com/game-of-prompts/gop-examples"
+                            href="https://github.com/game-of-prompts/snake-game"
                             target="_blank"
                             class="underline font-bold hover:text-yellow-500"
                             >Examples Repository</a

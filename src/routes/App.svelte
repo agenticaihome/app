@@ -604,24 +604,43 @@
 <WalletAddressChangeHandler />
 
 <style lang="postcss">
+    :global(:root) {
+        --gop-nav-top: 0.75rem;
+        --gop-nav-height: 4rem;
+    }
+
     :global(body) {
         background-color: hsl(var(--background));
     }
 
     /* ===== Navbar — Dark Cyberpunk ===== */
     .navbar-container {
-        @apply sticky top-0 z-50 w-full backdrop-blur-lg;
-        background-color: hsl(var(--background) / 0.85);
-        border-bottom: 1px solid rgba(74, 222, 128, 0.08);
+        @apply sticky z-50;
+        top: var(--gop-nav-top);
+        width: fit-content;
+        max-width: calc(100vw - 1rem);
+        margin-inline: auto;
+        border-radius: 30px / 24px;
+        background-color: hsl(var(--background) / 0.82);
+        border: 1px solid rgba(74, 222, 128, 0.14);
+        box-shadow:
+            0 14px 34px rgba(0, 0, 0, 0.28),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(14px) saturate(1.2);
+        -webkit-backdrop-filter: blur(14px) saturate(1.2);
+        overflow: clip;
     }
 
     .navbar-content {
-        @apply container flex h-16 items-center;
+        @apply flex h-16 items-center px-3 md:px-4;
         @apply justify-end md:justify-start;
+        gap: 0.5rem;
+        width: fit-content;
+        max-width: calc(100vw - 1.5rem);
     }
 
     .logo-container {
-        @apply mr-6 flex items-center;
+        @apply mr-3 flex items-center;
     }
 
     .logo-image {
@@ -632,7 +651,7 @@
     }
 
     .desktop-nav {
-        @apply hidden md:flex flex-1;
+        @apply hidden md:flex;
     }
 
     .nav-links {
@@ -660,7 +679,7 @@
     }
 
     .user-section {
-        @apply items-center gap-3;
+        @apply items-center gap-3 md:ml-2;
     }
 
     .mobile-menu-button {
@@ -674,10 +693,12 @@
 
     .mobile-nav {
         @apply md:hidden fixed left-0 right-0 z-40 shadow-lg flex flex-col;
-        top: 4rem;
+        top: calc(var(--gop-nav-top) + var(--gop-nav-height) + 0.35rem);
         background-color: hsl(var(--background));
         border-bottom: 1px solid rgba(74, 222, 128, 0.08);
-        max-height: calc(100vh - 4rem);
+        max-height: calc(
+            100vh - (var(--gop-nav-top) + var(--gop-nav-height) + 0.35rem)
+        );
         overflow-y: auto;
     }
 

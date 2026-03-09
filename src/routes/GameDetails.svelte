@@ -2181,14 +2181,14 @@
 
 {#if showLoadingScreen}
     <div
-        class="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-gray-200"
+        class="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"
     >
         <Loader2 class="w-12 h-12 animate-spin mb-4 text-green-500" />
         <p class="text-xl font-semibold opacity-80">Loading game...</p>
     </div>
 {:else if game}
     <div
-        class="game-detail-page min-h-screen bg-slate-900 text-gray-200"
+        class="game-detail-page min-h-screen bg-background text-foreground"
     >
         <div
             class="game-container w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8 py-0 md:py-8"

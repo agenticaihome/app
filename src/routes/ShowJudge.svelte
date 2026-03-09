@@ -9,7 +9,6 @@
 	import { onDestroy } from "svelte";
 	import { explorer_uri } from "$lib/ergo/envs";
 	import { GAME, JUDGE, PARTICIPATION } from "$lib/ergo/reputation/types";
-	import { mode } from "mode-watcher";
 
 	let proof: ReputationProof | undefined = undefined;
 
@@ -23,40 +22,22 @@
 
 	$: displayProof = proof ?? get(reputation_proof);
 
-	// Palette: Zinc (Neutrals) + Green (Brand)
-
-	const lightTheme = {
-		textPrimary: "#151617", // GoP near-black
-		textSecondary: "#52525b", // Zinc 600 - Readable secondary
-		textMuted: "#a1a1aa", // Zinc 400 - Subtle labels
-		bgPage: "#fdfbf8", // GoP cream background (matches --background)
-		bgCard: "#fdfaf7", // GoP card surface (matches --card)
-		bgInput: "#f2ded0", // GoP secondary/input (matches --secondary)
-		bgHover: "rgba(0,0,0,0.03)", // Very subtle hover
-		borderColor: "#151617", // GoP border (matches --border)
-		borderSubtle: "rgba(0,0,0,0.06)", // Light dividers
-		accentPrimary: "#16a34a", // Green 600 - Brand green for light bg
-		accentSecondary: "#15803d", // Green 700 - Interaction state
-		scoreGlow: "rgba(22, 163, 74, 0.15)", // Green glow
+	// Use the app design tokens directly so Profile always matches outer layout
+	// in both light and dark modes without duplicating hardcoded hex palettes.
+	const profileTheme = {
+		textPrimary: "hsl(var(--foreground))",
+		textSecondary: "hsl(var(--foreground) / 0.8)",
+		textMuted: "hsl(var(--muted-foreground))",
+		bgPage: "hsl(var(--background))",
+		bgCard: "hsl(var(--card))",
+		bgInput: "hsl(var(--secondary))",
+		bgHover: "hsl(var(--muted) / 0.35)",
+		borderColor: "hsl(var(--border))",
+		borderSubtle: "hsl(var(--border) / 0.6)",
+		accentPrimary: "hsl(var(--primary))",
+		accentSecondary: "hsl(var(--accent))",
+		scoreGlow: "rgba(74, 222, 128, 0.2)",
 	};
-
-	const darkTheme = {
-		textPrimary: "#fdfbf8", // GoP cream (matches dark --foreground)
-		textSecondary: "#a1a1aa", // Zinc 400 - Soft secondary
-		textMuted: "#52525b", // Zinc 600 - De-emphasized
-		bgPage: "#151617", // GoP dark background (matches dark --background)
-		bgCard: "#252628", // GoP dark card (matches dark --card)
-		bgInput: "#1e2022", // GoP dark secondary (matches dark --secondary)
-		bgHover: "rgba(255,255,255,0.03)", // Delicate overlay
-		borderColor: "#fdfbf8", // GoP dark border (matches dark --border)
-		borderSubtle: "rgba(255,255,255,0.05)", // Ghostly dividers
-		accentPrimary: "#4ade80", // Green 400 - Brand green pop on dark
-		accentSecondary: "#22c55e", // Green 500 - Interaction state
-		scoreGlow: "rgba(74, 222, 128, 0.15)", // Green glow
-	};
-
-	// Always use dark theme for Profile (preferred by design)
-	$: profileTheme = darkTheme;
 </script>
 
 <div class="show-judge-container">
@@ -124,10 +105,62 @@
 	{/if}
 </div>
 
-<style lang="postcss">
-	.show-judge-container {
-		max-width: 1400px;
-		margin: 0 auto;
-		padding: 2rem 15px 4rem;
-	}
-</style>
+	<style lang="postcss">
+		.show-judge-container {
+			max-width: 1400px;
+			margin: 0 auto;
+			padding: 2rem 15px 4rem;
+		}
+
+		/* Overrides for hardcoded orange accents inside reputation-system Profile */
+		:global(.show-judge-container .profile-container .project-title) {
+			background: linear-gradient(
+				135deg,
+				var(--gop-green-500),
+				var(--gop-green-600)
+			);
+			-webkit-background-clip: text;
+			background-clip: text;
+			color: transparent;
+		}
+
+		:global(.show-judge-container .profile-container .profile-avatar) {
+			background: linear-gradient(
+				135deg,
+				var(--gop-green-400),
+				var(--gop-green-600)
+			);
+			box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
+		}
+
+		:global(.show-judge-container .profile-container .icon-circle.orange) {
+			background-color: rgba(74, 222, 128, 0.1);
+			color: #16a34a;
+		}
+
+		:global(.show-judge-container .profile-container .asset-card.orange-gradient) {
+			background: linear-gradient(
+				to bottom right,
+				rgba(74, 222, 128, 0.05),
+				rgba(22, 163, 74, 0.04)
+			);
+			border: 1px solid rgba(34, 197, 94, 0.22);
+		}
+
+		:global(.show-judge-container .profile-container .badge.orange) {
+			background-color: rgba(74, 222, 128, 0.12);
+			color: #22c55e;
+			border: 1px solid rgba(34, 197, 94, 0.3);
+		}
+
+		:global(.show-judge-container .profile-container .item-type),
+		:global(.show-judge-container .profile-container .active .item-icon),
+		:global(.show-judge-container .profile-container .main-tab-btn.active),
+		:global(.show-judge-container .profile-container .main-tab-btn.active .tab-count),
+		:global(.show-judge-container .profile-container .sacrifice-toggle-btn),
+		:global(.show-judge-container .profile-container .create-profile-btn-v2:hover) {
+			background: rgba(74, 222, 128, 0.12);
+			border-color: rgba(34, 197, 94, 0.35);
+			color: hsl(var(--primary));
+		}
+	</style>

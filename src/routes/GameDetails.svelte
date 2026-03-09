@@ -2522,7 +2522,7 @@
                                     class="mt-8 border-t border-border pt-8 hidden"
                                 >
                                     <div class="flex items-center gap-2 mb-2">
-                                        <Music class="w-5 h-5 text-green-500" />
+                                        <Music class="w-5 h-5 text-red-500" />
                                         <h3 class="text-lg font-semibold">
                                             Soundtrack
                                         </h3>
@@ -2966,7 +2966,7 @@
                                     >
                                         <div class="flex items-center gap-2">
                                             <Cpu
-                                                class="w-5 h-5 text-purple-500"
+                                                class="w-5 h-5 text-green-500"
                                             />
                                             <span>Game Service Sources</span>
                                         </div>
@@ -3123,7 +3123,7 @@
                                     >
                                         <div class="flex items-center gap-2">
                                             <Music
-                                                class="w-5 h-5 text-purple-500"
+                                                class="w-5 h-5 text-red-500"
                                             />
                                             <span>Game Soundtrack Sources</span>
                                         </div>

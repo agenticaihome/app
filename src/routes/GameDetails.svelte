@@ -3014,14 +3014,17 @@
                                             </p>
                                         {/if}
 
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.serviceId}
-                                            sources={serviceSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
+                                        <!-- service-purple: override source-application's hardcoded green with purple -->
+                                        <div class="service-file-card-wrapper">
+                                            <FileCard
+                                                profile={$reputation_proof}
+                                                fileHash={game.content.serviceId}
+                                                sources={serviceSources}
+                                                explorerUri={$explorer_uri}
+                                                source_explorer_url={$source_explorer_url}
+                                                webExplorerUriTkn={$web_explorer_uri_tkn}
+                                            />
+                                        </div>
                                     </div>
                                 </details>
                             </div>
@@ -3090,14 +3093,16 @@
                                             </p>
                                         {/if}
 
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.paper}
-                                            sources={paperSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
+                                        <div class="service-file-card-wrapper">
+                                            <FileCard
+                                                profile={$reputation_proof}
+                                                fileHash={game.content.paper}
+                                                sources={paperSources}
+                                                explorerUri={$explorer_uri}
+                                                source_explorer_url={$source_explorer_url}
+                                                webExplorerUriTkn={$web_explorer_uri_tkn}
+                                            />
+                                        </div>
                                     </div>
                                 </details>
                             </div>
@@ -3118,7 +3123,7 @@
                                     >
                                         <div class="flex items-center gap-2">
                                             <Music
-                                                class="w-5 h-5 text-green-500"
+                                                class="w-5 h-5 text-purple-500"
                                             />
                                             <span>Game Soundtrack Sources</span>
                                         </div>
@@ -3166,14 +3171,16 @@
                                             </p>
                                         {/if}
 
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.soundtrack}
-                                            sources={soundtrackSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
+                                        <div class="service-file-card-wrapper">
+                                            <FileCard
+                                                profile={$reputation_proof}
+                                                fileHash={game.content.soundtrack}
+                                                sources={soundtrackSources}
+                                                explorerUri={$explorer_uri}
+                                                source_explorer_url={$source_explorer_url}
+                                                webExplorerUriTkn={$web_explorer_uri_tkn}
+                                            />
+                                        </div>
                                     </div>
                                 </details>
                             </div>
@@ -7293,5 +7300,25 @@
     }
     .legend-color.developers {
         background-color: #a855f7;
+    }
+
+    /* Override source-application FileCard hardcoded green → purple for Game Service Sources */
+    /* Tailwind class overrides */
+    .service-file-card-wrapper :global(.text-green-500),
+    .service-file-card-wrapper :global([class*="text-green"]) {
+        color: #a855f7 !important; /* purple-500 */
+    }
+    .service-file-card-wrapper :global(.bg-green-500\/10),
+    .service-file-card-wrapper :global([class*="bg-green"]) {
+        background-color: rgb(168 85 247 / 0.1) !important;
+    }
+    /* Inline style overrides — Timeline dot (background-color) and label (color) */
+    .service-file-card-wrapper :global([style*="color: #22c55e"]),
+    .service-file-card-wrapper :global([style*="color:#22c55e"]) {
+        color: #a855f7 !important;
+    }
+    .service-file-card-wrapper :global([style*="background-color: #22c55e"]),
+    .service-file-card-wrapper :global([style*="background-color:#22c55e"]) {
+        background-color: #a855f7 !important;
     }
 </style>

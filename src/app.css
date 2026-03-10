@@ -896,11 +896,3 @@ select option {
 :root:not(.dark) .hero-bg-layer {
   filter: blur(12px);
 }
-
-:root:not(.dark) .hero-main-image {
-  border-color: rgba(34, 197, 94, 0.25) !important;
-  box-shadow:
-    0 0 0 1px rgba(34, 197, 94, 0.2),
-    0 20px 60px rgba(2, 6, 23, 0.22),
-    0 0 48px rgba(34, 197, 94, 0.14) !important;
-}

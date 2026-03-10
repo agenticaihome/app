@@ -83,6 +83,10 @@
     let mobileMenuOpen = false;
     let showSettings = false;
     let showInvalidExplorerModal = false;
+    let navHidden = false;
+    let lastScrollY = 0;
+    let scrollTicking = false;
+    const scrollDeltaThreshold = 6;
 
     let platform = new ErgoPlatform();
 
@@ -116,6 +120,31 @@
             "animationiteration",
             handleAnimationIteration,
         );
+
+        lastScrollY = window.scrollY;
+        const onScroll = () => {
+            if (scrollTicking) return;
+            scrollTicking = true;
+            requestAnimationFrame(() => {
+                const currentY = window.scrollY;
+                const delta = currentY - lastScrollY;
+
+                if (currentY <= 0) {
+                    navHidden = false;
+                } else if (Math.abs(delta) >= scrollDeltaThreshold) {
+                    if (delta > 0) {
+                        navHidden = true;
+                        if (mobileMenuOpen) mobileMenuOpen = false;
+                    } else {
+                        navHidden = false;
+                    }
+                }
+
+                lastScrollY = currentY;
+                scrollTicking = false;
+            });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
 
         // Load settings
         const storedSettings = localStorage.getItem("gop_settings");
@@ -185,6 +214,7 @@
                 "animationiteration",
                 handleAnimationIteration,
             );
+            window.removeEventListener("scroll", onScroll);
             unsubscribeSettings.forEach((unsub) => unsub());
         };
     });
@@ -312,7 +342,7 @@
     }
 </script>
 
-<header class="navbar-container">
+<header class="navbar-container" class:navbar-hidden={navHidden}>
     <div class="navbar-content">
         <a
             href="#"
@@ -639,6 +669,18 @@
         backdrop-filter: blur(14px) saturate(1.2);
         -webkit-backdrop-filter: blur(14px) saturate(1.2);
         overflow: clip;
+        transition:
+            transform 200ms ease,
+            opacity 200ms ease;
+        will-change: transform, opacity;
+    }
+
+    .navbar-hidden {
+        transform: translateY(
+            calc(-1 * (var(--gop-nav-top) + var(--gop-nav-height) + 1rem))
+        );
+        opacity: 0;
+        pointer-events: none;
     }
 
     .navbar-content {

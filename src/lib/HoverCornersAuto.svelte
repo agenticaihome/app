@@ -23,6 +23,7 @@
 		".search-container input",
 		".search-container select",
 		".status-filter select",
+		".cyber-select",
 		"input[type='search']",
 		"input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='submit']):not([type='reset']):not([type='button'])",
 		"textarea",

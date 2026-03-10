@@ -15,6 +15,7 @@ export function hoverCorners(node: HTMLElement) {
 		node instanceof HTMLTextAreaElement ||
 		node instanceof HTMLSelectElement ||
 		node.getAttribute("role") === "combobox";
+	let isActive = false;
 
 	// Ensure positioned
 	const pos = getComputedStyle(node).position;
@@ -102,8 +103,14 @@ export function hoverCorners(node: HTMLElement) {
 	}
 
 	const onEnter = () => {
+		if (isActive) return;
+		isActive = true;
 		// Signal cursor to hide its corners
-		window.dispatchEvent(new CustomEvent('hoverCornerEnter'));
+		window.dispatchEvent(
+			new CustomEvent('hoverCornerEnter', {
+				detail: { keepDot: isFormControl },
+			}),
+		);
 		node.classList.add('hc-active');
 		updateOverlayRect();
 		if (overlay) overlay.style.opacity = "1";
@@ -115,6 +122,8 @@ export function hoverCorners(node: HTMLElement) {
 	};
 
 	const onLeave = () => {
+		if (!isActive) return;
+		isActive = false;
 		// Signal cursor to show its corners again
 		window.dispatchEvent(new CustomEvent('hoverCornerLeave'));
 		node.classList.remove('hc-active');
@@ -146,12 +155,24 @@ export function hoverCorners(node: HTMLElement) {
 	node.addEventListener('mouseenter', onEnter);
 	node.addEventListener('mouseleave', onLeave);
 	node.addEventListener('mousemove', onMove);
+	node.addEventListener("pointerenter", onEnter);
+	node.addEventListener("pointerleave", onLeave);
+	if (isFormControl) {
+		node.addEventListener("focus", onEnter);
+		node.addEventListener("blur", onLeave);
+	}
 
 	return {
 		destroy() {
 			node.removeEventListener('mouseenter', onEnter);
 			node.removeEventListener('mouseleave', onLeave);
 			node.removeEventListener('mousemove', onMove);
+			node.removeEventListener("pointerenter", onEnter);
+			node.removeEventListener("pointerleave", onLeave);
+			if (isFormControl) {
+				node.removeEventListener("focus", onEnter);
+				node.removeEventListener("blur", onLeave);
+			}
 			node.classList.remove('hc-active');
 			node.classList.remove('hc-target');
 			if (didAdjustPosition) {

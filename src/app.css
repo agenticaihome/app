@@ -529,6 +529,146 @@ nav, .navbar-container {
   color: #171717;
 }
 
+/* Cyberpunk select styling */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 0.75rem;
+  padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+  line-height: 1.2;
+  background-image:
+    linear-gradient(135deg, rgba(74, 222, 128, 0.15), rgba(22, 163, 74, 0.05)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2322c55e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center, right 0.75rem center;
+  background-size: 100% 100%, 14px 14px;
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.08), 0 6px 18px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+select:hover,
+select:focus {
+  border-color: rgba(74, 222, 128, 0.5);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.25), 0 10px 24px rgba(0, 0, 0, 0.22);
+  outline: none;
+}
+
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Light mode select */
+:root:not(.dark) select {
+  background-color: #ffffff;
+  border-color: hsl(0 0% 75%);
+  color: hsl(0 0% 12%);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08), 0 6px 16px rgba(2, 6, 23, 0.08);
+  background-image:
+    linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.02)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2316a34a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+:root:not(.dark) select:hover,
+:root:not(.dark) select:focus {
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3), 0 10px 24px rgba(2, 6, 23, 0.12);
+}
+
+select option {
+  background: #0b0b0b;
+  color: #f5f5f5;
+}
+
+:root:not(.dark) select option {
+  background: #ffffff;
+  color: #171717;
+}
+
+/* Bits UI select (custom cyberpunk) */
+.cyber-select {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 0.75rem;
+  padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+  line-height: 1.2;
+  background-image: linear-gradient(135deg, rgba(74, 222, 128, 0.15), rgba(22, 163, 74, 0.05));
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.08), 0 6px 18px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.cyber-select svg {
+  color: #22c55e;
+}
+
+.cyber-select:hover,
+.cyber-select:focus-visible,
+.cyber-select[aria-expanded="true"],
+.cyber-select[data-state="open"] {
+  border-color: rgba(74, 222, 128, 0.5);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.25), 0 10px 24px rgba(0, 0, 0, 0.22);
+  outline: none;
+}
+
+.cyber-select-content {
+  background: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.15), 0 18px 38px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.cyber-select-item {
+  color: hsl(var(--foreground));
+  border-radius: 0.5rem;
+}
+
+.cyber-select-item[data-highlighted],
+.cyber-select-item[data-state="checked"] {
+  background: rgba(34, 197, 94, 0.18);
+  color: #eafff0;
+}
+
+:root:not(.dark) .cyber-select {
+  background-color: #ffffff;
+  border-color: hsl(0 0% 75%);
+  color: hsl(0 0% 12%);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08), 0 6px 16px rgba(2, 6, 23, 0.08);
+  background-image: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.02));
+}
+
+:root:not(.dark) .cyber-select svg {
+  color: #16a34a;
+}
+
+:root:not(.dark) .cyber-select:hover,
+:root:not(.dark) .cyber-select:focus-visible,
+:root:not(.dark) .cyber-select[aria-expanded="true"],
+:root:not(.dark) .cyber-select[data-state="open"] {
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3), 0 10px 24px rgba(2, 6, 23, 0.12);
+}
+
+:root:not(.dark) .cyber-select-content {
+  background: #ffffff;
+  border-color: hsl(0 0% 82%);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08), 0 16px 32px rgba(2, 6, 23, 0.1);
+}
+
+:root:not(.dark) .cyber-select-item {
+  color: #171717;
+}
+
+:root:not(.dark) .cyber-select-item[data-highlighted],
+:root:not(.dark) .cyber-select-item[data-state="checked"] {
+  background: rgba(34, 197, 94, 0.12);
+  color: #0b2916;
+}
+
 /* Hover-corners targets in light mode: keep contrast readable */
 :root:not(.dark) .hc-target.hc-active {
   color: hsl(var(--foreground)) !important;
@@ -542,7 +682,14 @@ nav, .navbar-container {
 
 :root:not(.dark) .search-container input.hc-active,
 :root:not(.dark) .search-container select.hc-active,
+:root:not(.dark) .search-container .cyber-select.hc-active,
 :root:not(.dark) .status-filter select.hc-active {
+  border-color: rgba(34, 197, 94, 0.45) !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.14);
+  color: hsl(var(--foreground)) !important;
+}
+
+:root:not(.dark) .status-filter .cyber-select.hc-active {
   border-color: rgba(34, 197, 94, 0.45) !important;
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.14);
   color: hsl(var(--foreground)) !important;

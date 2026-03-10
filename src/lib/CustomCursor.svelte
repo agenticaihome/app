@@ -30,7 +30,18 @@
 		}
 
 		// Listen for hover corner transfer events
-		const onHoverEnter = () => hideCursorCorners();
+		const onHoverEnter = (e: Event) => {
+			const detail = (e as CustomEvent)?.detail as
+				| { keepDot?: boolean }
+				| undefined;
+			if (detail?.keepDot) {
+				cornersWrapper.style.opacity = "0";
+				cornersWrapper.style.animationPlayState = "paused";
+				dot.style.opacity = "1";
+				return;
+			}
+			hideCursorCorners();
+		};
 		const onHoverLeave = () => showCursorCorners();
 
 		window.addEventListener('hoverCornerEnter', onHoverEnter);
@@ -47,13 +58,15 @@
 			});
 		};
 
-		document.addEventListener('mousemove', onMove, { passive: true });
+		window.addEventListener('mousemove', onMove, { passive: true });
+		window.addEventListener("pointermove", onMove, { passive: true });
 
 		return () => {
 			cancelAnimationFrame(raf);
 			document.body.classList.remove('has-custom-cursor');
 			document.documentElement.classList.remove('has-custom-cursor');
-			document.removeEventListener('mousemove', onMove);
+			window.removeEventListener('mousemove', onMove);
+			window.removeEventListener("pointermove", onMove);
 			window.removeEventListener('hoverCornerEnter', onHoverEnter);
 			window.removeEventListener('hoverCornerLeave', onHoverLeave);
 		};

@@ -7,6 +7,13 @@
     import { onMount, onDestroy, afterUpdate, tick } from "svelte";
     import { get } from "svelte/store";
     import { Input } from "$lib/components/ui/input";
+    import {
+        Select,
+        SelectTrigger,
+        SelectContent,
+        SelectItem,
+        SelectValue,
+    } from "$lib/components/ui/select";
     import { fetchGoPGames } from "$lib/ergo/fetch";
 
     let allFetchedItems: Map<string, Game> = new Map();
@@ -27,6 +34,7 @@
     ];
 
     let selectedStatus: string = statusOptions[0].value;
+    let lastSelectedStatus: string = selectedStatus;
 
     let totalGamesCount: number = 0;
 
@@ -90,6 +98,11 @@
             });
         }, { threshold: 0.3 }); // 30% visible
         cardElements.forEach(el => observer.observe(el));
+    }
+
+    $: if (selectedStatus !== lastSelectedStatus) {
+        lastSelectedStatus = selectedStatus;
+        applyFiltersAndSearch(allFetchedItems);
     }
 
     async function applyFiltersAndSearch(sourceItems: Map<string, Game>) {
@@ -338,15 +351,26 @@
                 <label for="status-select" class="sr-only"
                     >Filter by status</label
                 >
-                <select
-                    id="status-select"
-                    bind:value={selectedStatus}
-                    on:change={() => applyFiltersAndSearch(allFetchedItems)}
-                >
-                    {#each statusOptions as option}
-                        <option value={option.value}>{option.label}</option>
-                    {/each}
-                </select>
+                <Select bind:value={selectedStatus}>
+                    <SelectTrigger
+                        id="status-select"
+                        class="cyber-select w-full"
+                        aria-label="Filter by status"
+                    >
+                        <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent class="cyber-select-content">
+                        {#each statusOptions as option}
+                            <SelectItem
+                                value={option.value}
+                                label={option.label}
+                                class="cyber-select-item"
+                            >
+                                {option.label}
+                            </SelectItem>
+                        {/each}
+                    </SelectContent>
+                </Select>
             </div>
         </div>
     </div>

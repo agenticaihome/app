@@ -47,6 +47,13 @@
     import { Button } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label/index.js";
+    import {
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+        SelectValue,
+    } from "$lib/components/ui/select";
     import { Textarea } from "$lib/components/ui/textarea";
     // ICONS
     import {
@@ -5869,28 +5876,43 @@
                                                                 class="text-xs text-yellow-600/90 mb-1.5 block"
                                                                 >Simulate Error</Label
                                                             >
-                                                            <select
+                                                            <Select
                                                                 bind:value={
                                                                     devGenErrorType
                                                                 }
-                                                                class="w-full h-8 text-xs rounded-md bg-transparent border border-yellow-500/30 focus:border-yellow-500/50 text-foreground px-2"
                                                             >
-                                                                <option
-                                                                    value="none"
-                                                                    >None
-                                                                    (Valid)</option
+                                                                <SelectTrigger
+                                                                    class="cyber-select w-full h-8 text-xs"
+                                                                    aria-label="Simulate error"
                                                                 >
-                                                                <option
-                                                                    value="wrong_commitment"
-                                                                    >Invalid
-                                                                    Commitment</option
-                                                                >
-                                                                <option
-                                                                    value="wrong_score"
-                                                                    >Score
-                                                                    Mismatch</option
-                                                                >
-                                                            </select>
+                                                                    <SelectValue placeholder="Select error type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent class="cyber-select-content">
+                                                                    <SelectItem
+                                                                        value="none"
+                                                                        label="None (Valid)"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        None (Valid)
+                                                                    </SelectItem>
+                                                                    <SelectItem
+                                                                        value="wrong_commitment"
+                                                                        label="Invalid Commitment"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        Invalid
+                                                                        Commitment
+                                                                    </SelectItem>
+                                                                    <SelectItem
+                                                                        value="wrong_score"
+                                                                        label="Score Mismatch"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        Score
+                                                                        Mismatch
+                                                                    </SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
                                                         </div>
                                                     </div>
 

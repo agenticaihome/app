@@ -25,6 +25,13 @@
     import { Input } from "$lib/components/ui/input";
     import { Checkbox } from "$lib/components/ui/checkbox";
     import {
+        Select,
+        SelectTrigger,
+        SelectContent,
+        SelectItem,
+        SelectValue,
+    } from "$lib/components/ui/select";
+    import {
         Trophy,
         Eye,
         EyeOff,
@@ -1493,15 +1500,32 @@
                                             placeholder="Time for robot upload"
                                             autocomplete="off"
                                         />
-                                        <select
-                                            bind:value={gameTimeUnit}
-                                            class="p-2 border border-slate-500/20 rounded-md bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-slate-500/20"
-                                        >
-                                            <option value="days">Days</option>
-                                            <option value="minutes"
-                                                >Minutes</option
+                                        <Select bind:value={gameTimeUnit}>
+                                            <SelectTrigger
+                                                class="cyber-select min-w-[140px] text-sm"
+                                                aria-label="Game time unit"
                                             >
-                                        </select>
+                                                <SelectValue placeholder="Unit" />
+                                            </SelectTrigger>
+                                            <SelectContent
+                                                class="cyber-select-content"
+                                            >
+                                                <SelectItem
+                                                    value="days"
+                                                    label="Days"
+                                                    class="cyber-select-item"
+                                                >
+                                                    Days
+                                                </SelectItem>
+                                                <SelectItem
+                                                    value="minutes"
+                                                    label="Minutes"
+                                                    class="cyber-select-item"
+                                                >
+                                                    Minutes
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <p
                                         class="text-[10px] text-muted-foreground mt-1"
@@ -1718,16 +1742,27 @@
                                             Loading your tokens...
                                         </p>
                                     {:else}
-                                        <select
-                                            bind:value={selectedTokenOption}
-                                            class="w-full p-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                                        >
-                                            {#each availableTokens as token (token.tokenId)}
-                                                <option value={token.tokenId}>
-                                                    {token.title}
-                                                </option>
-                                            {/each}
-                                        </select>
+                                        <Select bind:value={selectedTokenOption}>
+                                            <SelectTrigger
+                                                class="cyber-select w-full text-sm"
+                                                aria-label="Token for stake and fee"
+                                            >
+                                                <SelectValue placeholder="Select token" />
+                                            </SelectTrigger>
+                                            <SelectContent
+                                                class="cyber-select-content"
+                                            >
+                                                {#each availableTokens as token (token.tokenId)}
+                                                    <SelectItem
+                                                        value={token.tokenId}
+                                                        label={token.title}
+                                                        class="cyber-select-item"
+                                                    >
+                                                        {token.title}
+                                                    </SelectItem>
+                                                {/each}
+                                            </SelectContent>
+                                        </Select>
                                     {/if}
                                 </div>
                                 <div class="form-group lg:col-span-2">
@@ -1896,27 +1931,54 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <select
-                                        id="timeFactorOption"
-                                        bind:value={timeFactorOption}
-                                        class="w-full p-2 border border-slate-500/20 rounded-md bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-slate-500/20"
-                                    >
-                                        <option value="zero"
-                                            >Zero (Only score matters)</option
+                                    <Select bind:value={timeFactorOption}>
+                                        <SelectTrigger
+                                            id="timeFactorOption"
+                                            class="cyber-select w-full text-sm"
+                                            aria-label="Time factor"
                                         >
-                                        <option value="low"
-                                            >Low (1 point per block)</option
+                                            <SelectValue placeholder="Select time factor" />
+                                        </SelectTrigger>
+                                        <SelectContent
+                                            class="cyber-select-content"
                                         >
-                                        <option value="balanced"
-                                            >Balanced (5 points per block)</option
-                                        >
-                                        <option value="high"
-                                            >High (20 points per block)</option
-                                        >
-                                        <option value="extreme"
-                                            >Extreme (100 points per block)</option
-                                        >
-                                    </select>
+                                            <SelectItem
+                                                value="zero"
+                                                label="Zero (Only score matters)"
+                                                class="cyber-select-item"
+                                            >
+                                                Zero (Only score matters)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="low"
+                                                label="Low (1 point per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                Low (1 point per block)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="balanced"
+                                                label="Balanced (5 points per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                Balanced (5 points per block)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="high"
+                                                label="High (20 points per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                High (20 points per block)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="extreme"
+                                                label="Extreme (100 points per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                Extreme (100 points per block)
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                     <p
                                         class="text-xs mt-1 text-muted-foreground"
                                     >

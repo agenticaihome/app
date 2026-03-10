@@ -844,6 +844,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <Card.Root
+                    data-hover-corners
                     class="border-2 hover:border-primary/50 transition-colors"
                 >
                     <Card.Header class="p-4">
@@ -878,6 +879,7 @@
                 </Card.Root>
 
                 <Card.Root
+                    data-hover-corners
                     class="border-2 hover:border-purple-500/50 transition-colors"
                 >
                     <Card.Header class="p-4">

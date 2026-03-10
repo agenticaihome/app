@@ -2284,7 +2284,7 @@
 
                             {#if createdDateDisplay}
                                 <div
-                                    class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
+                                    class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                                 >
                                     <div class="flex items-center gap-2 mb-3">
                                         <Calendar
@@ -2304,7 +2304,7 @@
                             {/if}
 
                             <div
-                                class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
+                                class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                             >
                                 <div
                                     class="flex items-center justify-between mb-3"

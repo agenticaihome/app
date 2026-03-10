@@ -2369,7 +2369,7 @@
                             <Button
                                 on:click={shareGame}
                                 class="w-full sm:w-auto text-sm text-white bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md py-2 px-4 transition-all"
-                            >
+                                style="background-color: rgba(255, 255, 255, 0.05) !important; border-color: rgba(255, 255, 255, 0.1) !important; color: white !important;">
                                 <Share2 class="mr-2 h-4 w-4" />
                                 Share Game
                             </Button>

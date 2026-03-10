@@ -6,7 +6,10 @@
  */
 import { getAdaptiveCornerStyle } from "$lib/cornerColor";
 
-export function hoverCorners(node: HTMLElement) {
+export function hoverCorners(
+	node: HTMLElement,
+	options: { keepDot?: boolean } = {},
+) {
 	const CORNER_SIZE = 16;
 	const BORDER_WIDTH = 2;
 	const MARGIN = 6; // inset from element border
@@ -151,7 +154,7 @@ export function hoverCorners(node: HTMLElement) {
 		// Signal cursor to hide its corners
 		window.dispatchEvent(
 			new CustomEvent('hoverCornerEnter', {
-				detail: { keepDot: isFormControl },
+				detail: { keepDot: Boolean(options.keepDot) || isFormControl },
 			}),
 		);
 		node.classList.add('hc-active');

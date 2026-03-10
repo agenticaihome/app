@@ -135,16 +135,66 @@
     import ShareModal from "./ShareModal.svelte";
     import SolverSourceModal from "./SolverSourceModal.svelte";
     import GameTimeline from "$lib/components/GameTimeline.svelte";
+    import { hoverCorners } from "$lib/hoverCorners";
 
     const strictMode = true;
 
     const PARTICIPATION_BATCH_THRESHOLD = 2;
+
+    type HoverHandle = { destroy: () => void };
+
+    function hoverCornersWhenClosed(node: HTMLElement, isOpen: boolean) {
+        let handle: HoverHandle | null = null;
+
+        const applyState = (open: boolean) => {
+            if (open) {
+                if (handle) {
+                    handle.destroy();
+                    handle = null;
+                }
+                return;
+            }
+            if (typeof window !== "undefined") {
+                const isTouch =
+                    "ontouchstart" in window ||
+                    navigator.maxTouchPoints > 0;
+                if (
+                    isTouch ||
+                    window.matchMedia("(max-width:768px)").matches
+                ) {
+                    return;
+                }
+            }
+            if (!handle) {
+                handle = hoverCorners(node, { keepDot: true });
+            }
+        };
+
+        applyState(isOpen);
+
+        return {
+            update(open: boolean) {
+                applyState(open);
+            },
+            destroy() {
+                if (handle) {
+                    handle.destroy();
+                    handle = null;
+                }
+            },
+        };
+    }
 
     // --- COMPONENT STATE ---
     let game: AnyGame | null = null;
     let isLoaded = false;
     let hasHydrated = false;
     let primaryAction: string | null = null;
+    let technicalDetailsOpen = false;
+    let imageSourcesOpen = false;
+    let serviceSourcesOpen = false;
+    let paperSourcesOpen = false;
+    let soundtrackSourcesOpen = false;
 
     $: isBeforeDeadline = targetDate
         ? new Date().getTime() < targetDate
@@ -2659,6 +2709,8 @@
                             class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                         >
                             <details
+                                bind:open={technicalDetailsOpen}
+                                use:hoverCornersWhenClosed={technicalDetailsOpen}
                                 class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                 'dark'
                                     ? 'border-slate-700'
@@ -2875,6 +2927,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={imageSourcesOpen}
+                                    use:hoverCornersWhenClosed={imageSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'
@@ -2963,6 +3017,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={serviceSourcesOpen}
+                                    use:hoverCornersWhenClosed={serviceSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'
@@ -3042,6 +3098,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={paperSourcesOpen}
+                                    use:hoverCornersWhenClosed={paperSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'
@@ -3120,6 +3178,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={soundtrackSourcesOpen}
+                                    use:hoverCornersWhenClosed={soundtrackSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'

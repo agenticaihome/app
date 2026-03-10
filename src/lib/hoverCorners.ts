@@ -4,6 +4,8 @@
  * On hover, dispatches events so the custom cursor can hide its corners,
  * and renders 4 bracket corners on the element that track the mouse with parallax.
  */
+import { getAdaptiveCornerStyle } from "$lib/cornerColor";
+
 export function hoverCorners(node: HTMLElement) {
 	const CORNER_SIZE = 16;
 	const BORDER_WIDTH = 2;
@@ -39,6 +41,12 @@ export function hoverCorners(node: HTMLElement) {
 			opacity: 0;
 		`;
 		document.body.appendChild(overlay);
+	}
+
+	function applyCornerStyle(el: HTMLDivElement, x: number, y: number) {
+		const style = getAdaptiveCornerStyle(x, y, node);
+		el.style.borderColor = style.color;
+		el.style.filter = style.filter;
 	}
 
 	function createCorners(container: HTMLElement) {
@@ -92,6 +100,9 @@ export function hoverCorners(node: HTMLElement) {
 
 	const cornerHost = overlay ?? node;
 	const corners = createCorners(cornerHost);
+	let colorRaf: number | null = null;
+	let lastShiftX = 0;
+	let lastShiftY = 0;
 
 	function updateOverlayRect(rect?: DOMRect) {
 		if (!overlay) return;
@@ -101,6 +112,38 @@ export function hoverCorners(node: HTMLElement) {
 		overlay.style.width = `${r.width}px`;
 		overlay.style.height = `${r.height}px`;
 	}
+
+	function updateCornerColors(rect?: DOMRect) {
+		const r = rect ?? node.getBoundingClientRect();
+		const xLeft = r.left + MARGIN + CORNER_SIZE / 2 + lastShiftX;
+		const xRight = r.right - (MARGIN + CORNER_SIZE / 2) + lastShiftX;
+		const yTop = r.top + MARGIN + CORNER_SIZE / 2 + lastShiftY;
+		const yBottom = r.bottom - (MARGIN + CORNER_SIZE / 2) + lastShiftY;
+		const points = [
+			{ x: xLeft, y: yTop },
+			{ x: xRight, y: yTop },
+			{ x: xRight, y: yBottom },
+			{ x: xLeft, y: yBottom },
+		];
+		points.forEach((point, index) => {
+			const corner = corners[index];
+			if (!corner) return;
+			applyCornerStyle(corner, point.x, point.y);
+		});
+	}
+
+	function scheduleCornerColorUpdate(rect?: DOMRect) {
+		if (colorRaf) return;
+		colorRaf = requestAnimationFrame(() => {
+			colorRaf = null;
+			updateCornerColors(rect);
+		});
+	}
+
+	const onViewportChange = () => {
+		updateOverlayRect();
+		scheduleCornerColorUpdate();
+	};
 
 	const onEnter = () => {
 		if (isActive) return;
@@ -113,12 +156,13 @@ export function hoverCorners(node: HTMLElement) {
 		);
 		node.classList.add('hc-active');
 		updateOverlayRect();
+		scheduleCornerColorUpdate();
 		if (overlay) overlay.style.opacity = "1";
 		for (const c of corners) {
 			c.style.opacity = '1';
 		}
-		window.addEventListener("scroll", updateOverlayRect, true);
-		window.addEventListener("resize", updateOverlayRect);
+		window.addEventListener("scroll", onViewportChange, true);
+		window.addEventListener("resize", onViewportChange);
 	};
 
 	const onLeave = () => {
@@ -132,19 +176,28 @@ export function hoverCorners(node: HTMLElement) {
 			c.style.opacity = '0';
 			c.style.transform = 'translate(0, 0)';
 		}
-		window.removeEventListener("scroll", updateOverlayRect, true);
-		window.removeEventListener("resize", updateOverlayRect);
+		lastShiftX = 0;
+		lastShiftY = 0;
+		if (colorRaf) {
+			cancelAnimationFrame(colorRaf);
+			colorRaf = null;
+		}
+		window.removeEventListener("scroll", onViewportChange, true);
+		window.removeEventListener("resize", onViewportChange);
 	};
 
 	const onMove = (e: MouseEvent) => {
 		const rect = node.getBoundingClientRect();
 		updateOverlayRect(rect);
+		scheduleCornerColorUpdate(rect);
 		const centerX = rect.left + rect.width / 2;
 		const centerY = rect.top + rect.height / 2;
 		const relX = (e.clientX - centerX) / (rect.width / 2); // -1 to 1
 		const relY = (e.clientY - centerY) / (rect.height / 2); // -1 to 1
 		const shiftX = relX * MAX_SHIFT;
 		const shiftY = relY * MAX_SHIFT;
+		lastShiftX = shiftX;
+		lastShiftY = shiftY;
 
 		// All corners shift in the same direction — tracks the mouse
 		for (const c of corners) {
@@ -178,8 +231,12 @@ export function hoverCorners(node: HTMLElement) {
 			if (didAdjustPosition) {
 				node.style.position = originalPosition;
 			}
-			window.removeEventListener("scroll", updateOverlayRect, true);
-			window.removeEventListener("resize", updateOverlayRect);
+			if (colorRaf) {
+				cancelAnimationFrame(colorRaf);
+				colorRaf = null;
+			}
+			window.removeEventListener("scroll", onViewportChange, true);
+			window.removeEventListener("resize", onViewportChange);
 			for (const c of corners) {
 				c.remove();
 			}

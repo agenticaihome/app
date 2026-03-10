@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { getAdaptiveCornerStyle } from '$lib/cornerColor';
 
 	let wrapper: HTMLDivElement;
 
@@ -12,8 +13,16 @@
 
 		const cornersWrapper = wrapper.querySelector('.corners-ring') as HTMLElement;
 		const dot = wrapper.querySelector('.tcd') as HTMLElement;
+		const cornerEls = Array.from(wrapper.querySelectorAll('.tcc')) as HTMLElement[];
+		const CORNER_OFFSETS = [
+			{ x: -13, y: -13 },
+			{ x: 13, y: -13 },
+			{ x: 13, y: 13 },
+			{ x: -13, y: 13 },
+		];
 
 		let raf: number;
+		let colorRaf: number | undefined;
 		let curX = window.innerWidth / 2;
 		let curY = window.innerHeight / 2;
 
@@ -47,6 +56,35 @@
 		window.addEventListener('hoverCornerEnter', onHoverEnter);
 		window.addEventListener('hoverCornerLeave', onHoverLeave);
 
+		const updateCornerColors = () => {
+			const transform = getComputedStyle(cornersWrapper).transform;
+			const MatrixCtor = (window.DOMMatrixReadOnly || window.DOMMatrix) as
+				| typeof DOMMatrix
+				| undefined;
+			const matrix =
+				MatrixCtor && transform && transform !== 'none'
+					? new MatrixCtor(transform)
+					: null;
+
+			CORNER_OFFSETS.forEach((offset, index) => {
+				const el = cornerEls[index];
+				if (!el) return;
+				const point = matrix
+					? matrix.transformPoint(new DOMPoint(offset.x, offset.y))
+					: offset;
+				const style = getAdaptiveCornerStyle(curX + point.x, curY + point.y);
+				el.style.borderColor = style.color;
+				el.style.filter = style.filter;
+			});
+		};
+
+		const colorTick = () => {
+			updateCornerColors();
+			colorRaf = requestAnimationFrame(colorTick);
+		};
+
+		colorRaf = requestAnimationFrame(colorTick);
+
 		const onMove = (e: MouseEvent) => {
 			cancelAnimationFrame(raf);
 			curX = e.clientX;
@@ -63,6 +101,7 @@
 
 		return () => {
 			cancelAnimationFrame(raf);
+			if (colorRaf) cancelAnimationFrame(colorRaf);
 			document.body.classList.remove('has-custom-cursor');
 			document.documentElement.classList.remove('has-custom-cursor');
 			window.removeEventListener('mousemove', onMove);

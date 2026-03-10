@@ -42,6 +42,10 @@
 		if (node.hasAttribute("disabled")) return false;
 		if (node.getAttribute("aria-disabled") === "true") return false;
 		const rect = node.getBoundingClientRect();
+		const vw = window.innerWidth || document.documentElement.clientWidth;
+		const vh = window.innerHeight || document.documentElement.clientHeight;
+		// Avoid full-screen overlays (e.g., modal backdrops with role="button").
+		if (rect.width > vw * 0.7 && rect.height > vh * 0.7) return false;
 		if (rect.width < 18 || rect.height < 18) return false;
 		return true;
 	}

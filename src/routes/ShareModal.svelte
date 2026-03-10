@@ -93,7 +93,7 @@
     <Dialog.Content class="sm:max-w-[500px]">
         <Dialog.Header>
             <Dialog.Title class="flex items-center gap-2">
-                <ShareIcon class="w-5 h-5 text-orange-500" />
+                <ShareIcon class="w-5 h-5 text-green-500" />
                 Share "{projectName}"
             </Dialog.Title>
             <Dialog.Description>
@@ -112,8 +112,8 @@
                             "p-4 rounded-lg border-2 transition-all duration-200",
                             "flex flex-col items-center justify-center gap-2",
                             selectedPlatform === platform
-                                ? "border-orange-500 bg-orange-500/10"
-                                : "border-border hover:border-orange-500/50 bg-muted/30",
+                                ? "border-green-500 bg-green-500/10"
+                                : "border-border hover:border-green-500/50 bg-muted/30",
                         )}
                     >
                         {#if platform === "twitter"}
@@ -177,7 +177,7 @@
             <Button
                 on:click={handleShare}
                 disabled={!selectedPlatform || isSharing}
-                class="bg-orange-500 hover:bg-orange-600 text-white gap-2"
+                class="bg-green-500 hover:bg-green-600 text-white gap-2"
             >
                 {#if isSharing}
                     <span>Opening...</span>
@@ -201,6 +201,6 @@
 
     :global(.share-button:hover) {
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
     }
 </style>

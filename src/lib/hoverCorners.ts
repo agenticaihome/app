@@ -10,81 +10,126 @@ export function hoverCorners(node: HTMLElement) {
 	const MARGIN = 6; // inset from element border
 	const MAX_SHIFT = 8; // max parallax shift in px
 	const originalPosition = node.style.position;
+	const isFormControl =
+		node instanceof HTMLInputElement ||
+		node instanceof HTMLTextAreaElement ||
+		node instanceof HTMLSelectElement ||
+		node.getAttribute("role") === "combobox";
 
 	// Ensure positioned
 	const pos = getComputedStyle(node).position;
-	if (pos === 'static') {
-		node.style.position = 'relative';
+	const didAdjustPosition = !isFormControl && pos === "static";
+	if (didAdjustPosition) {
+		node.style.position = "relative";
 	}
 	node.classList.add('hc-target');
 
-	// Create corner elements
-	const corners: HTMLDivElement[] = [];
-	const cornerPositions = ['tl', 'tr', 'br', 'bl'];
-
-	for (const cp of cornerPositions) {
-		const el = document.createElement('div');
-		el.className = `hc-corner hc-${cp}`;
-		el.style.cssText = `
-			position: absolute;
-			width: ${CORNER_SIZE}px;
-			height: ${CORNER_SIZE}px;
-			border: ${BORDER_WIDTH}px solid #22c55e;
+	const overlay = isFormControl ? document.createElement("div") : null;
+	if (overlay) {
+		overlay.className = "hc-overlay";
+		overlay.style.cssText = `
+			position: fixed;
+			left: 0;
+			top: 0;
+			width: 0;
+			height: 0;
 			pointer-events: none;
+			z-index: 99998;
 			opacity: 0;
-			transition: opacity 0.2s ease, transform 0.15s ease;
-			z-index: 3;
-			will-change: transform, opacity;
-			filter: drop-shadow(0 0 3px rgba(34,197,94,.6));
 		`;
+		document.body.appendChild(overlay);
+	}
 
-		if (cp === 'tl') {
-			el.style.top = `${MARGIN}px`;
-			el.style.left = `${MARGIN}px`;
-			el.style.borderRight = 'none';
-			el.style.borderBottom = 'none';
-		} else if (cp === 'tr') {
-			el.style.top = `${MARGIN}px`;
-			el.style.right = `${MARGIN}px`;
-			el.style.borderLeft = 'none';
-			el.style.borderBottom = 'none';
-		} else if (cp === 'br') {
-			el.style.bottom = `${MARGIN}px`;
-			el.style.right = `${MARGIN}px`;
-			el.style.borderLeft = 'none';
-			el.style.borderTop = 'none';
-		} else if (cp === 'bl') {
-			el.style.bottom = `${MARGIN}px`;
-			el.style.left = `${MARGIN}px`;
-			el.style.borderRight = 'none';
-			el.style.borderTop = 'none';
+	function createCorners(container: HTMLElement) {
+		const corners: HTMLDivElement[] = [];
+		const cornerPositions = ["tl", "tr", "br", "bl"];
+
+		for (const cp of cornerPositions) {
+			const el = document.createElement("div");
+			el.className = `hc-corner hc-${cp}`;
+			el.style.cssText = `
+				position: absolute;
+				width: ${CORNER_SIZE}px;
+				height: ${CORNER_SIZE}px;
+				border: ${BORDER_WIDTH}px solid #22c55e;
+				pointer-events: none;
+				opacity: 0;
+				transition: opacity 0.2s ease, transform 0.15s ease;
+				z-index: 3;
+				will-change: transform, opacity;
+				filter: drop-shadow(0 0 3px rgba(34,197,94,.6));
+			`;
+
+			if (cp === "tl") {
+				el.style.top = `${MARGIN}px`;
+				el.style.left = `${MARGIN}px`;
+				el.style.borderRight = "none";
+				el.style.borderBottom = "none";
+			} else if (cp === "tr") {
+				el.style.top = `${MARGIN}px`;
+				el.style.right = `${MARGIN}px`;
+				el.style.borderLeft = "none";
+				el.style.borderBottom = "none";
+			} else if (cp === "br") {
+				el.style.bottom = `${MARGIN}px`;
+				el.style.right = `${MARGIN}px`;
+				el.style.borderLeft = "none";
+				el.style.borderTop = "none";
+			} else if (cp === "bl") {
+				el.style.bottom = `${MARGIN}px`;
+				el.style.left = `${MARGIN}px`;
+				el.style.borderRight = "none";
+				el.style.borderTop = "none";
+			}
+
+			container.appendChild(el);
+			corners.push(el);
 		}
 
-		node.appendChild(el);
-		corners.push(el);
+		return corners;
+	}
+
+	const cornerHost = overlay ?? node;
+	const corners = createCorners(cornerHost);
+
+	function updateOverlayRect(rect?: DOMRect) {
+		if (!overlay) return;
+		const r = rect ?? node.getBoundingClientRect();
+		overlay.style.left = `${r.left}px`;
+		overlay.style.top = `${r.top}px`;
+		overlay.style.width = `${r.width}px`;
+		overlay.style.height = `${r.height}px`;
 	}
 
 	const onEnter = () => {
 		// Signal cursor to hide its corners
 		window.dispatchEvent(new CustomEvent('hoverCornerEnter'));
 		node.classList.add('hc-active');
+		updateOverlayRect();
+		if (overlay) overlay.style.opacity = "1";
 		for (const c of corners) {
 			c.style.opacity = '1';
 		}
+		window.addEventListener("scroll", updateOverlayRect, true);
+		window.addEventListener("resize", updateOverlayRect);
 	};
 
 	const onLeave = () => {
 		// Signal cursor to show its corners again
 		window.dispatchEvent(new CustomEvent('hoverCornerLeave'));
 		node.classList.remove('hc-active');
+		if (overlay) overlay.style.opacity = "0";
 		for (const c of corners) {
 			c.style.opacity = '0';
 			c.style.transform = 'translate(0, 0)';
 		}
+		window.removeEventListener("scroll", updateOverlayRect, true);
+		window.removeEventListener("resize", updateOverlayRect);
 	};
 
 	const onMove = (e: MouseEvent) => {
 		const rect = node.getBoundingClientRect();
+		updateOverlayRect(rect);
 		const centerX = rect.left + rect.width / 2;
 		const centerY = rect.top + rect.height / 2;
 		const relX = (e.clientX - centerX) / (rect.width / 2); // -1 to 1
@@ -109,11 +154,16 @@ export function hoverCorners(node: HTMLElement) {
 			node.removeEventListener('mousemove', onMove);
 			node.classList.remove('hc-active');
 			node.classList.remove('hc-target');
-			if (pos === 'static') {
+			if (didAdjustPosition) {
 				node.style.position = originalPosition;
 			}
+			window.removeEventListener("scroll", updateOverlayRect, true);
+			window.removeEventListener("resize", updateOverlayRect);
 			for (const c of corners) {
 				c.remove();
+			}
+			if (overlay) {
+				overlay.remove();
 			}
 		}
 	};

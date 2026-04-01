@@ -199,7 +199,7 @@
         text-align: center;
         font-size: 2.8rem;
         font-family: "Russo One", sans-serif;
-        color: hsl(var(--foreground));
+        color: hsl(var(--primary));
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
     .subtitle {

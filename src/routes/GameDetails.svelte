@@ -2001,7 +2001,7 @@
         console.log("setupActionModal called with type:", type);
         currentActionType = type;
         const titles = {
-            submit_score: `Submit Score`,
+            submit_score: `Participate`,
             resolve_game: `Resolve Competition`,
             cancel_game: `Cancel Competition`,
             drain_stake: `Drain Resolver Stake`,
@@ -3843,7 +3843,7 @@
                                                 class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
                                             >
                                                 <span class="font-medium"
-                                                    >Submit Score:</span
+                                                    >Participate (Submit Score):</span
                                                 >
                                                 Wait for ceremony to end.
                                             </li>
@@ -3877,7 +3877,7 @@
                                                 class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
                                             >
                                                 <span class="font-medium"
-                                                    >Submit Score:</span
+                                                    >Participate (Submit score):</span
                                                 >
                                                 Deadline has passed.
                                             </li>

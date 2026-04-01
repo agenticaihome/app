@@ -86,11 +86,17 @@
 
   val getBotBoxHeight = { (participationBox: Box) =>
     val pBoxSolverId = participationBox.R7[Coll[Byte]].get
-    val candidateBotBoxes = CONTEXT.dataInputs.filter({ (box: Box) =>
-      box.R4[Coll[Byte]].isDefined &&
-      box.R4[Coll[Byte]].get == pBoxSolverId &&
-      blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH
-    })
+    val candidateBotBoxes = CONTEXT.dataInputs.filter { (box: Box) =>
+      if (blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH) {
+        box.R4[Coll[Byte]].isDefined &&
+        box.R4[Coll[Byte]].get == pBoxSolverId
+      } else if (blake2b256(box.propositionBytes) == REPUTATION_PROOF_SCRIPT_HASH) {
+        box.R5[Coll[Byte]].isDefined &&
+        box.R5[Coll[Byte]].get == pBoxSolverId
+      } else {
+        false
+      }
+    }
 
     if (candidateBotBoxes.size > 0) {
       val oldestBox = candidateBotBoxes.fold(candidateBotBoxes(0), { (acc: Box, curr: Box) =>

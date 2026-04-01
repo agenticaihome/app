@@ -84,6 +84,10 @@
     let indetermismIndex: number = 1;
     let gameTimeValue: number;
     let gameTimeUnit: "days" | "minutes" = "days";
+    let gameTimeUnitSelected: { value: "days" | "minutes"; label: string } = {
+        value: "days",
+        label: "Days",
+    };
     let deadlineBlock: number | undefined;
     let deadlineBlockDateText: string = "";
     let resolverStakeAmount: number | undefined;
@@ -95,6 +99,8 @@
 
     let isSubmitting: boolean = false;
     let showSummary: boolean = false;
+
+    $: gameTimeUnit = gameTimeUnitSelected?.value ?? "days";
 
     // Guide State
     let showGuide = true;
@@ -267,7 +273,7 @@
 
             // Default to 20 minutes for quick testing
             gameTimeValue = 20;
-            gameTimeUnit = "minutes";
+            gameTimeUnitSelected = { value: "minutes", label: "Minutes" };
 
             // Trigger calculation immediately
             calculateBlockLimit();
@@ -467,20 +473,21 @@
     let lockdownEndDateText = "";
     let executionEndDateText = "";
 
-    // Helper function to format block duration into days, hours, and minutes
+    // Helper function to format block duration using only the selected unit
     function formatBlockDuration(blocks: number): string {
-        const minutes =
+        const totalMinutes =
             (blocks * new ErgoPlatform().time_per_block) / (60 * 1000); // Each block is ~2 minutes
-        const days = Math.floor(minutes / (24 * 60));
-        const hours = Math.floor((minutes % (24 * 60)) / 60);
-        const mins = Math.floor(minutes % 60);
 
-        const parts = [];
-        if (days > 0) parts.push(`${days}d`);
-        if (hours > 0) parts.push(`${hours}h`);
-        if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
+        if (gameTimeUnit === "days") {
+            const totalDays = totalMinutes / (24 * 60);
+            const formattedDays =
+                totalDays >= 1
+                    ? totalDays.toFixed(1).replace(/\.0$/, "")
+                    : totalDays.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+            return `${formattedDays}d`;
+        }
 
-        return parts.join(" ");
+        return `${Math.round(totalMinutes)}m`;
     }
 
     $: {
@@ -1502,7 +1509,9 @@
                                             placeholder="Time for robot upload"
                                             autocomplete="off"
                                         />
-                                        <Select bind:value={gameTimeUnit}>
+                                        <Select
+                                            bind:selected={gameTimeUnitSelected}
+                                        >
                                             <SelectTrigger
                                                 class="cyber-select min-w-[140px] text-sm"
                                                 aria-label="Game time unit"

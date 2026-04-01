@@ -1019,7 +1019,7 @@
                                     <div
                                         class="flex justify-between text-sm border-b border-border/50 pb-1"
                                     >
-                                        <span>Indetermism Index:</span>
+                                        <span>Verification Runs:</span>
                                         <span class="font-mono"
                                             >{indetermismIndex}</span
                                         >

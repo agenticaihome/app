@@ -9,11 +9,13 @@
     let isSubmitting: boolean = false;
     let errorMessage: string | null = null;
     let burned_amount_erg: number = 0; // Default to 0 (optional burn)
+    let copiedTx: boolean = false;
 
     async function submit() {
         isSubmitting = true;
         errorMessage = null;
         transactionId = null;
+        copiedTx = false;
 
         try {
             if (burned_amount_erg < 0) {
@@ -44,10 +46,17 @@
         }
     }
 
-    function copyTransactionId() {
-        if (transactionId) {
-            navigator.clipboard.writeText(transactionId);
-            alert("Transaction ID copied to clipboard!");
+    async function copyTransactionId() {
+        if (!transactionId) return;
+
+        try {
+            await navigator.clipboard.writeText(transactionId);
+            copiedTx = true;
+            setTimeout(() => {
+                copiedTx = false;
+            }, 2000);
+        } catch (error) {
+            console.error("Unable to copy transaction id", error);
         }
     }
 </script>
@@ -130,35 +139,41 @@
                 </Button>
             </div>
         {:else}
-            <div class="result-container text-center py-12">
-                <h3 class="text-2xl font-bold text-green-500 mb-4">
-                    Registration Submitted!
-                </h3>
-                <p class="mb-2">
-                    Your judge registration transaction has been sent to the
-                    blockchain.
+            <div class="result-container">
+                <div class="status-pill">Pending on-chain confirmation</div>
+                <h3 class="result-title">Registration Submitted</h3>
+                <p class="result-description">
+                    Your judge profile transaction has been sent to the blockchain.
+                    Confirmation can take a few moments.
                 </p>
-                <p class="text-sm text-muted-foreground mb-4">
-                    It may take a few moments to confirm.
-                </p>
-                <div class="flex items-center justify-center">
-                    <p
-                        class="font-mono text-xs p-2 rounded bg-slate-800/50 break-all"
+
+                <div class="tx-card" aria-live="polite">
+                    <span class="tx-label">Transaction ID</span>
+                    <a
+                        href={get(web_explorer_uri_tx) + transactionId}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="tx-value"
+                        title="Open transaction in explorer"
                     >
-                        <a
-                            href={get(web_explorer_uri_tx) + transactionId}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="hover:underline"
-                        >
-                            {transactionId}
-                        </a>
-                    </p>
+                        {transactionId}
+                    </a>
+                </div>
+
+                <div class="tx-actions">
+                    <a
+                        href={get(web_explorer_uri_tx) + transactionId}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="action-button"
+                    >
+                        View on Explorer
+                    </a>
                     <button
                         on:click={copyTransactionId}
-                        class="ml-2 text-sm text-muted-foreground hover:underline"
+                        class={`action-button action-button-secondary ${copiedTx ? "is-copied" : ""}`}
                     >
-                        Copy TxID
+                        {copiedTx ? "Copied" : "Copy TxID"}
                     </button>
                 </div>
             </div>
@@ -215,6 +230,69 @@
     }
     .judge-description li {
         @apply text-base;
+    }
+    .result-container {
+        @apply py-8 px-4 text-center;
+    }
+    .status-pill {
+        @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide;
+        color: hsl(var(--primary));
+        background: color-mix(in oklab, hsl(var(--primary)) 18%, transparent);
+        border: 1px solid color-mix(in oklab, hsl(var(--primary)) 40%, transparent);
+    }
+    .result-title {
+        @apply mt-4 text-3xl font-bold;
+        color: color-mix(in oklab, hsl(var(--primary)) 85%, white 15%);
+    }
+    .result-description {
+        @apply mt-3 text-base leading-relaxed text-muted-foreground max-w-xl mx-auto;
+    }
+    .tx-card {
+        @apply mt-7 rounded-xl border p-4 text-left;
+        background: linear-gradient(
+            165deg,
+            color-mix(in oklab, hsl(var(--background)) 85%, #2b2f3a 15%) 0%,
+            color-mix(in oklab, hsl(var(--background)) 80%, #1f2430 20%) 100%
+        );
+        border-color: color-mix(in oklab, hsl(var(--foreground)) 16%, transparent);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+    .tx-label {
+        @apply block text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+    }
+    .tx-value {
+        @apply mt-2 block font-mono text-xs leading-relaxed break-all transition-opacity;
+        color: hsl(var(--foreground));
+        opacity: 0.9;
+    }
+    .tx-value:hover {
+        opacity: 1;
+        text-decoration: underline;
+    }
+    .tx-actions {
+        @apply mt-4 flex flex-col sm:flex-row gap-2 justify-center;
+    }
+    .action-button {
+        @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
+        background: color-mix(in oklab, hsl(var(--primary)) 90%, black 10%);
+        color: hsl(var(--primary-foreground));
+        border: 1px solid color-mix(in oklab, hsl(var(--primary)) 75%, black 25%);
+    }
+    .action-button:hover {
+        background: color-mix(in oklab, hsl(var(--primary)) 80%, black 20%);
+    }
+    .action-button-secondary {
+        background: transparent;
+        color: hsl(var(--foreground));
+        border: 1px solid color-mix(in oklab, hsl(var(--foreground)) 18%, transparent);
+    }
+    .action-button-secondary:hover {
+        background: color-mix(in oklab, hsl(var(--foreground)) 9%, transparent);
+    }
+    .action-button-secondary.is-copied {
+        color: hsl(var(--primary));
+        border-color: color-mix(in oklab, hsl(var(--primary)) 50%, transparent);
+        background: color-mix(in oklab, hsl(var(--primary)) 10%, transparent);
     }
     .spinner {
         display: inline-block;

@@ -140,6 +140,9 @@
     const strictMode = true;
 
     const PARTICIPATION_BATCH_THRESHOLD = 2;
+    const NODO_INSTALLATION = "https://github.com/celaut-project/nodo?tab=readme-ov-file#installation";
+    const JUDGE_CHECK_SERVICE = "";
+    const ROBOT_DEVELOPMENT_GUIDE = "";
 
     type HoverHandle = { destroy: () => void };
 
@@ -5299,30 +5302,60 @@
                                             <p
                                                 class="text-sm text-muted-foreground mb-4"
                                             >
-                                                Verify the reputation of the
-                                                judges to ensure fair play.
+                                                Install and run the judge-check
+                                                service to verify the reputation
+                                                of the judges before
+                                                participating.
                                             </p>
-                                            <div
-                                                class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
-                                            >
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() =>
-                                                        navigator.clipboard.writeText(
-                                                            `nodo gop_judges_check ${game?.boxId}`,
-                                                        )}
-                                                    title="Copy command"
+                                            <div class="space-y-2">
+                                                <div
+                                                    class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
                                                 >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary"
-                                                    >nodo</span
+                                                    <button
+                                                        type="button"
+                                                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                        on:click={() =>
+                                                            navigator.clipboard.writeText(
+                                                                `nodo download ${JUDGE_CHECK_SERVICE}`,
+                                                            )}
+                                                        title="Copy command"
+                                                    >
+                                                        <Copy class="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span class="text-primary"
+                                                        >nodo</span
+                                                    >
+                                                    download {JUDGE_CHECK_SERVICE}
+                                                </div>
+                                                <div
+                                                    class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
                                                 >
-                                                gop_judges_check {game?.boxId.slice(
-                                                    0,
-                                                    10,
-                                                )}...
+                                                    <button
+                                                        type="button"
+                                                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                        on:click={() =>
+                                                            navigator.clipboard.writeText(
+                                                                "nodo execute gop_judges_check",
+                                                            )}
+                                                        title="Copy command"
+                                                    >
+                                                        <Copy class="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span class="text-primary"
+                                                        >nodo</span
+                                                    >
+                                                    execute gop_judges_check
+                                                </div>
+                                                <p
+                                                    class="text-xs text-muted-foreground"
+                                                >
+                                                    Requires Celaut Nodo.
+                                                    Follow {NODO_INSTALLATION},
+                                                    then open the service web UI,
+                                                    enter the game id or the
+                                                    judges you want to verify,
+                                                    and wait for the verdict.
+                                                </p>
                                             </div>
                                         </div>
 
@@ -5347,31 +5380,24 @@
                                             <p
                                                 class="text-sm text-muted-foreground mb-4"
                                             >
-                                                Use the CLI to generate your bot
-                                                template and integrate with
-                                                LLMs.
+                                                Build your robot by following
+                                                the development guide and its
+                                                recommendations.
                                             </p>
                                             <div
-                                                class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
+                                                class="bg-muted/50 p-3 rounded-lg text-xs break-all"
                                             >
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() =>
-                                                        navigator.clipboard.writeText(
-                                                            `nodo gop_create_bot ${game?.boxId}`,
-                                                        )}
-                                                    title="Copy command"
+                                                <span class="font-mono text-primary"
+                                                    >{ROBOT_DEVELOPMENT_GUIDE}</span
                                                 >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary"
-                                                    >nodo</span
+                                                <p
+                                                    class="mt-2 text-muted-foreground"
                                                 >
-                                                gop_create_bot {game?.boxId.slice(
-                                                    0,
-                                                    10,
-                                                )}...
+                                                    Follow the guide and all
+                                                    its instructions and
+                                                    suggestions to create your
+                                                    robot.
+                                                </p>
                                             </div>
                                         </div>
                                     </div>

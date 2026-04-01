@@ -2809,12 +2809,12 @@
 
                                     <div class="info-block">
                                         <span class="info-label"
-                                            >Indeterminism Index<button
+                                            >Verification Runs<button
                                                 type="button"
                                                 class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
                                                 on:click|stopPropagation={() =>
                                                     openDidacticModal(
-                                                        "Indeterminism Index",
+                                                        "Verification Runs",
                                                         "Number of times judges will test your participation to verify if it reproduces your game logs. If judges cannot reproduce the logs, the participation is invalidated.",
                                                     )}
                                             >

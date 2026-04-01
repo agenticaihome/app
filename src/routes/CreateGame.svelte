@@ -1286,7 +1286,7 @@
                             <div
                                 class="form-grid grid grid-cols-1 lg:grid-cols-4 gap-x-6 gap-y-6"
                             >
-                                <div class="form-group lg:col-span-3">
+                                <div class="form-group lg:col-span-4">
                                     <div class="flex items-center gap-2 mb-1.5">
                                         <Label for="gameTitle" class="mb-0"
                                             >Game Title</Label
@@ -1311,39 +1311,6 @@
                                         id="gameTitle"
                                         bind:value={gameTitle}
                                         placeholder="The official title of the game"
-                                        required
-                                    />
-                                </div>
-                                <div class="form-group lg:col-span-1">
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <Label
-                                            for="indetermismIndex"
-                                            class="mb-0 whitespace-nowrap"
-                                            >Indetermism Index</Label
-                                        >
-                                        <div class="group relative">
-                                            <button
-                                                type="button"
-                                                tabindex="-1"
-                                                on:click={() =>
-                                                    openDidacticModal(
-                                                        "Indetermism Index",
-                                                        "The number of times judges will test if the participation reproduces the logs correctly.",
-                                                    )}
-                                            >
-                                                <Info
-                                                    class="w-3.5 h-3.5 text-muted-foreground cursor-help hover:text-primary transition-colors"
-                                                />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <Input
-                                        id="indetermismIndex"
-                                        type="number"
-                                        bind:value={indetermismIndex}
-                                        min="1"
-                                        step="1"
-                                        placeholder="Executions"
                                         required
                                     />
                                 </div>
@@ -2242,6 +2209,47 @@
                                             winner's prize will be 0.
                                         </p>
                                     {/if}
+                                </div>
+
+                                <div class="form-group lg:col-span-4">
+                                    <div class="flex items-center gap-2 mb-1.5">
+                                        <Label for="indetermismIndex" class="mb-0 whitespace-nowrap">
+                                            Verification Runs
+                                        </Label>
+                                        <div class="group relative">
+                                            <button
+                                                type="button"
+                                                tabindex="-1"
+                                                on:click={() =>
+                                                    openDidacticModal(
+                                                        "Verification Runs",
+                                                        "This defines how many times judges are expected to re-run and verify a submitted solution. It acts as a guideline for how much testing is required before considering that a game may be manipulated or not reproducible by the creator. Deterministic games may only need 1 run, while more complex or uncertain games benefit from multiple verification attempts."
+                                                    )}
+                                            >
+                                                <Info
+                                                    class="w-3.5 h-3.5 text-muted-foreground cursor-help hover:text-primary transition-colors"
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Input + Hint inline -->
+                                    <div class="flex items-start gap-2">
+                                        <Input
+                                            id="indetermismIndex"
+                                            type="number"
+                                            bind:value={indetermismIndex}
+                                            min="1"
+                                            step="1"
+                                            placeholder="Runs"
+                                            required
+                                            class="w-24"
+                                        />
+
+                                        <p class="text-[12px] text-muted-foreground leading-snug">
+                                            Number of verification attempts judges should perform before suspecting manipulation. Increase for non-deterministic games.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </section>

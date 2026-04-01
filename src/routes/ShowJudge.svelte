@@ -74,25 +74,6 @@
 			<p class="mb-4">
 				It looks like you haven't registered a reputation proof yet.
 			</p>
-			<!-- The Profile component might handle creation if we pass allowCreateProfile, 
-                 but if we don't have a proof to pass, we might need to handle it or pass null? 
-                 The Profile component props say reputationProof is the object. 
-                 If it's null, does it show creation UI? 
-                 The docs say "create_profile" function exists. 
-                 Let's assume we show a message or maybe the Profile component has a "create" mode if proof is missing?
-                 The user's original code had a "Register as a Judge" button.
-                 I'll keep the "No proof" message for now as a fallback if Profile doesn't handle null proof.
-            -->
-			<!-- Actually, let's try to render Profile even if displayProof is null, 
-                 maybe it has a creation flow? 
-                 But the prop type is `ReputationProof`, not `ReputationProof | null`.
-                 So I should probably keep the fallback or check if there's a CreateProfile component.
-                 The user's original code had a link to `/create-judge`.
-            -->
-			<!-- Wait, the original code had:
-                 <Button size="lg" href="/create-judge">Register as a Judge</Button>
-            -->
-			<!-- I will keep the fallback for now. -->
 			<a
 				href="#"
 				on:click|preventDefault={() =>

@@ -144,8 +144,8 @@ export class ErgoPlatform implements Platform {
             );
         } catch (error) {
             console.error("Error en el método de plataforma createGoPGame:", error);
-            if (error instanceof Error) throw new Error(`No se pudo crear el juego: ${error.message}`);
-            throw new Error("Ocurrió un error desconocido al crear el juego.");
+            if (error instanceof Error) throw new Error(`Failed to create the game: ${error.message}`);
+            throw new Error("An unknown error occurred while creating the game.");
         }
     }
 

@@ -157,9 +157,9 @@
     let timeFactorOption: "zero" | "low" | "balanced" | "high" | "extreme" =
         "zero";
 
-    let participationTokenId: string = ""; // "" para ERG
+    let participationTokenId: string = "";
     let participationTokenDecimals: number = 9;
-    let participationTokenName: string = "ERG";
+    let participationTokenName: string = "";
 
     let selectedTokenOption: string = "";
 

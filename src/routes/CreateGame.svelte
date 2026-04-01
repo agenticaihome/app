@@ -81,6 +81,10 @@
     let gameTitle: string = "";
     let gameDescription: string = "";
     let creatorTokenId: string = "";
+    let isEditingCreatorTokenId = false;
+    let activeCreatorProfileTokenId = "";
+    let hasActiveCreatorProfile = false;
+    let usingActiveCreatorProfile = false;
     let indetermismIndex: number = 1;
     let gameTimeValue: number;
     let gameTimeUnit: "days" | "minutes" = "days";
@@ -279,12 +283,16 @@
             calculateBlockLimit();
         }
 
-        // Set creatorTokenId from reputation proof only on load if not set
-        const repProof = get(reputation_proof);
-        if (!creatorTokenId && repProof && (repProof as any).token_id) {
-            creatorTokenId = (repProof as any).token_id;
-        }
     });
+
+    $: activeCreatorProfileTokenId = (($reputation_proof as any)?.token_id ??
+        "") as string;
+    $: hasActiveCreatorProfile = !!activeCreatorProfileTokenId;
+    $: usingActiveCreatorProfile =
+        hasActiveCreatorProfile && !isEditingCreatorTokenId;
+    $: if (usingActiveCreatorProfile) {
+        creatorTokenId = activeCreatorProfileTokenId;
+    }
 
     // --- Box Size Validation ---
     $: gameDetailsObject = {
@@ -2295,14 +2303,48 @@
                                     {/if}
                                 </div>
                                 <div class="form-group lg:col-span-4">
-                                    <Label for="creatorTokenId"
-                                        >Creator Reputation Proof ID (Optional)</Label
+                                    <div
+                                        class="flex items-center justify-between gap-2 mb-1.5"
                                     >
-                                    <Input
-                                        id="creatorTokenId"
-                                        bind:value={creatorTokenId}
-                                        placeholder="Enter a token ID to link to the creator"
-                                    />
+                                        <Label for="creatorTokenId"
+                                            >Creator Reputation Profile ID</Label
+                                        >
+                                        {#if usingActiveCreatorProfile}
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                on:click={() =>
+                                                    (isEditingCreatorTokenId = true)}
+                                            >
+                                                Modify
+                                            </Button>
+                                        {/if}
+                                    </div>
+
+                                    {#if usingActiveCreatorProfile}
+                                        <div
+                                            class="px-3 py-2 rounded-md border bg-muted/40 text-sm"
+                                        >
+                                            Current profile set in UI:
+                                            <span class="font-mono break-all">
+                                                {activeCreatorProfileTokenId.slice(0, 8)}...
+                                            </span>
+                                        </div>
+                                    {:else}
+                                        <Input
+                                            id="creatorTokenId"
+                                            bind:value={creatorTokenId}
+                                            placeholder="Enter a token ID to link to the creator"
+                                        />
+                                    {/if}
+                                    <p
+                                        class="text-xs mt-1 text-muted-foreground"
+                                    >
+                                        If this profile is used, it must publish
+                                        an authorization for this game, just
+                                        like invited judges do.
+                                    </p>
                                 </div>
                                 <div class="form-group lg:col-span-4">
                                     <Label for="gamePaperHash"

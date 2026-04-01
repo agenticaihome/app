@@ -161,7 +161,9 @@
     let participationTokenDecimals: number = 9;
     let participationTokenName: string = "";
 
-    let selectedTokenOption: string = "";
+    let selectedTokenOption: { value: string; label: string } | undefined;
+    let selectedTokenId = "";
+    let tokenSelectionError: string | null = null;
 
     let availableTokens: {
         tokenId: string;
@@ -193,6 +195,7 @@
             return;
         }
         isLoadingTokens = true;
+        tokenSelectionError = null;
         try {
             const utxos = await ergo.get_utxos();
             const tokenMap = new Map<string, number>();
@@ -252,6 +255,8 @@
             availableTokens = tokensWithDetails;
         } catch (e) {
             console.error("Error loading user tokens", e);
+            tokenSelectionError =
+                "Error loading wallet tokens. Please retry after reconnecting the wallet.";
         } finally {
             isLoadingTokens = false;
         }
@@ -617,19 +622,27 @@
     }
 
     // --- Token Reactive Logic ---
+    $: selectedTokenId = selectedTokenOption?.value ?? "";
+
     $: {
-        if (selectedTokenOption) {
+        if (selectedTokenId) {
             const token = availableTokens.find(
-                (t) => t.tokenId === selectedTokenOption,
+                (t) => t.tokenId === selectedTokenId,
             );
 
             if (token) {
                 participationTokenId = token.tokenId;
                 participationTokenDecimals = token.decimals;
                 participationTokenName = token.title;
+                tokenSelectionError = null;
             } else {
-                alert("Token not found. Contact developers on Telegram.");
+                participationTokenId = "";
+                participationTokenName = "";
+                tokenSelectionError =
+                    "Selected token not found in available wallet tokens.";
             }
+        } else {
+            tokenSelectionError = null;
         }
     }
 
@@ -1728,7 +1741,7 @@
                                             Loading your tokens...
                                         </p>
                                     {:else}
-                                        <Select bind:value={selectedTokenOption}>
+                                        <Select bind:selected={selectedTokenOption}>
                                             <SelectTrigger
                                                 class="cyber-select w-full text-sm"
                                                 aria-label="Token for stake and fee"
@@ -1749,6 +1762,11 @@
                                                 {/each}
                                             </SelectContent>
                                         </Select>
+                                        {#if tokenSelectionError}
+                                            <p class="text-xs text-red-500 mt-2">
+                                                {tokenSelectionError}
+                                            </p>
+                                        {/if}
                                     {/if}
                                 </div>
                                 <div class="form-group lg:col-span-2">

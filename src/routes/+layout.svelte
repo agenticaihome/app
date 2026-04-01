@@ -19,6 +19,13 @@
 		const theme = $page.url.searchParams.get("theme");
 		if (theme === "light" || theme === "dark") {
 			setMode(theme);
+			const url = new URL($page.url);
+			url.searchParams.delete("theme");
+        	goto(url.pathname + url.search, {
+				replaceState: true, // No crea una nueva entrada en el historial
+				noScroll: true,    // Evita que la página salte al inicio
+				keepFocus: true    // Mantiene el foco donde estaba
+			});
 		}
 		initialized = true;
 	});

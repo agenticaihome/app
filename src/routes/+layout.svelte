@@ -1,6 +1,6 @@
 <script lang="ts">
 	import "../app.css";
-	import { ModeWatcher } from "mode-watcher";
+	import { ModeWatcher, setMode } from "mode-watcher";
 	import { isDevMode } from "$lib/ergo/envs";
 	import CustomCursor from "$lib/CustomCursor.svelte";
 	import HoverCornersAuto from "$lib/HoverCornersAuto.svelte";
@@ -14,6 +14,11 @@
 		const env = $page.url.searchParams.get("env");
 		if (env === "dev") {
 			isDevMode.set(true);
+		}
+
+		const theme = $page.url.searchParams.get("theme");
+		if (theme === "light" || theme === "dark") {
+			setMode(theme);
 		}
 		initialized = true;
 	});

@@ -2475,7 +2475,7 @@
                         class="lg:col-span-4 space-y-8 lg:sticky lg:top-24 h-fit"
                     >
                         <!-- FILE SOURCES SECTIONS -->
-                        {#if $reputation_proof || $isDevMode}
+                        {#if $reputation_proof}
                             <section class="form-section">
                                 <h3 class="section-title">
                                     File Sources (Optional)
@@ -2677,6 +2677,33 @@
                                             </div>
                                         {/if}
                                     </div>
+                                </div>
+                            </section>
+                        
+                        {:else}
+                            <section class="form-section">
+                                <h3 class="section-title">
+                                    File Sources (Requires Judge Profile)
+                                </h3>
+                                <p class="section-description">
+                                    To publish File Sources on Ergo, you first
+                                    need a reputation proof.
+                                </p>
+
+                                <div
+                                    class="form-group p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-sm"
+                                >
+                                    <p
+                                        class="text-sm text-amber-600 dark:text-amber-400 leading-relaxed"
+                                    >
+                                        In Game of Prompts, <strong>being a
+                                            judge means having a reputation
+                                            proof</strong>. Create your Judge
+                                        profile from the top menu (<strong
+                                            >Become a Judge</strong
+                                        >), then come back here to add Service,
+                                        Paper, Image and Soundtrack sources.
+                                    </p>
                                 </div>
                             </section>
                         {/if}

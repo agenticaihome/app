@@ -92,6 +92,7 @@
         ArrowRight,
         Copy,
         Loader2,
+        Clock3,
     } from "lucide-svelte";
     // UTILITIES
     import { format, formatDistanceToNow } from "date-fns";
@@ -589,7 +590,7 @@
                     contractBadge:
                         "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
                     currentChip:
-                        "border-sky-500 bg-sky-500 text-white shadow-sm",
+                        "border-sky-300 bg-sky-50 text-sky-800 shadow-sm dark:border-sky-500 dark:bg-sky-500 dark:text-white",
                     completedChip:
                         "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300",
                 };
@@ -600,7 +601,7 @@
                     contractBadge:
                         "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
                     currentChip:
-                        "border-amber-500 bg-amber-500 text-white shadow-sm",
+                        "border-amber-300 bg-amber-50 text-amber-800 shadow-sm dark:border-amber-500 dark:bg-amber-500 dark:text-white",
                     completedChip:
                         "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300",
                 };
@@ -611,7 +612,7 @@
                     contractBadge:
                         "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
                     currentChip:
-                        "border-emerald-500 bg-emerald-500 text-white shadow-sm",
+                        "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-sm dark:border-emerald-500 dark:bg-emerald-500 dark:text-white",
                     completedChip:
                         "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300",
                 };
@@ -622,7 +623,7 @@
                     contractBadge:
                         "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
                     currentChip:
-                        "border-orange-500 bg-orange-500 text-white shadow-sm",
+                        "border-orange-300 bg-orange-50 text-orange-800 shadow-sm dark:border-orange-500 dark:bg-orange-500 dark:text-white",
                     completedChip:
                         "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-300",
                 };
@@ -635,7 +636,7 @@
                     contractBadge:
                         "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
                     currentChip:
-                        "border-red-500 bg-red-500 text-white shadow-sm",
+                        "border-red-300 bg-red-50 text-red-800 shadow-sm dark:border-red-500 dark:bg-red-500 dark:text-white",
                     completedChip:
                         "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300",
                 };
@@ -646,7 +647,7 @@
                     contractBadge:
                         "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
                     currentChip:
-                        "border-yellow-500 bg-yellow-500 text-white shadow-sm",
+                        "border-yellow-300 bg-yellow-50 text-yellow-800 shadow-sm dark:border-yellow-500 dark:bg-yellow-500 dark:text-white",
                     completedChip:
                         "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-300",
                 };
@@ -658,7 +659,7 @@
                     contractBadge:
                         "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
                     currentChip:
-                        "border-gray-500 bg-gray-500 text-white shadow-sm",
+                        "border-gray-300 bg-gray-50 text-gray-800 shadow-sm dark:border-gray-500 dark:bg-gray-500 dark:text-white",
                     completedChip:
                         "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-300",
                 };
@@ -670,7 +671,7 @@
                     contractBadge:
                         "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
                     currentChip:
-                        "border-blue-500 bg-blue-500 text-white shadow-sm",
+                        "border-blue-300 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-500 dark:bg-blue-500 dark:text-white",
                     completedChip:
                         "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300",
                 };
@@ -712,7 +713,7 @@
                 id: GameContractPhase.FINALIZED,
                 label: "FINALIZED",
                 description:
-                    "Derived frontend state after payouts are distributed. Not a fourth contract state.",
+                    "Derived frontend state after payouts are distributed.",
                 badge: "Pending",
                 status: "pending",
                 icon: Trophy,
@@ -896,7 +897,7 @@
         const status = getSubphaseStatus(phase, subphase);
 
         if (status === "current") {
-            return "bg-white/20 text-current ring-1 ring-inset ring-current/20";
+            return "bg-current/10 text-current ring-1 ring-inset ring-current/15";
         }
 
         if (status === "completed") {
@@ -3898,14 +3899,14 @@
             </section>
 
             <section
-                class="game-status status-actions-panel grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 p-6 md:p-8 shadow-lg rounded-xl bg-card border border-border/50"
+                class="game-status status-actions-panel mb-12 p-6 md:p-8 shadow-lg rounded-xl bg-card border border-border/50"
             >
-                <div class="status-side">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-semibold">Game Progress</h2>
-                    </div>
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold">Game Progress</h2>
+                </div>
 
-                    <div class="mb-8 space-y-5">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div class="status-side space-y-5">
                         <div
                             class="rounded-2xl border {$mode === 'dark'
                                 ? 'border-slate-700 bg-slate-900/40'
@@ -3960,9 +3961,16 @@
                                                 : 'border-gray-200 bg-gray-50/80'} p-4 md:p-5"
                                         >
                                             <div class="timeleft">
-                                                <span class="timeleft-label">
-                                                    {clockLabel}
-                                                </span>
+                                                <div class="timeleft-header">
+                                                    <span
+                                                        class="timeleft-label-icon"
+                                                    >
+                                                        <Clock3 class="w-4 h-4" />
+                                                    </span>
+                                                    <span class="timeleft-label">
+                                                        {clockLabel}
+                                                    </span>
+                                                </div>
                                                 {#if remainingBlocks > 0}
                                                     <span class="text-xs opacity-70 mt-1 block">
                                                         Estimated time ({remainingBlocks}
@@ -4079,152 +4087,6 @@
                                     <p
                                         class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
                                     >
-                                        Contract Lifecycle
-                                    </p>
-                                    <p
-                                        class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400"
-                                    >
-                                        The contract only moves through three
-                                        main states. FINALIZED is the frontend
-                                        end state after the successful path pays
-                                        out.
-                                    </p>
-                                </div>
-                                <span
-                                    class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500"
-                                >
-                                    Canonical contract path
-                                </span>
-                            </div>
-
-                            <div
-                                class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-stretch"
-                            >
-                                {#each mainContractStateCards as card, index (card.id)}
-                                    <div
-                                        class={`rounded-xl p-4 ${getContractCardClasses(
-                                            card,
-                                            gamePhase,
-                                        )}`}
-                                    >
-                                        <div
-                                            class="flex items-start justify-between gap-3"
-                                        >
-                                            <div
-                                                class="flex items-start gap-3 min-w-0"
-                                            >
-                                                <div
-                                                    class={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold shrink-0 ${getContractStateMeta(
-                                                        card.id,
-                                                    ).accent}`}
-                                                >
-                                                    {index + 1}
-                                                </div>
-                                                <div class="min-w-0">
-                                                    <p
-                                                        class="text-[10px] uppercase tracking-[0.18em] opacity-70"
-                                                    >
-                                                        {getContractStateMeta(
-                                                            card.id,
-                                                        ).eyebrow}
-                                                    </p>
-                                                    <div
-                                                        class="mt-1 flex items-center gap-2"
-                                                    >
-                                                        <svelte:component
-                                                            this={card.icon}
-                                                            class="w-4 h-4 shrink-0"
-                                                        />
-                                                        <span
-                                                            class="text-sm font-semibold leading-tight"
-                                                            >{card.label}</span
-                                                        >
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <span
-                                                class={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getContractBadgeClasses(
-                                                    card,
-                                                )}`}
-                                            >
-                                                {card.badge}
-                                            </span>
-                                        </div>
-                                        <p
-                                            class="mt-3 text-sm leading-6 opacity-80"
-                                        >
-                                            {card.description}
-                                        </p>
-                                    </div>
-
-                                    {#if index < mainContractStateCards.length - 1}
-                                        <div
-                                            class="hidden md:flex items-center justify-center text-gray-300 dark:text-slate-600"
-                                            aria-hidden="true"
-                                        >
-                                            <ArrowRight class="w-5 h-5" />
-                                        </div>
-                                    {/if}
-                                {/each}
-                            </div>
-
-                            {#if alternativeContractCard}
-                                <div
-                                    class="mt-4 rounded-xl border border-dashed border-red-200 bg-red-50/60 dark:border-red-900/50 dark:bg-red-950/20 p-4"
-                                >
-                                    <div
-                                        class="flex flex-col gap-3 sm:flex-row sm:items-start"
-                                    >
-                                        <div
-                                            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 shrink-0"
-                                        >
-                                            <XCircle class="w-5 h-5" />
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div
-                                                class="flex flex-wrap items-center gap-2"
-                                            >
-                                                <span
-                                                    class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                                                >
-                                                    Alternative branch
-                                                </span>
-                                                <span
-                                                    class="text-sm font-semibold text-red-700 dark:text-red-300"
-                                                >
-                                                    {alternativeContractCard.label}
-                                                </span>
-                                                <span
-                                                    class="text-[10px] uppercase tracking-[0.18em] text-red-600/80 dark:text-red-300/80"
-                                                >
-                                                    Exits from ACTIVE
-                                                </span>
-                                            </div>
-                                            <p
-                                                class="mt-2 text-sm leading-6 text-red-700 dark:text-red-300/90"
-                                            >
-                                                {alternativeContractCard.description}
-                                                This path is only taken if the
-                                                secret is revealed too early.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            {/if}
-                        </div>
-
-                        <div
-                            class="rounded-2xl border {$mode === 'dark'
-                                ? 'border-slate-700 bg-slate-900/40'
-                                : 'border-gray-200 bg-white'} p-5 md:p-6"
-                        >
-                            <div
-                                class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
-                            >
-                                <div>
-                                    <p
-                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
-                                    >
                                         Subphase Progression
                                     </p>
                                     <p
@@ -4311,11 +4173,160 @@
                     </div>
 
                     <div
-                        class="status-description mb-8 rounded-xl border bg-card overflow-hidden {$mode ===
+                        class="actions-side space-y-5"
+                    >
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <div
+                                class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
+                            >
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                    >
+                                        Contract Lifecycle
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400"
+                                    >
+                                        The contract only moves through three
+                                        main states. FINALIZED is the frontend
+                                        end state after the successful path pays
+                                        out.
+                                    </p>
+                                </div>
+                                <span
+                                    class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500"
+                                >
+                                    Canonical contract path
+                                </span>
+                            </div>
+
+                            <div
+                                class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-stretch"
+                            >
+                                {#each mainContractStateCards as card, index (card.id)}
+                                    <div
+                                        class={`rounded-xl p-4 ${getContractCardClasses(
+                                            card,
+                                            gamePhase,
+                                        )}`}
+                                    >
+                                        <div
+                                            class="flex items-start justify-between gap-4"
+                                        >
+                                            <div
+                                                class="flex items-start gap-3 min-w-0 flex-1"
+                                            >
+                                                <div
+                                                    class={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold shrink-0 ${getContractStateMeta(
+                                                        card.id,
+                                                    ).accent}`}
+                                                >
+                                                    {index + 1}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <p
+                                                        class="text-[10px] uppercase tracking-[0.18em] opacity-70"
+                                                    >
+                                                        {getContractStateMeta(
+                                                            card.id,
+                                                        ).eyebrow}
+                                                    </p>
+                                                    <div
+                                                        class="mt-1 flex items-center gap-2"
+                                                    >
+                                                        <svelte:component
+                                                            this={card.icon}
+                                                            class="w-4 h-4 shrink-0"
+                                                        />
+                                                        <span
+                                                            class="text-sm font-semibold leading-tight"
+                                                            >{card.label}</span
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span
+                                                class={`ml-2 shrink-0 self-start rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getContractBadgeClasses(
+                                                    card,
+                                                )}`}
+                                            >
+                                                {card.badge}
+                                            </span>
+                                        </div>
+                                        <p
+                                            class="mt-3 text-sm leading-6 opacity-80"
+                                        >
+                                            {card.description}
+                                        </p>
+                                    </div>
+
+                                    {#if index < mainContractStateCards.length - 1}
+                                        <div
+                                            class="hidden md:flex items-center justify-center text-gray-300 dark:text-slate-600"
+                                            aria-hidden="true"
+                                        >
+                                            <ArrowRight class="w-5 h-5" />
+                                        </div>
+                                    {/if}
+                                {/each}
+                            </div>
+
+                            {#if alternativeContractCard}
+                                <div
+                                    class="mt-4 rounded-xl border border-dashed border-red-200 bg-red-50/60 dark:border-red-900/50 dark:bg-red-950/20 p-4"
+                                >
+                                    <div
+                                        class="flex flex-col gap-3 sm:flex-row sm:items-start"
+                                    >
+                                        <div
+                                            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 shrink-0"
+                                        >
+                                            <XCircle class="w-5 h-5" />
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div
+                                                class="flex flex-wrap items-center gap-2"
+                                            >
+                                                <span
+                                                    class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                                >
+                                                    Alternative branch
+                                                </span>
+                                                <span
+                                                    class="text-sm font-semibold text-red-700 dark:text-red-300"
+                                                >
+                                                    {alternativeContractCard.label}
+                                                </span>
+                                                <span
+                                                    class="text-[10px] uppercase tracking-[0.18em] text-red-600/80 dark:text-red-300/80"
+                                                >
+                                                    Exits from ACTIVE
+                                                </span>
+                                            </div>
+                                            <p
+                                                class="mt-2 text-sm leading-6 text-red-700 dark:text-red-300/90"
+                                            >
+                                                {alternativeContractCard.description}
+                                                This path is only taken if the
+                                                secret is revealed too early.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+                        </div>
+
+                        <div
+                            class="status-description rounded-xl border bg-card overflow-hidden {$mode ===
                         'dark'
                             ? 'border-slate-700'
                             : 'border-gray-200'} shadow-sm"
-                    >
+                        >
                         <!-- Header with State Title -->
                         <div
                             class="p-4 border-b {$mode === 'dark'
@@ -4405,20 +4416,20 @@
                                 </ul>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div
-                    class="actions-side md:border-l {$mode === 'dark'
-                        ? 'border-slate-700'
-                        : 'border-gray-200'} md:pl-8"
-                >
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <ShieldCheck class="w-5 h-5 mr-2 text-blue-500" />
-                        Trust & Security
-                    </h2>
+                        </div>
 
-                    <div class="grid grid-cols-1 gap-y-6">
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <h2 class="text-xl font-semibold mb-5 flex items-center">
+                                <ShieldCheck class="w-5 h-5 mr-2 text-blue-500" />
+                                Trust & Security
+                            </h2>
+
+                            <div class="grid grid-cols-1 gap-y-6">
                         {#if riskLevel === "Low"}
                             <div class="info-block">
                                 <div
@@ -4635,6 +4646,7 @@
                                 </div>
                             {/if}
                         {/if}
+                        </div>
                     </div>
                 </div>
 
@@ -7734,12 +7746,36 @@
         @apply text-foreground;
     }
 
+    .timeleft-header {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+
+    .timeleft-label-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        @apply bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200;
+    }
+
     .timeleft-label {
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-size: 1.125rem;
+        font-weight: 700;
         text-align: left;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.14em;
+        line-height: 1.2;
+        font-family:
+            "Avenir Next",
+            "Segoe UI",
+            "Helvetica Neue",
+            Arial,
+            sans-serif;
     }
 
     .secondary-text {
@@ -7796,6 +7832,11 @@
     @media (max-width: 640px) {
         .timeleft {
             gap: 1rem;
+        }
+
+        .timeleft-header {
+            margin-top: 0.25rem;
+            gap: 0.625rem;
         }
 
         .timeleft-label {

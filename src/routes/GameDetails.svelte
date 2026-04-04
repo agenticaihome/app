@@ -1665,6 +1665,8 @@
         warningMessage = null;
 
         try {
+            platform = game.platform;
+
             // 2. Commission integration (unified logic)
             // Only compute breakdown if the status exposes commissions
             if (game.status === "Active" || game.status === "Resolution") {
@@ -5871,7 +5873,7 @@
                                                 to automatically generate and
                                                 submit the participation, or
                                                 monitor the <a
-                                                    href="https://t.me/gameofprompts"
+                                                    href="https://t.me/unstopbots"
                                                     target="_blank"
                                                     class="underline font-semibold hover:text-yellow-500"
                                                     >Game of Prompts Telegram

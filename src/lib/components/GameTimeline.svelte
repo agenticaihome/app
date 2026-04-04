@@ -50,6 +50,10 @@
     let showBotEvents = true;
     let isLoadingTimeline = false;
 
+    function getTimelinePlatform() {
+        return currentGame?.platform ?? history[history.length - 1]?.platform ?? new ErgoPlatform();
+    }
+
     // Helper to get a readable date and height from block height or timestamp
     async function getEventDetails(
         box: Box<Amount> | null,
@@ -68,7 +72,7 @@
         // Fallback to approximation
         const ts = await block_height_to_timestamp(
             box.creationHeight,
-            new ErgoPlatform(),
+            getTimelinePlatform(),
         );
         return {
             date: new Date(ts).toLocaleString(),
@@ -151,7 +155,7 @@
     ): Promise<string> {
         const timestamp = await block_height_to_timestamp(
             targetHeight,
-            new ErgoPlatform(),
+            getTimelinePlatform(),
         );
         return `${prefix} ~${formatDistanceToNow(new Date(timestamp))}`;
     }
@@ -178,8 +182,8 @@
         const addedBotBoxes = new Set<string>();
 
         // Fetch token details if applicable
-        let decimals = 0;
-        let tokenSymbol = "N/A";
+        let decimals = 9;
+        let tokenSymbol = "ERG";
         const referenceGame = current || (hist.length > 0 ? hist[0] : null);
 
         if (referenceGame && referenceGame.participationTokenId) {
@@ -436,7 +440,7 @@
                     const isUnlocked = height >= g_cancel.unlockHeight;
                     const unlockTimestamp = await block_height_to_timestamp(
                         g_cancel.unlockHeight,
-                        new ErgoPlatform(),
+                        getTimelinePlatform(),
                     );
                     const countdown = formatDistanceToNow(
                         new Date(unlockTimestamp),

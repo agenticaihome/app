@@ -15,6 +15,7 @@
         SelectValue,
     } from "$lib/components/ui/select";
     import { fetchGoPGames } from "$lib/ergo/fetch";
+    import { isDevMode } from "$lib/ergo/envs";
 
     let allFetchedItems: Map<string, Game> = new Map();
     let listedItems: Map<string, Game> | null = null;
@@ -37,6 +38,7 @@
     let lastSelectedStatus: string = selectedStatus;
 
     let totalGamesCount: number = 0;
+    let previousDevMode = $isDevMode;
 
     export let filterGame: ((item: Game) => Promise<boolean>) | null = null;
 
@@ -224,6 +226,11 @@
             await applyFiltersAndSearch(allFetchedItems);
             isFiltering = false;
         }, 300);
+    }
+
+    $: if ($isDevMode !== previousDevMode) {
+        previousDevMode = $isDevMode;
+        loadInitialItems();
     }
 
     onMount(() => {

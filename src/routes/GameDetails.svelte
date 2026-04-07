@@ -147,7 +147,7 @@
     const PARTICIPATION_BATCH_THRESHOLD = 2;
     const NODO_INSTALLATION = "https://github.com/celaut-project/nodo?tab=readme-ov-file#installation";
     const JUDGE_CHECK_SERVICE = "";
-    const ROBOT_DEVELOPMENT_GUIDE = "";
+    const ROBOT_DEVELOPMENT_GUIDE = "https://raw.githubusercontent.com/game-of-prompts/.github/refs/heads/main/ROBOT_DEVELOPMENT_GUIDE.md";
 
     type HoverHandle = { destroy: () => void };
 

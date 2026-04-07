@@ -16,6 +16,7 @@
     import Demo from "./Demo.svelte";
     import TokenAcquisition from "./TokenAcquisition.svelte";
     import GameDetails from "./GameDetails.svelte";
+    import FaqModal from "./FaqModal.svelte";
     import { ErgoPlatform } from "$lib/ergo/platform";
     import { loadGameById } from "$lib/common/load_by_id";
     import { browser } from "$app/environment";
@@ -588,6 +589,7 @@
 <footer class="page-footer">
     <div class="footer-left">
         <Kya />
+        <FaqModal />
         <a
             href="http://github.com/game-of-prompts"
             target="_blank"

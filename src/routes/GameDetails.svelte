@@ -139,6 +139,7 @@
     import ShareModal from "./ShareModal.svelte";
     import SolverSourceModal from "./SolverSourceModal.svelte";
     import GameTimeline from "$lib/components/GameTimeline.svelte";
+    import AI_ASSISTANT from "$lib/components/AI_ASSISTANT.svelte";
     import { hoverCorners } from "$lib/hoverCorners";
 
     const strictMode = true;
@@ -1262,6 +1263,7 @@
     let showParticipantGuide = true;
     let showSolverIdStep = false;
     let showJudgeGuide = true;
+    let showBotAssistantModal = false;
     let currentActionType:
         | "submit_score"
         | "resolve_game"
@@ -1348,6 +1350,13 @@
     let loadedHandlerAdded = false;
 
     $: audio_element.set(audioElement || null);
+    $: botAssistantPaperUrl =
+        paperSources.find(
+            (source) =>
+                typeof source?.sourceUrl === "string" &&
+                source.sourceUrl.length > 0,
+        )?.sourceUrl ?? null;
+    $: botAssistantPrompt = buildBotAssistantPrompt(game, botAssistantPaperUrl);
 
     function openFileSourceModal(
         hash: string,
@@ -1361,6 +1370,32 @@
     function closeFileSourceModal() {
         showFileSourceModal = false;
         modalFileHash = "";
+    }
+
+    function buildBotAssistantPrompt(
+        currentGame: AnyGame | null,
+        paperUrl: string | null,
+    ) {
+        const title = currentGame?.content?.title?.trim() || "Untitled challenge";
+        const description =
+            currentGame?.content?.description?.trim() ||
+            "No game description was provided.";
+
+        const parts = [
+            "Please develop a robot that solves the following Game of Prompts challenge.",
+            `Game title: ${title}`,
+            `Game description: ${description}`,
+        ];
+
+        if (paperUrl) {
+            parts.push(`Reference paper URL: ${paperUrl}`);
+        }
+
+        parts.push(
+            "Please reason about the game mechanics, propose a solver-service strategy, and provide implementation guidance or code in English.",
+        );
+
+        return parts.join("\n\n");
     }
 
     async function handleFileSourceAdded(txId: string) {
@@ -2665,6 +2700,7 @@
         warningMessage = null;
         isSubmitting = false;
         transactionId = null;
+        showBotAssistantModal = false;
 
         // Reset guide states
         if (type === "invalidate_winner" || type === "judge_unavailable") {
@@ -2690,6 +2726,7 @@
     }
 
     function closeModal() {
+        showBotAssistantModal = false;
         showActionModal = false;
         currentActionType = null;
     }
@@ -5618,7 +5655,7 @@
                 <div
                     class="modal-content {$mode === 'dark'
                         ? 'bg-slate-800 text-gray-200 border border-slate-700'
-                        : 'bg-white text-gray-800 border border-gray-200'} p-6 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-4xl transform transition-all flex flex-col max-h-[90vh]"
+                        : 'bg-white text-gray-800 border border-gray-200'} relative p-6 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-5xl xl:max-w-6xl transform transition-all flex flex-col max-h-[90vh]"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="modal-title"
@@ -5662,7 +5699,7 @@
                         {#if currentActionType === "submit_score"}
                             {#if showParticipantGuide}
                                 <div
-                                    class="space-y-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
+                                    class="space-y-6 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
                                 >
                                     <div class="text-center mb-8">
                                         <h3 class="text-2xl font-bold mb-2">
@@ -5796,6 +5833,16 @@
                                                     suggestions to create your
                                                     robot.
                                                 </p>
+                                            </div>
+                                            <div class="mt-4">
+                                                <Button
+                                                    variant="outline"
+                                                    class="w-full justify-center gap-2"
+                                                    on:click={() => (showBotAssistantModal = true)}
+                                                >
+                                                    <Sparkles class="w-4 h-4" />
+                                                    Need help drafting your bot?
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -7323,6 +7370,53 @@
                             </div>
                         {/if}
                     </div>
+
+                    {#if showBotAssistantModal}
+                        <div
+                            class="absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                            on:click|self={() => (showBotAssistantModal = false)}
+                            role="presentation"
+                        >
+                            <div
+                                class="w-full max-w-3xl rounded-xl border shadow-2xl p-5 md:p-6 max-h-[85vh] overflow-y-auto {$mode === 'dark'
+                                    ? 'bg-slate-900/95 text-gray-100 border-slate-700'
+                                    : 'bg-white/95 text-gray-800 border-gray-200'}"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="bot-assistant-modal-title"
+                            >
+                                <div class="flex items-start justify-between gap-4 mb-5">
+                                    <div>
+                                        <h4
+                                            id="bot-assistant-modal-title"
+                                            class="text-xl font-semibold"
+                                        >
+                                            Need help drafting your bot?
+                                        </h4>
+                                        <p class="text-sm text-muted-foreground mt-1">
+                                            Open this assistant only if you want an AI-generated
+                                            first pass based on the game description and paper.
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        on:click={() => (showBotAssistantModal = false)}
+                                        aria-label="Close AI assistant modal"
+                                        class="flex-shrink-0"
+                                    >
+                                        <X class="w-5 h-5" />
+                                    </Button>
+                                </div>
+
+                                <AI_ASSISTANT
+                                    prompt={botAssistantPrompt}
+                                    title={null}
+                                    description={null}
+                                />
+                            </div>
+                        </div>
+                    {/if}
                 </div>
             </div>
         {/if}

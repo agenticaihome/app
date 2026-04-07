@@ -3,8 +3,8 @@
     import { hoverCorners } from "$lib/hoverCorners";
 
     export let prompt: string;
-    export let title = "Still have questions?";
-    export let description =
+    export let title: string | null = "Still have questions?";
+    export let description: string | null =
         "Copy the prompt below and paste it into any AI assistant. It includes a link to the full documentation.";
     export let officialDocsUrl =
         "https://github.com/game-of-prompts/.github/blob/main/profile/README.md";
@@ -38,8 +38,16 @@
 
 <section class="ai-assistant-panel">
     <div class="ai-assistant-copy">
-        <h3 class="ai-assistant-title">{title}</h3>
-        <p class="ai-assistant-description">{description}</p>
+        {#if title || description}
+            <div class="ai-assistant-heading">
+                {#if title}
+                    <h3 class="ai-assistant-title">{title}</h3>
+                {/if}
+                {#if description}
+                    <p class="ai-assistant-description">{description}</p>
+                {/if}
+            </div>
+        {/if}
 
         <button
             type="button"
@@ -147,6 +155,12 @@
     }
 
     .ai-assistant-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    .ai-assistant-heading {
         display: flex;
         flex-direction: column;
         gap: 0.6rem;

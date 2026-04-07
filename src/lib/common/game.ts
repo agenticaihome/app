@@ -247,12 +247,12 @@ export type AnyParticipation = ValidParticipation | MalformedParticipation | Par
  * Esto ocurre cuando el juego ya no está en estado 'Active'.
  */
 export async function isGameParticipationEnded(game: AnyGame): Promise<boolean> {
-    const currentHeight = await (new ErgoPlatform).get_current_height();
+    const currentHeight = await game.platform.get_current_height();
     return game.status !== GameState.Active || game.deadlineBlock <= currentHeight;
 }
 
 export async function isResolutionAllowed(game: AnyGame): Promise<boolean> {
-    const currentHeight = await (new ErgoPlatform).get_current_height();
+    const currentHeight = await game.platform.get_current_height();
     return game.status === GameState.Active && game.deadlineBlock <= currentHeight && currentHeight < game.deadlineBlock + game.constants.PARTICIPATION_GRACE_PERIOD;
 }
 
@@ -268,19 +268,19 @@ export async function isResolutionAllowed(game: AnyGame): Promise<boolean> {
  * - The creator CANNOT recover their stake (penalty for not resolving in time)
  */
 export async function isGameSuspended(game: AnyGame): Promise<boolean> {
-    const currentHeight = await (new ErgoPlatform).get_current_height();
+    const currentHeight = await game.platform.get_current_height();
     return game.status === GameState.Active &&
         game.deadlineBlock <= currentHeight &&
         currentHeight >= game.deadlineBlock + game.constants.PARTICIPATION_GRACE_PERIOD;
 }
 
 export async function isOpenCeremony(game: AnyGame): Promise<boolean> {
-    const currentHeight = await (new ErgoPlatform).get_current_height();
+    const currentHeight = await game.platform.get_current_height();
     return game.status === "Active" && currentHeight < game.ceremonyDeadline
 }
 
 export async function isOpenSolverSubmit(game: AnyGame): Promise<boolean> {
-    const currentHeight = await (new ErgoPlatform).get_current_height();
+    const currentHeight = await game.platform.get_current_height();
     return game.status === "Active" && currentHeight < game.ceremonyDeadline - game.constants.SEED_MARGIN;
 }
 
@@ -305,8 +305,7 @@ export async function isGameDrainingAllowed(game: AnyGame): Promise<boolean> {
     if (!iGameDrainingStaking(game)) {
         return false;
     }
-    const platform = new ErgoPlatform();
-    const currentHeight = await platform.get_current_height();
+    const currentHeight = await game.platform.get_current_height();
     const unlocked = currentHeight >= game.unlockHeight;
 
     const portionToClaim = game.portionToClaim;

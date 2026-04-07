@@ -25,6 +25,13 @@
     import { Input } from "$lib/components/ui/input";
     import { Checkbox } from "$lib/components/ui/checkbox";
     import {
+        Select,
+        SelectTrigger,
+        SelectContent,
+        SelectItem,
+        SelectValue,
+    } from "$lib/components/ui/select";
+    import {
         Trophy,
         Eye,
         EyeOff,
@@ -74,9 +81,17 @@
     let gameTitle: string = "";
     let gameDescription: string = "";
     let creatorTokenId: string = "";
+    let isEditingCreatorTokenId = false;
+    let activeCreatorProfileTokenId = "";
+    let hasActiveCreatorProfile = false;
+    let usingActiveCreatorProfile = false;
     let indetermismIndex: number = 1;
     let gameTimeValue: number;
     let gameTimeUnit: "days" | "minutes" = "days";
+    let gameTimeUnitSelected: { value: "days" | "minutes"; label: string } = {
+        value: "days",
+        label: "Days",
+    };
     let deadlineBlock: number | undefined;
     let deadlineBlockDateText: string = "";
     let resolverStakeAmount: number | undefined;
@@ -88,6 +103,8 @@
 
     let isSubmitting: boolean = false;
     let showSummary: boolean = false;
+
+    $: gameTimeUnit = gameTimeUnitSelected?.value ?? "days";
 
     // Guide State
     let showGuide = true;
@@ -140,11 +157,13 @@
     let timeFactorOption: "zero" | "low" | "balanced" | "high" | "extreme" =
         "zero";
 
-    let participationTokenId: string = ""; // "" para ERG
+    let participationTokenId: string = "";
     let participationTokenDecimals: number = 9;
-    let participationTokenName: string = "ERG";
+    let participationTokenName: string = "";
 
-    let selectedTokenOption: string = "";
+    let selectedTokenOption: { value: string; label: string } | undefined;
+    let selectedTokenId = "";
+    let tokenSelectionError: string | null = null;
 
     let availableTokens: {
         tokenId: string;
@@ -176,6 +195,7 @@
             return;
         }
         isLoadingTokens = true;
+        tokenSelectionError = null;
         try {
             const utxos = await ergo.get_utxos();
             const tokenMap = new Map<string, number>();
@@ -235,6 +255,8 @@
             availableTokens = tokensWithDetails;
         } catch (e) {
             console.error("Error loading user tokens", e);
+            tokenSelectionError =
+                "Error loading wallet tokens. Please retry after reconnecting the wallet.";
         } finally {
             isLoadingTokens = false;
         }
@@ -260,18 +282,22 @@
 
             // Default to 20 minutes for quick testing
             gameTimeValue = 20;
-            gameTimeUnit = "minutes";
+            gameTimeUnitSelected = { value: "minutes", label: "Minutes" };
 
             // Trigger calculation immediately
             calculateBlockLimit();
         }
 
-        // Set creatorTokenId from reputation proof only on load if not set
-        const repProof = get(reputation_proof);
-        if (!creatorTokenId && repProof && (repProof as any).token_id) {
-            creatorTokenId = (repProof as any).token_id;
-        }
     });
+
+    $: activeCreatorProfileTokenId = (($reputation_proof as any)?.token_id ??
+        "") as string;
+    $: hasActiveCreatorProfile = !!activeCreatorProfileTokenId;
+    $: usingActiveCreatorProfile =
+        hasActiveCreatorProfile && !isEditingCreatorTokenId;
+    $: if (usingActiveCreatorProfile) {
+        creatorTokenId = activeCreatorProfileTokenId;
+    }
 
     // --- Box Size Validation ---
     $: gameDetailsObject = {
@@ -460,20 +486,21 @@
     let lockdownEndDateText = "";
     let executionEndDateText = "";
 
-    // Helper function to format block duration into days, hours, and minutes
+    // Helper function to format block duration using only the selected unit
     function formatBlockDuration(blocks: number): string {
-        const minutes =
+        const totalMinutes =
             (blocks * new ErgoPlatform().time_per_block) / (60 * 1000); // Each block is ~2 minutes
-        const days = Math.floor(minutes / (24 * 60));
-        const hours = Math.floor((minutes % (24 * 60)) / 60);
-        const mins = Math.floor(minutes % 60);
 
-        const parts = [];
-        if (days > 0) parts.push(`${days}d`);
-        if (hours > 0) parts.push(`${hours}h`);
-        if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
+        if (gameTimeUnit === "days") {
+            const totalDays = totalMinutes / (24 * 60);
+            const formattedDays =
+                totalDays >= 1
+                    ? totalDays.toFixed(1).replace(/\.0$/, "")
+                    : totalDays.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+            return `${formattedDays}d`;
+        }
 
-        return parts.join(" ");
+        return `${Math.round(totalMinutes)}m`;
     }
 
     $: {
@@ -595,19 +622,27 @@
     }
 
     // --- Token Reactive Logic ---
+    $: selectedTokenId = selectedTokenOption?.value ?? "";
+
     $: {
-        if (selectedTokenOption) {
+        if (selectedTokenId) {
             const token = availableTokens.find(
-                (t) => t.tokenId === selectedTokenOption,
+                (t) => t.tokenId === selectedTokenId,
             );
 
             if (token) {
                 participationTokenId = token.tokenId;
                 participationTokenDecimals = token.decimals;
                 participationTokenName = token.title;
+                tokenSelectionError = null;
             } else {
-                alert("Token not found. Contact developers on Telegram.");
+                participationTokenId = "";
+                participationTokenName = "";
+                tokenSelectionError =
+                    "Selected token not found in available wallet tokens.";
             }
+        } else {
+            tokenSelectionError = null;
         }
     }
 
@@ -825,7 +860,7 @@
         >
             <div class="text-center mb-6">
                 <h2
-                    class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-2 bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent inline-block"
+                    class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-2 gop-gradient-text inline-block"
                 >
                     Create a Challenge
                 </h2>
@@ -837,6 +872,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <Card.Root
+                    data-hover-corners
                     class="border-2 hover:border-primary/50 transition-colors"
                 >
                     <Card.Header class="p-4">
@@ -871,6 +907,7 @@
                 </Card.Root>
 
                 <Card.Root
+                    data-hover-corners
                     class="border-2 hover:border-purple-500/50 transition-colors"
                 >
                     <Card.Header class="p-4">
@@ -914,7 +951,7 @@
                     <BookOpen class="w-6 h-6 flex-shrink-0" />
                     <p class="text-sm">
                         Check the <a
-                            href="https://github.com/game-of-prompts/gop-examples"
+                            href="https://github.com/game-of-prompts/snake-game"
                             target="_blank"
                             class="underline font-bold hover:text-yellow-500"
                             >Examples Repository</a
@@ -935,7 +972,7 @@
     {:else}
         <div class="hero-section text-center">
             <h2
-                class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent inline-block"
+                class="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 gop-gradient-text inline-block"
             >
                 Create a New Competition
             </h2>
@@ -1003,7 +1040,7 @@
                                     <div
                                         class="flex justify-between text-sm border-b border-border/50 pb-1"
                                     >
-                                        <span>Indetermism Index:</span>
+                                        <span>Verification Runs:</span>
                                         <span class="font-mono"
                                             >{indetermismIndex}</span
                                         >
@@ -1270,7 +1307,7 @@
                             <div
                                 class="form-grid grid grid-cols-1 lg:grid-cols-4 gap-x-6 gap-y-6"
                             >
-                                <div class="form-group lg:col-span-3">
+                                <div class="form-group lg:col-span-4">
                                     <div class="flex items-center gap-2 mb-1.5">
                                         <Label for="gameTitle" class="mb-0"
                                             >Game Title</Label
@@ -1295,39 +1332,6 @@
                                         id="gameTitle"
                                         bind:value={gameTitle}
                                         placeholder="The official title of the game"
-                                        required
-                                    />
-                                </div>
-                                <div class="form-group lg:col-span-1">
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <Label
-                                            for="indetermismIndex"
-                                            class="mb-0 whitespace-nowrap"
-                                            >Indetermism Index</Label
-                                        >
-                                        <div class="group relative">
-                                            <button
-                                                type="button"
-                                                tabindex="-1"
-                                                on:click={() =>
-                                                    openDidacticModal(
-                                                        "Indetermism Index",
-                                                        "The number of times judges will test if the participation reproduces the logs correctly.",
-                                                    )}
-                                            >
-                                                <Info
-                                                    class="w-3.5 h-3.5 text-muted-foreground cursor-help hover:text-primary transition-colors"
-                                                />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <Input
-                                        id="indetermismIndex"
-                                        type="number"
-                                        bind:value={indetermismIndex}
-                                        min="1"
-                                        step="1"
-                                        placeholder="Executions"
                                         required
                                     />
                                 </div>
@@ -1493,15 +1497,34 @@
                                             placeholder="Time for robot upload"
                                             autocomplete="off"
                                         />
-                                        <select
-                                            bind:value={gameTimeUnit}
-                                            class="p-2 border border-slate-500/20 rounded-md bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-slate-500/20"
+                                        <Select
+                                            bind:selected={gameTimeUnitSelected}
                                         >
-                                            <option value="days">Days</option>
-                                            <option value="minutes"
-                                                >Minutes</option
+                                            <SelectTrigger
+                                                class="cyber-select min-w-[140px] text-sm"
+                                                aria-label="Game time unit"
                                             >
-                                        </select>
+                                                <SelectValue placeholder="Unit" />
+                                            </SelectTrigger>
+                                            <SelectContent
+                                                class="cyber-select-content"
+                                            >
+                                                <SelectItem
+                                                    value="days"
+                                                    label="Days"
+                                                    class="cyber-select-item"
+                                                >
+                                                    Days
+                                                </SelectItem>
+                                                <SelectItem
+                                                    value="minutes"
+                                                    label="Minutes"
+                                                    class="cyber-select-item"
+                                                >
+                                                    Minutes
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <p
                                         class="text-[10px] text-muted-foreground mt-1"
@@ -1718,16 +1741,32 @@
                                             Loading your tokens...
                                         </p>
                                     {:else}
-                                        <select
-                                            bind:value={selectedTokenOption}
-                                            class="w-full p-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                                        >
-                                            {#each availableTokens as token (token.tokenId)}
-                                                <option value={token.tokenId}>
-                                                    {token.title}
-                                                </option>
-                                            {/each}
-                                        </select>
+                                        <Select bind:selected={selectedTokenOption}>
+                                            <SelectTrigger
+                                                class="cyber-select w-full text-sm"
+                                                aria-label="Token for stake and fee"
+                                            >
+                                                <SelectValue placeholder="Select token" />
+                                            </SelectTrigger>
+                                            <SelectContent
+                                                class="cyber-select-content"
+                                            >
+                                                {#each availableTokens as token (token.tokenId)}
+                                                    <SelectItem
+                                                        value={token.tokenId}
+                                                        label={token.title}
+                                                        class="cyber-select-item"
+                                                    >
+                                                        {token.title}
+                                                    </SelectItem>
+                                                {/each}
+                                            </SelectContent>
+                                        </Select>
+                                        {#if tokenSelectionError}
+                                            <p class="text-xs text-red-500 mt-2">
+                                                {tokenSelectionError}
+                                            </p>
+                                        {/if}
                                     {/if}
                                 </div>
                                 <div class="form-group lg:col-span-2">
@@ -1896,27 +1935,54 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <select
-                                        id="timeFactorOption"
-                                        bind:value={timeFactorOption}
-                                        class="w-full p-2 border border-slate-500/20 rounded-md bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-slate-500/20"
-                                    >
-                                        <option value="zero"
-                                            >Zero (Only score matters)</option
+                                    <Select bind:value={timeFactorOption}>
+                                        <SelectTrigger
+                                            id="timeFactorOption"
+                                            class="cyber-select w-full text-sm"
+                                            aria-label="Time factor"
                                         >
-                                        <option value="low"
-                                            >Low (1 point per block)</option
+                                            <SelectValue placeholder="Select time factor" />
+                                        </SelectTrigger>
+                                        <SelectContent
+                                            class="cyber-select-content"
                                         >
-                                        <option value="balanced"
-                                            >Balanced (5 points per block)</option
-                                        >
-                                        <option value="high"
-                                            >High (20 points per block)</option
-                                        >
-                                        <option value="extreme"
-                                            >Extreme (100 points per block)</option
-                                        >
-                                    </select>
+                                            <SelectItem
+                                                value="zero"
+                                                label="Zero (Only score matters)"
+                                                class="cyber-select-item"
+                                            >
+                                                Zero (Only score matters)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="low"
+                                                label="Low (1 point per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                Low (1 point per block)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="balanced"
+                                                label="Balanced (5 points per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                Balanced (5 points per block)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="high"
+                                                label="High (20 points per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                High (20 points per block)
+                                            </SelectItem>
+                                            <SelectItem
+                                                value="extreme"
+                                                label="Extreme (100 points per block)"
+                                                class="cyber-select-item"
+                                            >
+                                                Extreme (100 points per block)
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                     <p
                                         class="text-xs mt-1 text-muted-foreground"
                                     >
@@ -2170,6 +2236,47 @@
                                         </p>
                                     {/if}
                                 </div>
+
+                                <div class="form-group lg:col-span-4">
+                                    <div class="flex items-center gap-2 mb-1.5">
+                                        <Label for="indetermismIndex" class="mb-0 whitespace-nowrap">
+                                            Verification Runs
+                                        </Label>
+                                        <div class="group relative">
+                                            <button
+                                                type="button"
+                                                tabindex="-1"
+                                                on:click={() =>
+                                                    openDidacticModal(
+                                                        "Verification Runs",
+                                                        "This defines how many times judges are expected to re-run and verify a submitted solution. It acts as a guideline for how much testing is required before considering that a game may be manipulated or not reproducible by the creator. Deterministic games may only need 1 run, while more complex or uncertain games benefit from multiple verification attempts."
+                                                    )}
+                                            >
+                                                <Info
+                                                    class="w-3.5 h-3.5 text-muted-foreground cursor-help hover:text-primary transition-colors"
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Input + Hint inline -->
+                                    <div class="flex items-start gap-2">
+                                        <Input
+                                            id="indetermismIndex"
+                                            type="number"
+                                            bind:value={indetermismIndex}
+                                            min="1"
+                                            step="1"
+                                            placeholder="Runs"
+                                            required
+                                            class="w-24"
+                                        />
+
+                                        <p class="text-[12px] text-muted-foreground leading-snug">
+                                            Number of verification attempts judges should perform before suspecting manipulation. Increase for non-deterministic games.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </section>
 
@@ -2214,14 +2321,48 @@
                                     {/if}
                                 </div>
                                 <div class="form-group lg:col-span-4">
-                                    <Label for="creatorTokenId"
-                                        >Creator Reputation Proof ID (Optional)</Label
+                                    <div
+                                        class="flex items-center justify-between gap-2 mb-1.5"
                                     >
-                                    <Input
-                                        id="creatorTokenId"
-                                        bind:value={creatorTokenId}
-                                        placeholder="Enter a token ID to link to the creator"
-                                    />
+                                        <Label for="creatorTokenId"
+                                            >Creator Reputation Profile ID</Label
+                                        >
+                                        {#if usingActiveCreatorProfile}
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                on:click={() =>
+                                                    (isEditingCreatorTokenId = true)}
+                                            >
+                                                Modify
+                                            </Button>
+                                        {/if}
+                                    </div>
+
+                                    {#if usingActiveCreatorProfile}
+                                        <div
+                                            class="px-3 py-2 rounded-md border bg-muted/40 text-sm"
+                                        >
+                                            Current profile set in UI:
+                                            <span class="font-mono break-all">
+                                                {activeCreatorProfileTokenId.slice(0, 8)}...
+                                            </span>
+                                        </div>
+                                    {:else}
+                                        <Input
+                                            id="creatorTokenId"
+                                            bind:value={creatorTokenId}
+                                            placeholder="Enter a token ID to link to the creator"
+                                        />
+                                    {/if}
+                                    <p
+                                        class="text-xs mt-1 text-muted-foreground"
+                                    >
+                                        If this profile is used, it must publish
+                                        an authorization for this game, just
+                                        like invited judges do.
+                                    </p>
                                 </div>
                                 <div class="form-group lg:col-span-4">
                                     <Label for="gamePaperHash"
@@ -2402,7 +2543,7 @@
                         class="lg:col-span-4 space-y-8 lg:sticky lg:top-24 h-fit"
                     >
                         <!-- FILE SOURCES SECTIONS -->
-                        {#if $reputation_proof || $isDevMode}
+                        {#if $reputation_proof}
                             <section class="form-section">
                                 <h3 class="section-title">
                                     File Sources (Optional)
@@ -2604,6 +2745,33 @@
                                             </div>
                                         {/if}
                                     </div>
+                                </div>
+                            </section>
+                        
+                        {:else}
+                            <section class="form-section">
+                                <h3 class="section-title">
+                                    File Sources (Requires Judge Profile)
+                                </h3>
+                                <p class="section-description">
+                                    To publish File Sources on Ergo, you first
+                                    need a reputation proof.
+                                </p>
+
+                                <div
+                                    class="form-group p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-sm"
+                                >
+                                    <p
+                                        class="text-sm text-amber-600 dark:text-amber-400 leading-relaxed"
+                                    >
+                                        In Game of Prompts, <strong>being a
+                                            judge means having a reputation
+                                            proof</strong>. Create your Judge
+                                        profile from the top menu (<strong
+                                            >Become a Judge</strong
+                                        >), then come back here to add Service,
+                                        Paper, Image and Soundtrack sources.
+                                    </p>
                                 </div>
                             </section>
                         {/if}

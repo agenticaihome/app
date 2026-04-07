@@ -48,6 +48,7 @@
         VolumeX,
         Music,
         Github,
+        Globe,
         Send,
     } from "lucide-svelte";
     import SettingsModal from "./SettingsModal.svelte";
@@ -82,6 +83,10 @@
     let mobileMenuOpen = false;
     let showSettings = false;
     let showInvalidExplorerModal = false;
+    let navHidden = false;
+    let lastScrollY = 0;
+    let scrollTicking = false;
+    const scrollDeltaThreshold = 6;
 
     let platform = new ErgoPlatform();
 
@@ -115,6 +120,31 @@
             "animationiteration",
             handleAnimationIteration,
         );
+
+        lastScrollY = window.scrollY;
+        const onScroll = () => {
+            if (scrollTicking) return;
+            scrollTicking = true;
+            requestAnimationFrame(() => {
+                const currentY = window.scrollY;
+                const delta = currentY - lastScrollY;
+
+                if (currentY <= 0) {
+                    navHidden = false;
+                } else if (Math.abs(delta) >= scrollDeltaThreshold) {
+                    if (delta > 0) {
+                        navHidden = true;
+                        if (mobileMenuOpen) mobileMenuOpen = false;
+                    } else {
+                        navHidden = false;
+                    }
+                }
+
+                lastScrollY = currentY;
+                scrollTicking = false;
+            });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
 
         // Load settings
         const storedSettings = localStorage.getItem("gop_settings");
@@ -184,6 +214,7 @@
                 "animationiteration",
                 handleAnimationIteration,
             );
+            window.removeEventListener("scroll", onScroll);
             unsubscribeSettings.forEach((unsub) => unsub());
         };
     });
@@ -311,7 +342,7 @@
     }
 </script>
 
-<header class="navbar-container">
+<header class="navbar-container" class:navbar-hidden={navHidden}>
     <div class="navbar-content">
         <a
             href="#"
@@ -383,6 +414,7 @@
                 variant="ghost"
                 size="icon"
                 on:click={() => muted.set(!$muted)}
+                title={$muted ? "Unmute card scroll sounds" : "Mute card scroll sounds"}
             >
                 {#if $muted}
                     <VolumeX class="h-[1.2rem] w-[1.2rem]" />
@@ -394,6 +426,7 @@
                 variant="ghost"
                 size="icon"
                 on:click={() => (showSettings = true)}
+                title="Settings"
             >
                 <Settings class="h-[1.2rem] w-[1.2rem]" />
             </Button>
@@ -565,6 +598,15 @@
             <Github class="h-4 w-4" />
         </a>
         <a
+            href="https://game-of-prompts.github.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-foreground transition-colors ml-2"
+            title="GoP Landing"
+        >
+            <Globe class="h-4 w-4" />
+        </a>
+        <a
             href="https://t.me/unstopbots"
             target="_blank"
             rel="noopener noreferrer"
@@ -602,65 +644,113 @@
 <WalletAddressChangeHandler />
 
 <style lang="postcss">
+    :global(:root) {
+        --gop-nav-top: 0.75rem;
+        --gop-nav-height: 4rem;
+    }
+
     :global(body) {
         background-color: hsl(var(--background));
     }
 
+    /* ===== Navbar — Dark Cyberpunk ===== */
     .navbar-container {
-        @apply sticky top-0 z-50 w-full border-b backdrop-blur-lg;
-        background-color: hsl(var(--background) / 0.8);
-        border-bottom-color: hsl(var(--border));
+        @apply sticky z-50;
+        top: var(--gop-nav-top);
+        width: fit-content;
+        max-width: calc(100vw - 1rem);
+        margin-inline: auto;
+        border-radius: 30px / 24px;
+        background-color: hsl(var(--background) / 0.82);
+        border: 1px solid rgba(74, 222, 128, 0.14);
+        box-shadow:
+            0 14px 34px rgba(0, 0, 0, 0.28),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(14px) saturate(1.2);
+        -webkit-backdrop-filter: blur(14px) saturate(1.2);
+        overflow: clip;
+        transition:
+            transform 200ms ease,
+            opacity 200ms ease;
+        will-change: transform, opacity;
+    }
+
+    .navbar-hidden {
+        transform: translateY(
+            calc(-1 * (var(--gop-nav-top) + var(--gop-nav-height) + 1rem))
+        );
+        opacity: 0;
+        pointer-events: none;
     }
 
     .navbar-content {
-        @apply container flex h-16 items-center;
+        @apply flex h-16 items-center px-3 md:px-4;
         @apply justify-end md:justify-start;
+        gap: 0.5rem;
+        width: fit-content;
+        max-width: calc(100vw - 1.5rem);
     }
 
     .logo-container {
-        @apply mr-6 flex items-center;
+        @apply mr-3 flex items-center;
     }
 
     .logo-image {
         height: 2rem;
         width: auto;
         margin-right: 2rem;
+        filter: drop-shadow(0 0 8px rgba(74, 222, 128, 0.3));
     }
 
     .desktop-nav {
-        @apply hidden md:flex flex-1;
+        @apply hidden md:flex;
     }
 
     .nav-links {
-        @apply flex items-center gap-4 text-sm;
+        @apply flex items-center gap-1 text-sm;
     }
 
     .nav-links li a {
-        @apply transition-colors text-muted-foreground;
+        @apply transition-colors px-3 py-1.5 rounded-lg;
+        color: hsl(var(--muted-foreground));
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        letter-spacing: 0.01em;
     }
 
     .nav-links li a:hover {
-        @apply text-foreground;
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.06);
     }
 
     .nav-links li.active a {
-        @apply text-foreground font-semibold;
+        color: #4ade80;
+        font-weight: 600;
+        background: rgba(74, 222, 128, 0.08);
+        border: 1px solid rgba(74, 222, 128, 0.15);
     }
 
     .user-section {
-        @apply items-center gap-4;
+        @apply items-center gap-3 md:ml-2;
     }
 
     .mobile-menu-button {
-        @apply md:hidden p-2 rounded-md hover:bg-accent hover:text-accent-foreground;
+        @apply md:hidden p-2 rounded-md;
+        color: hsl(var(--foreground));
+    }
+    .mobile-menu-button:hover {
+        background: rgba(74, 222, 128, 0.08);
+        color: #4ade80;
     }
 
     .mobile-nav {
-        @apply md:hidden fixed left-0 right-0 z-40 border-b shadow-lg flex flex-col;
-        top: 4rem;
+        @apply md:hidden fixed left-0 right-0 z-40 shadow-lg flex flex-col;
+        top: calc(var(--gop-nav-top) + var(--gop-nav-height) + 0.35rem);
         background-color: hsl(var(--background));
-        border-bottom-color: hsl(var(--border));
-        max-height: calc(100vh - 4rem);
+        border-bottom: 1px solid rgba(74, 222, 128, 0.08);
+        max-height: calc(
+            100vh - (var(--gop-nav-top) + var(--gop-nav-height) + 0.35rem)
+        );
         overflow-y: auto;
     }
 
@@ -669,34 +759,51 @@
     }
 
     .mobile-nav-links li a {
-        @apply block text-base font-medium transition-colors hover:text-primary;
+        @apply block text-base font-medium transition-colors;
+        color: hsl(var(--foreground));
+        font-family: var(--font-mono);
+    }
+
+    .mobile-nav-links li a:hover {
+        color: #4ade80;
     }
 
     .mobile-nav-links li.active a {
-        @apply text-primary font-bold;
+        color: #4ade80;
+        font-weight: 700;
     }
 
     .mobile-user-controls {
-        @apply p-4 bg-accent/10;
+        @apply p-4;
+        background: rgba(74, 222, 128, 0.03);
     }
 
     main {
         @apply pb-16;
     }
 
+    /* ===== Footer — Cyberpunk ===== */
     .page-footer {
         @apply fixed bottom-0 left-0 right-0 z-40;
         @apply flex items-center;
         @apply h-12 px-6 gap-6;
-        @apply border-t text-sm text-muted-foreground;
-        background-color: hsl(var(--background) / 0.8);
-        border-top-color: hsl(var(--border));
-        backdrop-filter: blur(4px);
+        @apply text-sm;
+        background-color: hsl(var(--background) / 0.85);
+        border-top: 1px solid rgba(74, 222, 128, 0.06);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
     }
 
     .footer-left,
     .footer-right {
         @apply flex items-center gap-2 flex-shrink-0;
+    }
+
+    .footer-left a:hover,
+    .footer-right a:hover {
+        color: #4ade80 !important;
     }
 
     .footer-center {

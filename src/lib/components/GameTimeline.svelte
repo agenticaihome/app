@@ -2,9 +2,12 @@
     import {
         type AnyGame,
         GameState,
-        isGameSuspended,
         resolve_participation_commitment,
     } from "$lib/common/game";
+    import {
+        type GamePhaseSnapshot,
+        deriveGamePhaseSnapshot,
+    } from "$lib/common/game-phase";
     import { type Box, type Amount } from "@fleet-sdk/core";
     import {
         CheckCircle,
@@ -47,6 +50,10 @@
     let showBotEvents = true;
     let isLoadingTimeline = false;
 
+    function getTimelinePlatform() {
+        return currentGame?.platform ?? history[history.length - 1]?.platform ?? new ErgoPlatform();
+    }
+
     // Helper to get a readable date and height from block height or timestamp
     async function getEventDetails(
         box: Box<Amount> | null,
@@ -65,7 +72,7 @@
         // Fallback to approximation
         const ts = await block_height_to_timestamp(
             box.creationHeight,
-            new ErgoPlatform(),
+            getTimelinePlatform(),
         );
         return {
             date: new Date(ts).toLocaleString(),
@@ -103,6 +110,56 @@
     let steps: TimelineStep[] = [];
     let filteredSteps: TimelineStep[] = [];
 
+    const TIMELINE_ACCENT_COLORS: Record<string, string> = {
+        "blue-400": "#60a5fa",
+        "blue-500": "#3b82f6",
+        "blue-600": "#2563eb",
+        "purple-400": "#c084fc",
+        "purple-500": "#a855f7",
+        "yellow-500": "#eab308",
+        "orange-500": "#f97316",
+        "orange-600": "#ea580c",
+        "red-500": "#ef4444",
+        "red-600": "#dc2626",
+        "lime-500": "#84cc16",
+        "emerald-400": "#34d399",
+        "emerald-500": "#10b981",
+        "amber-500": "#f59e0b",
+        "indigo-500": "#6366f1",
+        "green-500": "#22c55e",
+        "gray-400": "#9ca3af",
+    };
+
+    function getStepAccentColor(step: TimelineStep): string {
+        if (step.status === "active") return "#3b82f6";
+        if (step.status === "cancelled") return "#ef4444";
+
+        // Extract token from classes like "text-purple-500 border-purple-500"
+        const match = step.color?.match(/(?:text|border)-([a-z]+-\d{3})/);
+        if (match?.[1] && TIMELINE_ACCENT_COLORS[match[1]]) {
+            return TIMELINE_ACCENT_COLORS[match[1]];
+        }
+
+        return "hsl(var(--muted-foreground))";
+    }
+
+    function getStepDotStyle(step: TimelineStep): string {
+        if (step.status === "pending") return "";
+        const color = getStepAccentColor(step);
+        return `color: ${color}; border-color: ${color};`;
+    }
+
+    async function formatPhaseCountdown(
+        targetHeight: number,
+        prefix = "Ends in",
+    ): Promise<string> {
+        const timestamp = await block_height_to_timestamp(
+            targetHeight,
+            getTimelinePlatform(),
+        );
+        return `${prefix} ~${formatDistanceToNow(new Date(timestamp))}`;
+    }
+
     $: if (currentGame || history.length > 0 || participations.length > 0) {
         isLoadingTimeline = true;
         buildSteps(history, currentGame, currentHeight, participations).then(
@@ -125,8 +182,8 @@
         const addedBotBoxes = new Set<string>();
 
         // Fetch token details if applicable
-        let decimals = 0;
-        let tokenSymbol = "N/A";
+        let decimals = 9;
+        let tokenSymbol = "ERG";
         const referenceGame = current || (hist.length > 0 ? hist[0] : null);
 
         if (referenceGame && referenceGame.participationTokenId) {
@@ -383,7 +440,7 @@
                     const isUnlocked = height >= g_cancel.unlockHeight;
                     const unlockTimestamp = await block_height_to_timestamp(
                         g_cancel.unlockHeight,
-                        new ErgoPlatform(),
+                        getTimelinePlatform(),
                     );
                     const countdown = formatDistanceToNow(
                         new Date(unlockTimestamp),
@@ -791,8 +848,8 @@
                     );
                     newSteps.push({
                         id: `past_solver_hash_deadline`,
-                        label: "Solver Hash Deadline Passed",
-                        description: "Bot hash submission period ended.",
+                        label: "Bot Upload Deadline Passed",
+                        description: "The solver upload window ended.",
                         status: "completed",
                         date: new Date(deadlineTimestamp).toLocaleString(),
                         icon: Bot,
@@ -815,8 +872,8 @@
                     );
                     newSteps.push({
                         id: `past_ceremony_seed_deadline`,
-                        label: "Ceremony Seed Deadline Passed",
-                        description: "Randomness submission period ended.",
+                        label: "Ceremony Deadline Passed",
+                        description: "The seed-randomness window ended.",
                         status: "completed",
                         date: new Date(deadlineTimestamp).toLocaleString(),
                         icon: RefreshCw,
@@ -891,126 +948,212 @@
 
         // 4. Future/Current Steps (only if game is not finalized/cancelled)
         if (current) {
-            const isSuspended = isGameSuspended(current);
+            const phaseSnapshot: GamePhaseSnapshot = deriveGamePhaseSnapshot(
+                current,
+                height,
+            );
 
             if (current.status === GameState.Active) {
-                // Add sub-phases if active
-                if ("ceremonyDeadline" in current) {
-                    const hashDeadline =
-                        current.ceremonyDeadline -
-                        current.constants.SEED_MARGIN;
-                    if (height < hashDeadline) {
-                        newSteps.push({
-                            id: "future_hash",
-                            label: "Bot Hash Submission",
-                            description: "Currently accepting bot hashes.",
-                            status: "active",
-                            date: `Ends in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(hashDeadline, new ErgoPlatform())))}`,
-                            icon: Bot,
-                            height: hashDeadline,
-                            color: "text-blue-500 border-blue-500",
-                        });
-                    }
-
-                    const seedDeadline = current.ceremonyDeadline;
-                    if (height < seedDeadline) {
-                        newSteps.push({
-                            id: "future_seed",
-                            label: "Seed Randomness",
-                            description: "Currently accepting randomness.",
-                            status: "active",
-                            date: `Ends in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(seedDeadline, new ErgoPlatform())))}`,
-                            icon: RefreshCw,
-                            height: seedDeadline,
-                            color: "text-purple-500 border-purple-500",
-                        });
-                    }
-                }
-
-                const execDeadline = current.deadlineBlock;
-                if (height < execDeadline) {
-                    const isExecOpen =
-                        !("ceremonyDeadline" in current) ||
-                        height >= current.ceremonyDeadline;
-                    newSteps.push({
-                        id: "future_exec",
-                        label: "Participation submission",
-                        description: isExecOpen
-                            ? "Currently accepting game results."
-                            : "Waiting for seed to submit results.",
-                        status: isExecOpen ? "active" : "pending",
-                        date: `Ends in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(execDeadline, new ErgoPlatform())))}`,
-                        icon: Sparkles,
-                        height: execDeadline,
-                        color: "text-emerald-500 border-emerald-500",
-                    });
-                }
-
-                const isPartEnded = height >= current.deadlineBlock;
+                const hashDeadline =
+                    current.ceremonyDeadline - current.constants.SEED_MARGIN;
+                const seedDeadline = current.ceremonyDeadline;
+                const participationDeadline = current.deadlineBlock;
                 const suspendedHeight =
                     current.deadlineBlock +
                     current.constants.PARTICIPATION_GRACE_PERIOD;
 
-                if (!isSuspended) {
+                if (phaseSnapshot.subphase === "strategy_upload") {
                     newSteps.push({
-                        id: "future_resolution",
-                        label: isPartEnded
-                            ? "Awaiting Resolution"
-                            : "Resolution & Judging",
-                        description: isPartEnded
-                            ? "Waiting for the creator to reveal the seed and start the resolution phase."
-                            : "After the deadline, judges will reproduce the winning robot to verify creator honesty.",
-                        status: isPartEnded ? "active" : "pending",
-                        date: isPartEnded
-                            ? `Suspends in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(suspendedHeight, new ErgoPlatform())))}`
-                            : `Starts in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(current.deadlineBlock, new ErgoPlatform())))}`,
+                        id: "phase_strategy_upload",
+                        label: "Strategy & Upload",
+                        description:
+                            "Players can still upload solver services while anyone can keep adding randomness to the seed.",
+                        status: "active",
+                        date: await formatPhaseCountdown(hashDeadline),
+                        icon: Bot,
+                        height: hashDeadline,
+                        color: "text-indigo-500 border-indigo-500",
+                    });
+                    newSteps.push({
+                        id: "phase_seed_lockdown",
+                        label: "Seed Lockdown",
+                        description:
+                            "Bot uploads close, but the ceremony stays open until the seed deadline.",
+                        status: "pending",
+                        date: await formatPhaseCountdown(seedDeadline),
+                        icon: RefreshCw,
+                        height: seedDeadline,
+                        color: "text-amber-500 border-amber-500",
+                    });
+                    newSteps.push({
+                        id: "phase_playing",
+                        label: "Playing",
+                        description:
+                            "Once the seed is fixed, players can execute their bots and submit participations.",
+                        status: "pending",
+                        date: await formatPhaseCountdown(participationDeadline),
+                        icon: Sparkles,
+                        height: participationDeadline,
+                        color: "text-emerald-500 border-emerald-500",
+                    });
+                    newSteps.push({
+                        id: "phase_awaiting_resolution",
+                        label: "Awaiting Resolution",
+                        description:
+                            "After participation closes, the creator can reveal the secret before the game becomes suspended.",
+                        status: "pending",
+                        date: await formatPhaseCountdown(
+                            suspendedHeight,
+                            "Would suspend in",
+                        ),
+                        icon: Clock,
+                        height: suspendedHeight,
+                        color: "text-orange-500 border-orange-500",
+                    });
+                } else if (phaseSnapshot.subphase === "seed_lockdown") {
+                    newSteps.push({
+                        id: "phase_seed_lockdown",
+                        label: "Seed Lockdown",
+                        description:
+                            "Bot uploads are closed. Anyone can still add randomness until the ceremony deadline.",
+                        status: "active",
+                        date: await formatPhaseCountdown(seedDeadline),
+                        icon: RefreshCw,
+                        height: seedDeadline,
+                        color: "text-amber-500 border-amber-500",
+                    });
+                    newSteps.push({
+                        id: "phase_playing",
+                        label: "Playing",
+                        description:
+                            "Once the seed is fixed, players can execute their bots and submit participations.",
+                        status: "pending",
+                        date: await formatPhaseCountdown(participationDeadline),
+                        icon: Sparkles,
+                        height: participationDeadline,
+                        color: "text-emerald-500 border-emerald-500",
+                    });
+                    newSteps.push({
+                        id: "phase_awaiting_resolution",
+                        label: "Awaiting Resolution",
+                        description:
+                            "After participation closes, the creator can reveal the secret before the game becomes suspended.",
+                        status: "pending",
+                        date: await formatPhaseCountdown(
+                            suspendedHeight,
+                            "Would suspend in",
+                        ),
+                        icon: Clock,
+                        height: suspendedHeight,
+                        color: "text-orange-500 border-orange-500",
+                    });
+                } else if (phaseSnapshot.subphase === "playing") {
+                    newSteps.push({
+                        id: "phase_playing",
+                        label: "Playing",
+                        description:
+                            "The seed is fixed and players can publish participations until the deadline.",
+                        status: "active",
+                        date: await formatPhaseCountdown(participationDeadline),
+                        icon: Sparkles,
+                        height: participationDeadline,
+                        color: "text-emerald-500 border-emerald-500",
+                    });
+                    newSteps.push({
+                        id: "phase_awaiting_resolution",
+                        label: "Awaiting Resolution",
+                        description:
+                            "After participation closes, the creator can reveal the secret before the game becomes suspended.",
+                        status: "pending",
+                        date: await formatPhaseCountdown(
+                            suspendedHeight,
+                            "Would suspend in",
+                        ),
+                        icon: Clock,
+                        height: suspendedHeight,
+                        color: "text-orange-500 border-orange-500",
+                    });
+                } else if (phaseSnapshot.subphase === "awaiting_resolution") {
+                    newSteps.push({
+                        id: "phase_awaiting_resolution",
+                        label: "Awaiting Resolution",
+                        description:
+                            "Participation is closed and the creator must reveal the secret before the grace period expires.",
+                        status: "active",
+                        date: await formatPhaseCountdown(
+                            suspendedHeight,
+                            "Suspends in",
+                        ),
+                        icon: Clock,
+                        height: suspendedHeight,
+                        color: "text-orange-500 border-orange-500",
+                    });
+                    newSteps.push({
+                        id: "phase_judging_pending",
+                        label: "Judging",
+                        description:
+                            "Begins only if the creator reveals the secret before suspension.",
+                        status: "pending",
                         icon: Gavel,
                         height: 9999999,
-                        color: isPartEnded
-                            ? "text-amber-500 border-amber-500"
-                            : "text-lime-500 border-lime-500",
+                        color: "text-lime-500 border-lime-500",
+                    });
+                } else if (phaseSnapshot.subphase === "suspended") {
+                    const suspendedTimestamp = await block_height_to_timestamp(
+                        suspendedHeight,
+                        new ErgoPlatform(),
+                    );
+                    newSteps.push({
+                        id: "phase_suspended",
+                        label: "Suspended",
+                        description:
+                            "The creator missed the resolution window. Players can now claim refunds.",
+                        status: "active",
+                        date: `Started ${formatDistanceToNow(new Date(suspendedTimestamp), { addSuffix: true })}`,
+                        icon: EyeOff,
+                        height: suspendedHeight,
+                        color: "text-red-500 border-red-500",
                     });
                 }
             }
 
-            // Resolution & Finalization
-            if (
-                current.status === GameState.Resolution &&
-                currentHeight < current.resolutionDeadline
-            ) {
-                newSteps.push({
-                    id: "future_resolution",
-                    label: "Resolution & Judging",
-                    description: "Judges are verifying the winner.",
-                    status: "active",
-                    date:
-                        "resolutionDeadline" in current
-                            ? `Ends in ~${formatDistanceToNow(new Date(await block_height_to_timestamp(current.resolutionDeadline, new ErgoPlatform())))}`
-                            : undefined,
-                    icon: Gavel,
-                    height:
-                        "resolutionDeadline" in current
-                            ? current.resolutionDeadline
-                            : 9999999,
-                    color: "text-lime-500 border-lime-500",
-                });
-            }
-
-            if (
-                current.status === GameState.Resolution &&
-                currentHeight >= current.resolutionDeadline
-            ) {
-                newSteps.push({
-                    id: "future_finalization",
-                    label: "Finalization",
-                    description:
-                        "The game is ready to be finalized and prizes distributed.",
-                    status: "active",
-                    date: undefined,
-                    icon: Trophy,
-                    height: 9999999,
-                    color: "text-yellow-500 border-yellow-500",
-                });
+            if (current.status === GameState.Resolution) {
+                if (phaseSnapshot.subphase === "judging") {
+                    newSteps.push({
+                        id: "phase_judging",
+                        label: "Judging",
+                        description:
+                            "The secret is revealed and judges can verify or challenge the current winner candidate.",
+                        status: "active",
+                        date: await formatPhaseCountdown(
+                            current.resolutionDeadline,
+                        ),
+                        icon: Gavel,
+                        height: current.resolutionDeadline,
+                        color: "text-lime-500 border-lime-500",
+                    });
+                    newSteps.push({
+                        id: "phase_ready_to_finalize",
+                        label: "Ready to Finalize",
+                        description:
+                            "Once the judge window ends, the game can be finalized and payouts distributed.",
+                        status: "pending",
+                        icon: Trophy,
+                        height: 9999999,
+                        color: "text-yellow-500 border-yellow-500",
+                    });
+                } else {
+                    newSteps.push({
+                        id: "phase_ready_to_finalize",
+                        label: "Ready to Finalize",
+                        description:
+                            "The judge window ended. The game can now be finalized and payouts distributed.",
+                        status: "active",
+                        icon: Trophy,
+                        height: 9999999,
+                        color: "text-yellow-500 border-yellow-500",
+                    });
+                }
             }
 
             if (current.status === GameState.Finalized) {
@@ -1028,23 +1171,24 @@
             } else if (current.status === GameState.Cancelled_Draining) {
                 const drainPortion = current.portionToClaim;
                 const currentValue = current.value;
-                const isUnlocked = height >= current.unlockHeight;
-                const unlockTimestamp = await block_height_to_timestamp(
-                    current.unlockHeight,
-                    new ErgoPlatform(),
-                );
-                const countdown = formatDistanceToNow(
-                    new Date(unlockTimestamp),
-                );
+                const isUnlocked =
+                    phaseSnapshot.subphase === "cancelled_draining";
 
                 newSteps.push({
                     id: "cancelled",
-                    label: "Draining Stake",
+                    label: isUnlocked
+                        ? "Cancelled / Draining"
+                        : "Cancelled / Cooldown",
                     description: isUnlocked
-                        ? "Cooldown period ended. Stake can be drained!"
-                        : `Wait for cooldown to end to drain stake.`,
+                        ? "The game is cancelled and the next creator-stake drain is unlocked."
+                        : "The game is cancelled. Players can refund now, but the next creator-stake drain is still cooling down.",
                     status: "active",
-                    date: isUnlocked ? "Unlocked" : `Unlocks in ~${countdown}`,
+                    date: isUnlocked
+                        ? "Unlocked"
+                        : await formatPhaseCountdown(
+                              current.unlockHeight,
+                              "Unlocks in",
+                          ),
                     icon: XCircle,
                     height: 9999999,
                     color: "text-red-500 border-red-500",
@@ -1058,18 +1202,17 @@
                         "Revealed S": current.revealedS_Hex || "None",
                     },
                 });
-            } else {
-                if (!isSuspended) {
-                    newSteps.push({
-                        id: "future_finalized",
-                        label: "Finalized",
-                        description: "Game completion and prize distribution.",
-                        status: "pending",
-                        icon: Trophy,
-                        height: 10000000,
-                        color: "text-gray-400 border-gray-400",
-                    });
-                }
+            } else if (phaseSnapshot.subphase !== "suspended") {
+                newSteps.push({
+                    id: "future_finalized",
+                    label: "Finalized",
+                    description:
+                        "This is the successful end of the standard path, after payouts are distributed.",
+                    status: "pending",
+                    icon: Trophy,
+                    height: 10000000,
+                    color: "text-gray-400 border-gray-400",
+                });
             }
         }
 
@@ -1117,12 +1260,13 @@
                     <div
                         class="absolute -left-[45px] top-0 flex items-center justify-center w-8 h-8 rounded-full bg-background border-2
                     {step.status === 'completed'
-                            ? step.color
+                            ? 'border-current text-current'
                             : step.status === 'active'
-                              ? 'border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                              ? 'border-current text-current shadow-[0_0_10px_rgba(59,130,246,0.5)]'
                               : step.status === 'cancelled'
-                                ? 'border-red-500 text-red-500'
+                                ? 'border-current text-current'
                                 : 'border-muted text-muted-foreground'}"
+                        style={getStepDotStyle(step)}
                     >
                         {#if step.icon}
                             <svelte:component
@@ -1140,7 +1284,7 @@
                     >
                         <div class="flex items-center justify-between gap-2">
                             <span
-                                class="font-bold text-lg {step.status ===
+                                class="font-bold text-lg text-foreground {step.status ===
                                 'active'
                                     ? 'text-blue-500'
                                     : ''} {step.status === 'cancelled'

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import "../app.css";
-	import { ModeWatcher } from "mode-watcher";
+	import { ModeWatcher, setMode } from "mode-watcher";
 	import { isDevMode } from "$lib/ergo/envs";
+	import CustomCursor from "$lib/CustomCursor.svelte";
+	import HoverCornersAuto from "$lib/HoverCornersAuto.svelte";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -12,6 +14,18 @@
 		const env = $page.url.searchParams.get("env");
 		if (env === "dev") {
 			isDevMode.set(true);
+		}
+
+		const theme = $page.url.searchParams.get("theme");
+		if (theme === "light" || theme === "dark") {
+			setMode(theme);
+			const url = new URL($page.url);
+			url.searchParams.delete("theme");
+        	goto(url.pathname + url.search, {
+				replaceState: true, // No crea una nueva entrada en el historial
+				noScroll: true,    // Evita que la página salte al inicio
+				keepFocus: true    // Mantiene el foco donde estaba
+			});
 		}
 		initialized = true;
 	});
@@ -37,7 +51,9 @@
 	}
 </script>
 
-<ModeWatcher />
+<ModeWatcher defaultMode="dark" />
+<CustomCursor />
+<HoverCornersAuto />
 
 {#if $isDevMode}
 	<div

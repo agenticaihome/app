@@ -9,16 +9,19 @@
         GameState,
         iGameDrainingStaking,
         getPrizePool,
-        isGameParticipationEnded,
         isGameEnded,
-        isGameSuspended,
-        isOpenCeremony,
         resolve_participation_commitment,
         calculateEffectiveScore,
-        isOpenSolverSubmit,
         isDevFriendly,
-        isResolutionAllowed,
     } from "$lib/common/game";
+    import {
+        GameContractPhase,
+        GAME_PHASE_DEFINITIONS,
+        type GamePhaseSnapshot,
+        type GameUiSubphaseValue,
+        deriveGamePhaseSnapshot,
+        getSubphaseSequence,
+    } from "$lib/common/game-phase";
     import { marked } from "marked";
     import {
         address,
@@ -47,6 +50,13 @@
     import { Button } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label/index.js";
+    import {
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+        SelectValue,
+    } from "$lib/components/ui/select";
     import { Textarea } from "$lib/components/ui/textarea";
     // ICONS
     import {
@@ -82,6 +92,7 @@
         ArrowRight,
         Copy,
         Loader2,
+        Clock3,
     } from "lucide-svelte";
     // UTILITIES
     import { format, formatDistanceToNow } from "date-fns";
@@ -128,16 +139,69 @@
     import ShareModal from "./ShareModal.svelte";
     import SolverSourceModal from "./SolverSourceModal.svelte";
     import GameTimeline from "$lib/components/GameTimeline.svelte";
+    import { hoverCorners } from "$lib/hoverCorners";
 
     const strictMode = true;
 
     const PARTICIPATION_BATCH_THRESHOLD = 2;
+    const NODO_INSTALLATION = "https://github.com/celaut-project/nodo?tab=readme-ov-file#installation";
+    const JUDGE_CHECK_SERVICE = "";
+    const ROBOT_DEVELOPMENT_GUIDE = "";
+
+    type HoverHandle = { destroy: () => void };
+
+    function hoverCornersWhenClosed(node: HTMLElement, isOpen: boolean) {
+        let handle: HoverHandle | null = null;
+
+        const applyState = (open: boolean) => {
+            if (open) {
+                if (handle) {
+                    handle.destroy();
+                    handle = null;
+                }
+                return;
+            }
+            if (typeof window !== "undefined") {
+                const isTouch =
+                    "ontouchstart" in window ||
+                    navigator.maxTouchPoints > 0;
+                if (
+                    isTouch ||
+                    window.matchMedia("(max-width:768px)").matches
+                ) {
+                    return;
+                }
+            }
+            if (!handle) {
+                handle = hoverCorners(node, { keepDot: true });
+            }
+        };
+
+        applyState(isOpen);
+
+        return {
+            update(open: boolean) {
+                applyState(open);
+            },
+            destroy() {
+                if (handle) {
+                    handle.destroy();
+                    handle = null;
+                }
+            },
+        };
+    }
 
     // --- COMPONENT STATE ---
     let game: AnyGame | null = null;
     let isLoaded = false;
     let hasHydrated = false;
     let primaryAction: string | null = null;
+    let technicalDetailsOpen = false;
+    let imageSourcesOpen = false;
+    let serviceSourcesOpen = false;
+    let paperSourcesOpen = false;
+    let soundtrackSourcesOpen = false;
 
     $: isBeforeDeadline = targetDate
         ? new Date().getTime() < targetDate
@@ -460,24 +524,672 @@
     let claimRefundError: { [boxId: string]: string | null } = {};
     let claimRefundSuccessTxId: { [boxId: string]: string | null } = {};
 
-    const progressCircleBase =
-        "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300";
-    const progressDefaultCircle =
-        "bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600";
-    const progressActiveCircle =
-        "bg-blue-600 border-blue-600 text-white shadow-lg scale-110";
-    const progressJudgeCircle =
-        "bg-blue-600 border-blue-600 text-white shadow-lg scale-110";
-    const progressSuspendedCircle =
-        "bg-red-600 border-red-600 text-white shadow-lg scale-110";
+    interface PhaseActionItem {
+        actor: string;
+        text: string;
+    }
 
-    const ProgressPhase = {
-        ACTIVE: "active",
-        JUDGE: "judge",
-        SUSPENDED: "suspended",
-        CANCELLED: "cancelled",
-        FINALIZED: "finalized",
-    } as const;
+    interface ContractStateCard {
+        id: string;
+        label: string;
+        description: string;
+        badge: string;
+        status: "current" | "completed" | "pending" | "skipped" | "alternate";
+        icon: typeof Sparkles;
+    }
+
+    const MAIN_CONTRACT_FLOW = [
+        GameContractPhase.ACTIVE,
+        GameContractPhase.RESOLUTION,
+        GameContractPhase.FINALIZED,
+    ] as const;
+
+    const SUBPHASE_HINTS: Record<GameUiSubphaseValue, string> = {
+        strategy_upload:
+            "Players can still upload solver services while anyone can keep adding randomness.",
+        seed_lockdown:
+            "Bot uploads are closed, but the ceremony is still open until the seed deadline.",
+        playing:
+            "The seed is fixed and players can execute their bots and submit participations.",
+        awaiting_resolution:
+            "Participation is closed and the creator must reveal the secret before suspension.",
+        suspended:
+            "The creator missed the resolution window and players can recover their funds.",
+        judging:
+            "The secret is revealed and judges can verify or challenge the candidate.",
+        ready_to_finalize:
+            "The judge window ended and payouts can now be distributed.",
+        cancelled_locked:
+            "The game is cancelled, but the next creator-stake drain is still cooling down.",
+        cancelled_draining:
+            "The game is cancelled and the next creator-stake drain is unlocked.",
+        finalized: "The lifecycle is complete and payouts were already distributed.",
+        unknown: "The current phase could not be derived.",
+    };
+
+    const phaseIcons: Record<GameUiSubphaseValue, typeof Sparkles> = {
+        strategy_upload: Sparkles,
+        seed_lockdown: LockIcon,
+        playing: Cpu,
+        awaiting_resolution: Calendar,
+        suspended: AlertTriangle,
+        judging: Gavel,
+        ready_to_finalize: Trophy,
+        cancelled_locked: XCircle,
+        cancelled_draining: XCircle,
+        finalized: Trophy,
+        unknown: Info,
+    };
+
+    function getPhaseTone(subphase: GameUiSubphaseValue) {
+        switch (subphase) {
+            case "strategy_upload":
+                return {
+                    iconBg: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+                    titleText: "text-sky-700 dark:text-sky-300",
+                    contractBadge:
+                        "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+                    currentChip:
+                        "border-sky-300 bg-sky-50 text-sky-800 shadow-sm dark:border-sky-500 dark:bg-sky-500 dark:text-white",
+                    completedChip:
+                        "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300",
+                };
+            case "seed_lockdown":
+                return {
+                    iconBg: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                    titleText: "text-amber-700 dark:text-amber-300",
+                    contractBadge:
+                        "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                    currentChip:
+                        "border-amber-300 bg-amber-50 text-amber-800 shadow-sm dark:border-amber-500 dark:bg-amber-500 dark:text-white",
+                    completedChip:
+                        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300",
+                };
+            case "playing":
+                return {
+                    iconBg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                    titleText: "text-emerald-700 dark:text-emerald-300",
+                    contractBadge:
+                        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                    currentChip:
+                        "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-sm dark:border-emerald-500 dark:bg-emerald-500 dark:text-white",
+                    completedChip:
+                        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+                };
+            case "awaiting_resolution":
+                return {
+                    iconBg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+                    titleText: "text-orange-700 dark:text-orange-300",
+                    contractBadge:
+                        "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+                    currentChip:
+                        "border-orange-300 bg-orange-50 text-orange-800 shadow-sm dark:border-orange-500 dark:bg-orange-500 dark:text-white",
+                    completedChip:
+                        "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-300",
+                };
+            case "suspended":
+            case "cancelled_locked":
+            case "cancelled_draining":
+                return {
+                    iconBg: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                    titleText: "text-red-700 dark:text-red-300",
+                    contractBadge:
+                        "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                    currentChip:
+                        "border-red-300 bg-red-50 text-red-800 shadow-sm dark:border-red-500 dark:bg-red-500 dark:text-white",
+                    completedChip:
+                        "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300",
+                };
+            case "ready_to_finalize":
+                return {
+                    iconBg: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+                    titleText: "text-yellow-700 dark:text-yellow-300",
+                    contractBadge:
+                        "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+                    currentChip:
+                        "border-yellow-300 bg-yellow-50 text-yellow-800 shadow-sm dark:border-yellow-500 dark:bg-yellow-500 dark:text-white",
+                    completedChip:
+                        "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-300",
+                };
+            case "finalized":
+            case "unknown":
+                return {
+                    iconBg: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
+                    titleText: "text-gray-700 dark:text-gray-300",
+                    contractBadge:
+                        "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
+                    currentChip:
+                        "border-gray-300 bg-gray-50 text-gray-800 shadow-sm dark:border-gray-500 dark:bg-gray-500 dark:text-white",
+                    completedChip:
+                        "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-300",
+                };
+            case "judging":
+            default:
+                return {
+                    iconBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                    titleText: "text-blue-700 dark:text-blue-300",
+                    contractBadge:
+                        "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                    currentChip:
+                        "border-blue-300 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-500 dark:bg-blue-500 dark:text-white",
+                    completedChip:
+                        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300",
+                };
+        }
+    }
+
+    function getContractStateCards(
+        phase: GamePhaseSnapshot,
+    ): ContractStateCard[] {
+        const cards: ContractStateCard[] = [
+            {
+                id: GameContractPhase.ACTIVE,
+                label: "ACTIVE",
+                description:
+                    "On-chain state 0. This includes Strategy & Upload, Seed Lockdown, Playing, Awaiting Resolution, and Suspended.",
+                badge: "Upcoming",
+                status: "pending",
+                icon: Sparkles,
+            },
+            {
+                id: GameContractPhase.RESOLUTION,
+                label: "RESOLUTION",
+                description:
+                    "On-chain state 1. The secret is revealed and judges can verify or challenge the result.",
+                badge: "Upcoming",
+                status: "pending",
+                icon: Gavel,
+            },
+            {
+                id: GameContractPhase.CANCELLED,
+                label: "CANCELLED_DRAINING",
+                description:
+                    "On-chain state 2. Alternative exit if the secret is revealed before the participation deadline.",
+                badge: "Alternative exit",
+                status: "alternate",
+                icon: XCircle,
+            },
+            {
+                id: GameContractPhase.FINALIZED,
+                label: "FINALIZED",
+                description:
+                    "Derived frontend state after payouts are distributed.",
+                badge: "Pending",
+                status: "pending",
+                icon: Trophy,
+            },
+        ];
+
+        return cards.map((card) => {
+            if (card.id === phase.contractPhase) {
+                return {
+                    ...card,
+                    badge: "Current",
+                    status: "current",
+                };
+            }
+
+            if (
+                phase.contractPhase === GameContractPhase.RESOLUTION &&
+                card.id === GameContractPhase.ACTIVE
+            ) {
+                return { ...card, badge: "Completed", status: "completed" };
+            }
+
+            if (phase.contractPhase === GameContractPhase.FINALIZED) {
+                if (
+                    card.id === GameContractPhase.ACTIVE ||
+                    card.id === GameContractPhase.RESOLUTION
+                ) {
+                    return { ...card, badge: "Completed", status: "completed" };
+                }
+                if (card.id === GameContractPhase.CANCELLED) {
+                    return { ...card, badge: "Skipped", status: "skipped" };
+                }
+            }
+
+            if (phase.contractPhase === GameContractPhase.CANCELLED) {
+                if (card.id === GameContractPhase.ACTIVE) {
+                    return { ...card, badge: "Exited here", status: "completed" };
+                }
+                if (
+                    card.id === GameContractPhase.RESOLUTION ||
+                    card.id === GameContractPhase.FINALIZED
+                ) {
+                    return { ...card, badge: "Skipped", status: "skipped" };
+                }
+            }
+
+            return card;
+        });
+    }
+
+    function getContractCardClasses(
+        card: ContractStateCard,
+        phase: GamePhaseSnapshot,
+    ) {
+        if (card.status === "current") {
+            switch (card.id) {
+                case GameContractPhase.ACTIVE:
+                    return "border-sky-300 bg-sky-50 text-sky-950 shadow-sm dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-50";
+                case GameContractPhase.RESOLUTION:
+                    return "border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-50";
+                case GameContractPhase.FINALIZED:
+                    return "border-slate-300 bg-slate-100 text-slate-950 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-50";
+                default:
+                    return "border-red-300 bg-red-50 text-red-950 shadow-sm dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-50";
+            }
+        }
+
+        if (card.status === "completed") {
+            return "border border-gray-200 bg-gray-50/80 text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100";
+        }
+
+        if (card.status === "skipped") {
+            return "border border-dashed border-gray-200 bg-transparent text-gray-400 dark:border-gray-700 dark:text-gray-500";
+        }
+
+        if (card.status === "alternate") {
+            return "border border-dashed border-red-200 bg-red-50/60 text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300";
+        }
+
+        return "border border-gray-200 bg-background text-gray-500 dark:border-gray-700 dark:text-gray-400";
+    }
+
+    function getContractStateMeta(cardId: ContractStateCard["id"]) {
+        switch (cardId) {
+            case GameContractPhase.ACTIVE:
+                return {
+                    eyebrow: "State 0",
+                    accent:
+                        "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+                };
+            case GameContractPhase.RESOLUTION:
+                return {
+                    eyebrow: "State 1",
+                    accent:
+                        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                };
+            case GameContractPhase.FINALIZED:
+                return {
+                    eyebrow: "Derived",
+                    accent:
+                        "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                };
+            default:
+                return {
+                    eyebrow: "State 2",
+                    accent:
+                        "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                };
+        }
+    }
+
+    function getContractBadgeClasses(card: ContractStateCard) {
+        switch (card.status) {
+            case "current":
+                return "bg-black/10 text-current dark:bg-white/10";
+            case "completed":
+                return "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
+            case "alternate":
+                return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+            case "skipped":
+                return "bg-transparent text-gray-400 ring-1 ring-inset ring-gray-300 dark:text-gray-500 dark:ring-gray-700";
+            default:
+                return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
+        }
+    }
+
+    function getMainContractStateCards(
+        cards: ContractStateCard[],
+    ): ContractStateCard[] {
+        return MAIN_CONTRACT_FLOW.flatMap((id) =>
+            cards.filter((card) => card.id === id),
+        );
+    }
+
+    function getAlternativeContractCard(
+        cards: ContractStateCard[],
+    ): ContractStateCard | null {
+        return cards.find((card) => card.id === GameContractPhase.CANCELLED) ?? null;
+    }
+
+    function getSubphaseStatus(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ): "current" | "completed" | "pending" {
+        const sequence = getSubphaseSequence(phase.contractPhase);
+        const currentIndex = sequence.indexOf(phase.subphase);
+        const subphaseIndex = sequence.indexOf(subphase);
+
+        if (subphase === phase.subphase) {
+            return "current";
+        }
+
+        if (subphaseIndex > -1 && subphaseIndex < currentIndex) {
+            return "completed";
+        }
+
+        return "pending";
+    }
+
+    function getSubphaseCardClasses(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+
+        if (status === "current") {
+            return `border ${phaseTone.currentChip}`;
+        }
+
+        if (status === "completed") {
+            return `border ${phaseTone.completedChip}`;
+        }
+
+        return "border border-gray-200 bg-background text-gray-600 dark:border-gray-700 dark:text-gray-300";
+    }
+
+    function getSubphaseIndexClasses(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+
+        if (status === "current") {
+            return "bg-current/10 text-current ring-1 ring-inset ring-current/15";
+        }
+
+        if (status === "completed") {
+            return "bg-black/10 text-current dark:bg-white/10";
+        }
+
+        return "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400";
+    }
+
+    function getSubphaseStatusBadgeClasses(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+
+        if (status === "current") {
+            return phaseTone.contractBadge;
+        }
+
+        if (status === "completed") {
+            return "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
+        }
+
+        return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
+    }
+
+    function getSubphaseStatusLabel(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+        if (status === "current") return "Current";
+        if (status === "completed") return "Done";
+        return "Next";
+    }
+
+    function getAllowedActionsForPhase(
+        phase: GamePhaseSnapshot,
+    ): PhaseActionItem[] {
+        switch (phase.subphase) {
+            case "strategy_upload":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Add randomness to the seed while the ceremony remains open.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Register or upload solver services before the bot-upload deadline.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition if the secret is revealed before the participation deadline.",
+                    },
+                ];
+            case "seed_lockdown":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Add randomness to the seed until the ceremony deadline.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Wait for the fixed seed while preparing execution inputs off-chain.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition if the secret is revealed before the participation deadline.",
+                    },
+                ];
+            case "playing":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Execute their bots with the fixed seed and submit participations.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Inspect the game and monitor for an early secret reveal before the deadline.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition if the secret is revealed before the participation deadline.",
+                    },
+                ];
+            case "awaiting_resolution":
+                return [
+                    {
+                        actor: "Creator",
+                        text: "Reveal the secret and move the game into RESOLUTION before the grace period expires.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Monitor the game so they can challenge the result once RESOLUTION begins.",
+                    },
+                ];
+            case "suspended":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Recover their participation funds immediately.",
+                    },
+                ];
+            case "judging":
+                return [
+                    {
+                        actor: "Judges",
+                        text: "Validate, invalidate, or mark the candidate service as unavailable.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Include omitted participations or propose a better valid candidate.",
+                    },
+                ];
+            case "ready_to_finalize":
+                return [
+                    {
+                        actor: "Winner / Resolver",
+                        text: "Finalize the competition and distribute payouts.",
+                    },
+                ];
+            case "cancelled_locked":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Claim full refunds immediately.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Wait for the cooldown to unlock the next stake drain.",
+                    },
+                ];
+            case "cancelled_draining":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Claim full refunds immediately.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Drain the next portion of the creator stake now.",
+                    },
+                ];
+            case "finalized":
+                return [
+                    {
+                        actor: "Everyone",
+                        text: "Inspect the final result, transactions, and historical record.",
+                    },
+                ];
+            default:
+                return [];
+        }
+    }
+
+    function getRestrictedActionsForPhase(
+        phase: GamePhaseSnapshot,
+    ): PhaseActionItem[] {
+        switch (phase.subphase) {
+            case "strategy_upload":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Submit participation results before the seed is fixed.",
+                    },
+                    {
+                        actor: "Creator",
+                        text: "Reveal the secret and resolve the game before the participation deadline.",
+                    },
+                ];
+            case "seed_lockdown":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Upload new solver services. The bot-upload window is closed.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Submit participation results before the seed is fixed.",
+                    },
+                    {
+                        actor: "Creator",
+                        text: "Reveal the secret and resolve the game before the participation deadline.",
+                    },
+                ];
+            case "playing":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Add more seed randomness. The ceremony has ended.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Upload new solver services. Registration is already closed.",
+                    },
+                    {
+                        actor: "Creator",
+                        text: "Resolve the competition before the participation deadline.",
+                    },
+                ];
+            case "awaiting_resolution":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. The deadline already passed.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition. Cancellation is only valid before the participation deadline.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Add randomness or upload bots. The ACTIVE subphases for setup and play are closed.",
+                    },
+                ];
+            case "suspended":
+                return [
+                    {
+                        actor: "Creator",
+                        text: "Move the game into RESOLUTION. The grace period already expired.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. The competition flow is over.",
+                    },
+                ];
+            case "judging":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. Participation is already closed.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Finalize the competition before the judge window ends.",
+                    },
+                ];
+            case "ready_to_finalize":
+                return [
+                    {
+                        actor: "Judges",
+                        text: "Keep invalidating or replacing the winner. The judging window is closed.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. Participation is already closed.",
+                    },
+                ];
+            case "cancelled_locked":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Declare a winner or enter RESOLUTION. The cancellation path is permanent.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Drain the next stake portion before the cooldown unlocks.",
+                    },
+                ];
+            case "cancelled_draining":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Declare a winner or enter RESOLUTION. The cancellation path is permanent.",
+                    },
+                ];
+            case "finalized":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Modify the outcome or reopen the competition. The lifecycle is closed.",
+                    },
+                ];
+            default:
+                return [];
+        }
+    }
+
+    let gamePhase: GamePhaseSnapshot = deriveGamePhaseSnapshot(
+        game,
+        currentHeight,
+    );
+    let phaseTone = getPhaseTone(gamePhase.subphase);
+    let phaseIcon = phaseIcons[gamePhase.subphase];
+    let contractStateCards: ContractStateCard[] = [];
+    let mainContractStateCards: ContractStateCard[] = [];
+    let alternativeContractCard: ContractStateCard | null = null;
+    let currentSubphaseSequence: GameUiSubphaseValue[] = [];
+    let allowedPhaseActions: PhaseActionItem[] = [];
+    let restrictedPhaseActions: PhaseActionItem[] = [];
+    let currentMilestoneTitle = "No active deadline";
+    let currentMilestoneDescription = "This phase does not have a live countdown.";
 
     function setError(error: unknown, options: FormatOptions = {}) {
         errorMessage = formatUserFacingError(error, options);
@@ -490,62 +1202,42 @@
         });
     }
 
-    type ProgressPhaseValue =
-        (typeof ProgressPhase)[keyof typeof ProgressPhase];
-
-    function getCurrentProgressPhase(): ProgressPhaseValue | null {
-        if (gameSuspended) {
-            return ProgressPhase.SUSPENDED;
-        }
-
-        if (!game) {
-            return null;
-        }
-
-        if (game.status === "Cancelled_Draining") {
-            return ProgressPhase.CANCELLED;
-        }
-
-        if (game.status === "Finalized") {
-            return ProgressPhase.FINALIZED;
-        }
-
-        if (game.status === "Resolution") {
-            return ProgressPhase.JUDGE;
-        }
-
-        if (game.status === "Active" && participationIsEnded) {
-            return ProgressPhase.JUDGE;
-        }
-
-        if (game.status === "Active") {
-            return ProgressPhase.ACTIVE;
-        }
-
-        return null;
-    }
-
-    $: currentProgressPhase = getCurrentProgressPhase();
-    $: isActiveStep =
-        currentProgressPhase === ProgressPhase.ACTIVE && !gameSuspended;
-    $: isJudgeStep = currentProgressPhase === ProgressPhase.JUDGE;
-    $: isSuspendedStep = currentProgressPhase === ProgressPhase.SUSPENDED;
-    $: isCancelledStep = currentProgressPhase === ProgressPhase.CANCELLED;
-    $: isFinalizedStep = currentProgressPhase === ProgressPhase.FINALIZED;
+    $: gamePhase = deriveGamePhaseSnapshot(game, currentHeight);
+    $: phaseTone = getPhaseTone(gamePhase.subphase);
+    $: phaseIcon = phaseIcons[gamePhase.subphase];
+    $: contractStateCards = getContractStateCards(gamePhase);
+    $: mainContractStateCards = getMainContractStateCards(contractStateCards);
+    $: alternativeContractCard = getAlternativeContractCard(contractStateCards);
+    $: currentSubphaseSequence = getSubphaseSequence(gamePhase.contractPhase);
+    $: allowedPhaseActions = getAllowedActionsForPhase(gamePhase);
+    $: restrictedPhaseActions = getRestrictedActionsForPhase(gamePhase);
     $: showCountdown =
         !!targetDate &&
-        (game?.status === "Resolution" ||
-            game?.status === "Cancelled_Draining" ||
-            !participationIsEnded ||
-            (game?.status === "Active" &&
-                participationIsEnded &&
-                resolutionAllowed));
+        ![
+            "suspended",
+            "finalized",
+            "unknown",
+        ].includes(gamePhase.subphase);
     $: countdownIsZero =
         daysValue === 0 &&
         hoursValue === 0 &&
         minutesValue === 0 &&
         secondsValue === 0;
     $: shouldShowCountdown = showCountdown && !countdownIsZero;
+    $: currentMilestoneTitle = shouldShowCountdown
+        ? clockLabel
+        : gamePhase.subphase === "finalized"
+          ? "Game ended"
+          : gamePhase.subphase === "suspended"
+            ? "Refund window"
+            : "No active deadline";
+    $: currentMilestoneDescription = shouldShowCountdown
+        ? deadlineDateDisplay
+        : gamePhase.subphase === "suspended"
+          ? "The resolution grace period already expired."
+          : gamePhase.subphase === "finalized"
+            ? "Payouts were already distributed."
+            : "This phase does not currently expose a live countdown.";
 
     // Reclaim after Grace Period State
     let isReclaimingGraceFor: string | null = null;
@@ -973,6 +1665,8 @@
         warningMessage = null;
 
         try {
+            platform = game.platform;
+
             // 2. Commission integration (unified logic)
             // Only compute breakdown if the status exposes commissions
             if (game.status === "Active" || game.status === "Resolution") {
@@ -998,24 +1692,25 @@
                 gameHistory = history;
             });
 
-            participationIsEnded = await isGameParticipationEnded(game);
-            resolutionAllowed = await isResolutionAllowed(game);
-            gameSuspended = await isGameSuspended(game);
-            openCeremony = await isOpenCeremony(game);
-            openSolverSubmit = await isOpenSolverSubmit(game);
+            const phaseSnapshot = deriveGamePhaseSnapshot(game, currentHeight);
+            participationIsEnded = phaseSnapshot.participationIsEnded;
+            resolutionAllowed = phaseSnapshot.resolutionAllowed;
+            gameSuspended = phaseSnapshot.gameSuspended;
+            openCeremony = phaseSnapshot.openCeremony;
+            openSolverSubmit = phaseSnapshot.openSolverSubmit;
 
             // 4. Time and deadline logic (consolidated)
             if (game.status === "Active") {
-                if (openSolverSubmit) {
+                if (phaseSnapshot.subphase === "strategy_upload") {
                     targetBlockHeight =
                         game.ceremonyDeadline - game.constants.SEED_MARGIN;
                     targetDate = await block_height_to_timestamp(
                         targetBlockHeight,
                         platform,
                     );
-                    clockLabel = "Solver Submit Deadline";
-                    clockInformation = `Block limit to implement your solution and submit your bot hash. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
-                } else if (openCeremony) {
+                    clockLabel = "Bot Upload Deadline";
+                    clockInformation = `Block limit to register solver services before seed lockdown begins. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                } else if (phaseSnapshot.subphase === "seed_lockdown") {
                     targetBlockHeight = game.ceremonyDeadline;
                     targetDate = await block_height_to_timestamp(
                         targetBlockHeight,
@@ -1023,7 +1718,7 @@
                     );
                     clockLabel = "Ceremony Deadline";
                     clockInformation = `Block limit to add randomness to the game seed. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
-                } else if (currentHeight < game.deadlineBlock) {
+                } else if (phaseSnapshot.subphase === "playing") {
                     targetBlockHeight = game.deadlineBlock;
                     targetDate = await block_height_to_timestamp(
                         targetBlockHeight,
@@ -1039,8 +1734,8 @@
                         targetBlockHeight,
                         platform,
                     );
-                    clockLabel = "Awaiting Resolution";
-                    clockInformation = `Participation period ended. Waiting for the creator to reveal the secret and start the resolution phase. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                    clockLabel = "Resolution Grace Period";
+                    clockInformation = `Participation is closed. The creator must reveal the secret before this grace period ends or the game becomes suspended. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 }
                 deadlineDateDisplay = format(
                     new Date(targetDate),
@@ -1057,8 +1752,12 @@
                     targetBlockHeight,
                     platform,
                 );
-                clockLabel = isGrace ? "Grace Period" : "Resolution Deadline";
-                clockInformation = `Judges must resolve the game before this time. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                clockLabel = isGrace
+                    ? "End-Game Authorization Grace"
+                    : "Resolution Deadline";
+                clockInformation = isGrace
+                    ? `The judge window ended. After this grace period, resolver authorization rules change for finalization. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`
+                    : `Judges can challenge the candidate until this deadline. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 deadlineDateDisplay = `${clockLabel} ends ${formatDistanceToNow(new Date(targetDate), { addSuffix: true })}`;
             } else if (game.status === "Cancelled_Draining") {
                 targetBlockHeight = (game as GameCancellation).unlockHeight;
@@ -1066,8 +1765,8 @@
                     targetBlockHeight,
                     platform,
                 );
-                clockLabel = "STAKE UNLOCK DEADLINE";
-                clockInformation = `Creator stake is locked until this time. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                clockLabel = "Next Drain Unlock";
+                clockInformation = `The next creator-stake drain can happen after this cooldown. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 deadlineDateDisplay = format(
                     new Date(targetDate),
                     "MMM d, yyyy 'at' HH:mm",
@@ -1944,7 +2643,7 @@
         console.log("setupActionModal called with type:", type);
         currentActionType = type;
         const titles = {
-            submit_score: `Submit Score`,
+            submit_score: `Participate`,
             resolve_game: `Resolve Competition`,
             cancel_game: `Cancel Competition`,
             drain_stake: `Drain Resolver Stake`,
@@ -2181,19 +2880,14 @@
 
 {#if showLoadingScreen}
     <div
-        class="flex flex-col items-center justify-center min-h-screen {$mode ===
-        'dark'
-            ? 'bg-slate-900 text-gray-200'
-            : 'bg-gray-50 text-gray-800'}"
+        class="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"
     >
         <Loader2 class="w-12 h-12 animate-spin mb-4 text-green-500" />
         <p class="text-xl font-semibold opacity-80">Loading game...</p>
     </div>
 {:else if game}
     <div
-        class="game-detail-page min-h-screen {$mode === 'dark'
-            ? 'bg-slate-900 text-gray-200'
-            : 'bg-gray-50 text-gray-800'}"
+        class="game-detail-page min-h-screen bg-background text-foreground"
     >
         <div
             class="game-container w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8 py-0 md:py-8"
@@ -2201,12 +2895,12 @@
             <section
                 class="hero-section relative md:rounded-xl md:shadow-2xl overflow-hidden mb-6 md:mb-12"
             >
-                <div class="hero-bg-image">
+                <div class="hero-bg-image absolute inset-0">
                     {#if resolvedImageSrc}
                         <img
                             src={resolvedImageSrc}
                             alt=""
-                            class="absolute inset-0 w-full h-full object-cover blur-md scale-110"
+                            class="hero-bg-layer absolute inset-0 w-full h-full object-cover blur-md scale-110"
                         />
                     {/if}
                     <div
@@ -2222,7 +2916,7 @@
                             <img
                                 src={resolvedImageSrc}
                                 alt="{game.content.title} banner"
-                                class="w-full h-auto max-h-64 md:max-h-96 object-contain rounded-lg shadow-2xl border border-white/10"
+                                class="hero-main-image w-full h-auto max-h-64 md:max-h-96 object-contain rounded-lg shadow-2xl border border-white/10"
                             />
                         </div>
                     {/if}
@@ -2231,7 +2925,7 @@
                         class="flex-1 text-center md:text-left w-full mt-6 md:mt-0"
                     >
                         <h1
-                            class="text-3xl sm:text-4xl lg:text-5xl font-bold font-['Russo_One'] mb-8 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)] tracking-tight"
+                            class="text-3xl sm:text-4xl lg:text-5xl font-bold font-['Russo_One'] mb-8 tracking-tight text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)]"
                         >
                             {game.content.title}
                         </h1>
@@ -2282,7 +2976,7 @@
 
                             {#if createdDateDisplay}
                                 <div
-                                    class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
+                                    class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                                 >
                                     <div class="flex items-center gap-2 mb-3">
                                         <Calendar
@@ -2302,7 +2996,7 @@
                             {/if}
 
                             <div
-                                class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
+                                class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                             >
                                 <div
                                     class="flex items-center justify-between mb-3"
@@ -2356,7 +3050,7 @@
                                     class="w-full sm:w-auto"
                                 >
                                     <Button
-                                        class="w-full text-base bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-md border border-white/20 py-6 px-8 transition-all"
+                                        class="w-full text-base bg-slate-800/80 hover:bg-slate-700/80 text-white font-bold backdrop-blur-md border border-slate-600/50 py-6 px-8 transition-all"
                                     >
                                         <ExternalLink class="mr-2 h-5 w-5" />
                                         Visit Game Site
@@ -2366,8 +3060,8 @@
 
                             <Button
                                 on:click={shareGame}
-                                class="w-full sm:w-auto text-sm dark:text-white dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 text-gray-800 bg-gray-100 hover:bg-gray-200 border border-gray-300 backdrop-blur-md py-2 px-4 transition-all"
-                            >
+                                class="w-full sm:w-auto text-sm text-white bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md py-2 px-4 transition-all"
+                                style="background-color: rgba(255, 255, 255, 0.05) !important; border-color: rgba(255, 255, 255, 0.1) !important; color: white !important;">
                                 <Share2 class="mr-2 h-4 w-4" />
                                 Share Game
                             </Button>
@@ -2527,7 +3221,7 @@
                                     class="mt-8 border-t border-border pt-8 hidden"
                                 >
                                     <div class="flex items-center gap-2 mb-2">
-                                        <Music class="w-5 h-5 text-green-500" />
+                                        <Music class="w-5 h-5 text-red-500" />
                                         <h3 class="text-lg font-semibold">
                                             Soundtrack
                                         </h3>
@@ -2657,6 +3351,8 @@
                             class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                         >
                             <details
+                                bind:open={technicalDetailsOpen}
+                                use:hoverCornersWhenClosed={technicalDetailsOpen}
                                 class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                 'dark'
                                     ? 'border-slate-700'
@@ -2755,12 +3451,12 @@
 
                                     <div class="info-block">
                                         <span class="info-label"
-                                            >Indeterminism Index<button
+                                            >Verification Runs<button
                                                 type="button"
                                                 class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
                                                 on:click|stopPropagation={() =>
                                                     openDidacticModal(
-                                                        "Indeterminism Index",
+                                                        "Verification Runs",
                                                         "Number of times judges will test your participation to verify if it reproduces your game logs. If judges cannot reproduce the logs, the participation is invalidated.",
                                                     )}
                                             >
@@ -2873,6 +3569,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={imageSourcesOpen}
+                                    use:hoverCornersWhenClosed={imageSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'
@@ -2961,6 +3659,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={serviceSourcesOpen}
+                                    use:hoverCornersWhenClosed={serviceSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'
@@ -2971,7 +3671,7 @@
                                     >
                                         <div class="flex items-center gap-2">
                                             <Cpu
-                                                class="w-5 h-5 text-purple-500"
+                                                class="w-5 h-5 text-green-500"
                                             />
                                             <span>Game Service Sources</span>
                                         </div>
@@ -3040,6 +3740,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={paperSourcesOpen}
+                                    use:hoverCornersWhenClosed={paperSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'
@@ -3082,7 +3784,8 @@
                                                 size="sm"
                                                 on:click={() =>
                                                     openFileSourceModal(
-                                                        game.content.paper,
+                                                        game?.content.paper ??
+                                                            "",
                                                         "paper",
                                                     )}
                                                 class="w-full"
@@ -3118,6 +3821,8 @@
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
                                 <details
+                                    bind:open={soundtrackSourcesOpen}
+                                    use:hoverCornersWhenClosed={soundtrackSourcesOpen}
                                     class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                     'dark'
                                         ? 'border-slate-700'
@@ -3128,7 +3833,7 @@
                                     >
                                         <div class="flex items-center gap-2">
                                             <Music
-                                                class="w-5 h-5 text-purple-500"
+                                                class="w-5 h-5 text-red-500"
                                             />
                                             <span>Game Soundtrack Sources</span>
                                         </div>
@@ -3160,7 +3865,8 @@
                                                 size="sm"
                                                 on:click={() =>
                                                     openFileSourceModal(
-                                                        game.content.soundtrack,
+                                                        game?.content
+                                                            .soundtrack ?? "",
                                                         "soundtrack",
                                                     )}
                                                 class="w-full"
@@ -3195,358 +3901,480 @@
             </section>
 
             <section
-                class="game-status status-actions-panel grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 p-6 md:p-8 shadow-lg rounded-xl bg-card border border-border/50"
+                class="game-status status-actions-panel mb-12 p-6 md:p-8 shadow-lg rounded-xl bg-card border border-border/50"
             >
-                <div class="status-side">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-semibold">Game Progress</h2>
-                    </div>
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold">Game Progress</h2>
+                </div>
 
-                    <!-- Game Phase Stepper -->
-                    <div
-                        class="relative flex items-center justify-between mb-8 w-full px-4"
-                    >
-                        <!-- Progress Lines Background -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div class="status-side space-y-5">
                         <div
-                            class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 dark:bg-gray-700 -z-10 mx-4"
-                        ></div>
-
-                        {#if game.status === "Cancelled_Draining"}
-                            <!-- CANCELLED FLOW: Active -> Cancelled -> Draining -->
-
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
                             <div
-                                class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 bg-gray-200 dark:bg-gray-700"
-                                style="width: 50%;"
-                            ></div>
-
-                            <div
-                                class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 bg-gray-200 dark:bg-gray-700"
-                                style="width: 50%;"
-                            ></div>
-
-                            <!-- Step 1: Active (Completed) -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
+                                class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]"
                             >
-                                <div
-                                    class={`${progressCircleBase} ${progressDefaultCircle}`}
-                                >
-                                    <Check class="w-6 h-6" />
-                                </div>
-                                <span
-                                    class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                                    >Active</span
-                                >
-                            </div>
-
-                            <!-- Step 2: Cancelled (Completed Event) -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${progressDefaultCircle}`}
-                                >
-                                    <XCircle class="w-6 h-6" />
-                                </div>
-                                <span
-                                    class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                                    >Cancelled</span
-                                >
-                            </div>
-
-                            <!-- Step 3: Draining (Active State) -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${progressSuspendedCircle} animate-pulse`}
-                                >
-                                    <ShieldCheck class="w-5 h-5" />
-                                </div>
-                                <span
-                                    class="mt-2 text-xs font-bold uppercase tracking-wider text-red-600"
-                                    >Draining</span
-                                >
-                            </div>
-                        {:else}
-                            <!-- STANDARD FLOW: Ceremony -> Active -> Resolution -> Finalized -->
-
-                            <!-- Line 1: Active -> Resolution -->
-                            <div
-                                class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 transition-all duration-500 bg-gray-200 dark:bg-gray-700"
-                                style="width: {game.status !== 'Active'
-                                    ? '50%'
-                                    : '0%'};"
-                            ></div>
-
-                            <!-- Line 2: Resolution -> Finalized -->
-                            <div
-                                class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 transition-all duration-500 bg-gray-200 dark:bg-gray-700"
-                                style="width: {game.status === 'Finalized'
-                                    ? '50%'
-                                    : '0%'};"
-                            ></div>
-
-                            <!-- Step 1: Active -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${
-                                        isActiveStep
-                                            ? progressActiveCircle
-                                            : progressDefaultCircle
-                                    }`}
-                                >
-                                    {#if game.status !== "Active" || participationIsEnded}
-                                        <Check class="w-6 h-6" />
-                                    {:else}
-                                        <span class="text-base font-bold"
-                                            >1</span
+                                <div class="min-w-0">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class={`p-3 rounded-2xl shrink-0 ${phaseTone.iconBg}`}
                                         >
+                                            <svelte:component
+                                                this={phaseIcon}
+                                                class="w-6 h-6"
+                                            />
+                                        </div>
+                                        <div class="min-w-0">
+                                            <p
+                                                class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                Current Snapshot
+                                            </p>
+                                            <div
+                                                class="mt-2 flex flex-wrap items-center gap-2"
+                                            >
+                                                <span
+                                                    class={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] ${phaseTone.contractBadge}`}
+                                                >
+                                                    {gamePhase.contractLabel}
+                                                </span>
+                                                <h3
+                                                    class={`text-xl font-bold leading-tight ${phaseTone.titleText}`}
+                                                >
+                                                    {gamePhase.title}
+                                                </h3>
+                                            </div>
+                                            <p
+                                                class="mt-3 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400"
+                                            >
+                                                {gamePhase.description}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {#if shouldShowCountdown}
+                                        <div
+                                            class="countdown-container mt-5 rounded-2xl border {$mode ===
+                                            'dark'
+                                                ? 'border-slate-700 bg-slate-950/30'
+                                                : 'border-gray-200 bg-gray-50/80'} p-4 md:p-5"
+                                        >
+                                            <div class="timeleft">
+                                                <div class="timeleft-header">
+                                                    <span
+                                                        class="timeleft-label-icon"
+                                                    >
+                                                        <Clock3 class="w-4 h-4" />
+                                                    </span>
+                                                    <span class="timeleft-label">
+                                                        {clockLabel}
+                                                    </span>
+                                                </div>
+                                                {#if remainingBlocks > 0}
+                                                    <span class="text-xs opacity-70 mt-1 block">
+                                                        Estimated time ({remainingBlocks}
+                                                        blocks remaining, ~{platform
+                                                            .time_per_block /
+                                                            1000 /
+                                                            60} min/block)
+                                                    </span>
+                                                {/if}
+                                                <div class="countdown-items">
+                                                    <div class="item">
+                                                        <div>{daysValue}</div>
+                                                        <div><h3>Days</h3></div>
+                                                    </div>
+                                                    <div class="item">
+                                                        <div>{hoursValue}</div>
+                                                        <div><h3>Hours</h3></div>
+                                                    </div>
+                                                    <div class="item">
+                                                        <div>{minutesValue}</div>
+                                                        <div><h3>Minutes</h3></div>
+                                                    </div>
+                                                    <div class="item">
+                                                        <div>{secondsValue}</div>
+                                                        <div><h3>Seconds</h3></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     {/if}
                                 </div>
-                                <span
-                                    class={`mt-2 text-xs font-bold uppercase tracking-wider ${
-                                        isActiveStep
-                                            ? "text-blue-600 dark:text-blue-400"
-                                            : "text-gray-500 dark:text-gray-400"
-                                    }`}>Active</span
-                                >
-                            </div>
 
-                            <!-- Step 2: Resolution -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
                                 <div
-                                    class={`${progressCircleBase} ${
-                                        isSuspendedStep
-                                            ? progressSuspendedCircle
-                                            : isJudgeStep
-                                              ? progressJudgeCircle
-                                              : progressDefaultCircle
-                                    }`}
+                                    class="rounded-2xl border {$mode === 'dark'
+                                        ? 'border-slate-700 bg-slate-950/20'
+                                        : 'border-gray-200 bg-gray-50/70'} p-4 md:p-5"
                                 >
-                                    {#if game.status === "Finalized"}
-                                        <Check class="w-6 h-6" />
-                                    {:else if game.status === "Resolution" || (game.status === "Active" && participationIsEnded && !gameSuspended)}
-                                        <Gavel class="w-5 h-5" />
-                                    {:else if gameSuspended}
-                                        <AlertTriangle class="w-5 h-5" />
-                                    {:else}
-                                        <span class="text-base font-bold"
-                                            >2</span
-                                        >
-                                    {/if}
-                                </div>
-                                <span
-                                    class={`mt-2 text-xs font-bold uppercase tracking-wider ${
-                                        isSuspendedStep
-                                            ? "text-red-500"
-                                            : isJudgeStep
-                                              ? "text-blue-600 dark:text-blue-400"
-                                              : "text-gray-500 dark:text-gray-400"
-                                    }`}
-                                    >{gameSuspended
-                                        ? "Suspended"
-                                        : "Resolution"}</span
-                                >
-                            </div>
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                    >
+                                        At a Glance
+                                    </p>
 
-                            <!-- Step 3: Finalized -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${
-                                        isFinalizedStep
-                                            ? progressActiveCircle
-                                            : progressDefaultCircle
-                                    }`}
-                                >
-                                    {#if game.status === "Finalized"}
-                                        <Check class="w-6 h-6" />
-                                    {:else}
-                                        <span class="text-base font-bold"
-                                            >3</span
+                                    <div class="mt-4 space-y-3">
+                                        <div
+                                            class="rounded-xl border {$mode === 'dark'
+                                                ? 'border-slate-700 bg-slate-950/30'
+                                                : 'border-white bg-white'} p-4 shadow-sm"
                                         >
-                                    {/if}
-                                </div>
-                                <span
-                                    class={`mt-2 text-xs font-bold uppercase tracking-wider ${
-                                        isFinalizedStep
-                                            ? "text-blue-600"
-                                            : "text-gray-500 dark:text-gray-400"
-                                    }`}>Finalized</span
-                                >
-                            </div>
-                        {/if}
-                    </div>
+                                            <p
+                                                class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                On-chain state
+                                            </p>
+                                            <p
+                                                class="mt-2 text-base font-semibold"
+                                            >
+                                                {gamePhase.contractLabel}
+                                            </p>
+                                        </div>
 
-                    {#if shouldShowCountdown}
-                        <div class="countdown-container mb-8">
-                            <div class="timeleft">
-                                <span class="timeleft-label">
-                                    {clockLabel}
-                                </span>
-                                {#if remainingBlocks > 0}
-                                    <span class="text-xs opacity-70 mt-1 block">
-                                        Estimated time ({remainingBlocks} blocks
-                                        remaining, ~{platform.time_per_block /
-                                            1000 /
-                                            60} min/block)
-                                    </span>
-                                {/if}
-                                <div class="countdown-items">
-                                    <div class="item">
-                                        <div>{daysValue}</div>
-                                        <div><h3>Days</h3></div>
-                                    </div>
-                                    <div class="item">
-                                        <div>{hoursValue}</div>
-                                        <div><h3>Hours</h3></div>
-                                    </div>
-                                    <div class="item">
-                                        <div>{minutesValue}</div>
-                                        <div><h3>Minutes</h3></div>
-                                    </div>
-                                    <div class="item">
-                                        <div>{secondsValue}</div>
-                                        <div><h3>Seconds</h3></div>
+                                        <div
+                                            class="rounded-xl border {$mode === 'dark'
+                                                ? 'border-slate-700 bg-slate-950/30'
+                                                : 'border-white bg-white'} p-4 shadow-sm"
+                                        >
+                                            <p
+                                                class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                UI subphase
+                                            </p>
+                                            <p
+                                                class="mt-2 text-base font-semibold"
+                                            >
+                                                {gamePhase.label}
+                                            </p>
+                                        </div>
+
+                                        <div
+                                            class="rounded-xl border {$mode === 'dark'
+                                                ? 'border-slate-700 bg-slate-950/30'
+                                                : 'border-white bg-white'} p-4 shadow-sm"
+                                        >
+                                            <p
+                                                class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                Next milestone
+                                            </p>
+                                            <p
+                                                class="mt-2 text-base font-semibold leading-snug"
+                                            >
+                                                {currentMilestoneTitle}
+                                            </p>
+                                            <p
+                                                class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400"
+                                            >
+                                                {currentMilestoneDescription}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    {/if}
+
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <div
+                                class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
+                            >
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                    >
+                                        Subphase Progression
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400"
+                                    >
+                                        These frontend subphases explain where
+                                        the game sits inside the current
+                                        contract state.
+                                    </p>
+                                </div>
+                                <div
+                                    class="flex flex-wrap items-center gap-2"
+                                >
+                                    <span
+                                        class={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] ${phaseTone.contractBadge}`}
+                                    >
+                                        {gamePhase.contractLabel}
+                                    </span>
+                                    <span class="text-sm font-semibold">
+                                        {gamePhase.label}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="mt-5 space-y-3">
+                                {#each currentSubphaseSequence as subphase, index (subphase)}
+                                    <div
+                                        class={`rounded-xl border p-4 md:p-5 ${getSubphaseCardClasses(
+                                            gamePhase,
+                                            subphase,
+                                        )}`}
+                                    >
+                                        <div
+                                            class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
+                                        >
+                                            <div
+                                                class="flex items-start gap-4 min-w-0"
+                                            >
+                                                <div
+                                                    class={`inline-flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold shrink-0 ${getSubphaseIndexClasses(
+                                                        gamePhase,
+                                                        subphase,
+                                                    )}`}
+                                                >
+                                                    {index + 1}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div
+                                                        class="flex flex-wrap items-center gap-2"
+                                                    >
+                                                        <p
+                                                            class="text-base font-semibold leading-tight"
+                                                        >
+                                                            {
+                                                                GAME_PHASE_DEFINITIONS[
+                                                                    subphase
+                                                                ].label
+                                                            }
+                                                        </p>
+                                                        <span
+                                                            class={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getSubphaseStatusBadgeClasses(
+                                                                gamePhase,
+                                                                subphase,
+                                                            )}`}
+                                                        >
+                                                            {getSubphaseStatusLabel(
+                                                                gamePhase,
+                                                                subphase,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <p
+                                                        class="mt-2 text-sm leading-6 opacity-80"
+                                                    >
+                                                        {SUBPHASE_HINTS[subphase]}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                    </div>
 
                     <div
-                        class="status-description mb-8 rounded-xl border bg-card overflow-hidden {$mode ===
+                        class="actions-side space-y-5"
+                    >
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <div
+                                class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
+                            >
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                    >
+                                        Contract Lifecycle
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400"
+                                    >
+                                        The contract only moves through three
+                                        main states. FINALIZED is the frontend
+                                        end state after the successful path pays
+                                        out.
+                                    </p>
+                                </div>
+                                <span
+                                    class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500"
+                                >
+                                    Canonical contract path
+                                </span>
+                            </div>
+
+                            <div
+                                class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-stretch"
+                            >
+                                {#each mainContractStateCards as card, index (card.id)}
+                                    <div
+                                        class={`rounded-xl p-4 ${getContractCardClasses(
+                                            card,
+                                            gamePhase,
+                                        )}`}
+                                    >
+                                        <div
+                                            class="flex items-start justify-between gap-4"
+                                        >
+                                            <div
+                                                class="flex items-start gap-3 min-w-0 flex-1"
+                                            >
+                                                <div
+                                                    class={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold shrink-0 ${getContractStateMeta(
+                                                        card.id,
+                                                    ).accent}`}
+                                                >
+                                                    {index + 1}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <p
+                                                        class="text-[10px] uppercase tracking-[0.18em] opacity-70"
+                                                    >
+                                                        {getContractStateMeta(
+                                                            card.id,
+                                                        ).eyebrow}
+                                                    </p>
+                                                    <div
+                                                        class="mt-1 flex items-center gap-2"
+                                                    >
+                                                        <svelte:component
+                                                            this={card.icon}
+                                                            class="w-4 h-4 shrink-0"
+                                                        />
+                                                        <span
+                                                            class="text-sm font-semibold leading-tight"
+                                                            >{card.label}</span
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span
+                                                class={`ml-2 shrink-0 self-start rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getContractBadgeClasses(
+                                                    card,
+                                                )}`}
+                                            >
+                                                {card.badge}
+                                            </span>
+                                        </div>
+                                        <p
+                                            class="mt-3 text-sm leading-6 opacity-80"
+                                        >
+                                            {card.description}
+                                        </p>
+                                    </div>
+
+                                    {#if index < mainContractStateCards.length - 1}
+                                        <div
+                                            class="hidden md:flex items-center justify-center text-gray-300 dark:text-slate-600"
+                                            aria-hidden="true"
+                                        >
+                                            <ArrowRight class="w-5 h-5" />
+                                        </div>
+                                    {/if}
+                                {/each}
+                            </div>
+
+                            {#if alternativeContractCard}
+                                <div
+                                    class="mt-4 rounded-xl border border-dashed border-red-200 bg-red-50/60 dark:border-red-900/50 dark:bg-red-950/20 p-4"
+                                >
+                                    <div
+                                        class="flex flex-col gap-3 sm:flex-row sm:items-start"
+                                    >
+                                        <div
+                                            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 shrink-0"
+                                        >
+                                            <XCircle class="w-5 h-5" />
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div
+                                                class="flex flex-wrap items-center gap-2"
+                                            >
+                                                <span
+                                                    class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                                >
+                                                    Alternative branch
+                                                </span>
+                                                <span
+                                                    class="text-sm font-semibold text-red-700 dark:text-red-300"
+                                                >
+                                                    {alternativeContractCard.label}
+                                                </span>
+                                                <span
+                                                    class="text-[10px] uppercase tracking-[0.18em] text-red-600/80 dark:text-red-300/80"
+                                                >
+                                                    Exits from ACTIVE
+                                                </span>
+                                            </div>
+                                            <p
+                                                class="mt-2 text-sm leading-6 text-red-700 dark:text-red-300/90"
+                                            >
+                                                {alternativeContractCard.description}
+                                                This path is only taken if the
+                                                secret is revealed too early.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+                        </div>
+
+                        <div
+                            class="status-description rounded-xl border bg-card overflow-hidden {$mode ===
                         'dark'
                             ? 'border-slate-700'
                             : 'border-gray-200'} shadow-sm"
-                    >
+                        >
                         <!-- Header with State Title -->
                         <div
                             class="p-4 border-b {$mode === 'dark'
                                 ? 'border-slate-700'
                                 : 'border-gray-100'} flex items-center gap-3"
                         >
-                            <div
-                                class="p-2 rounded-lg {game.status ===
-                                    'Active' && gameSuspended
-                                    ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                                    : game.status === 'Active'
-                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                                      : game.status === 'Resolution'
-                                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                                        : game.status === 'Finalized'
-                                          ? 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400'
-                                          : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}"
-                            >
-                                {#if game.status === "Active"}
-                                    <Sparkles class="w-5 h-5" />
-                                {:else if game.status === "Resolution"}
-                                    <Gavel class="w-5 h-5" />
-                                {:else if game.status === "Finalized"}
-                                    <Trophy class="w-5 h-5" />
-                                {:else}
-                                    <XCircle class="w-5 h-5" />
-                                {/if}
+                            <div class={`p-2 rounded-lg ${phaseTone.iconBg}`}>
+                                <svelte:component
+                                    this={phaseIcon}
+                                    class="w-5 h-5"
+                                />
                             </div>
                             <div>
-                                <h3
-                                    class="text-lg font-bold flex items-center gap-2 {game.status ===
-                                        'Active' && gameSuspended
-                                        ? 'text-red-600 dark:text-red-400'
-                                        : game.status === 'Active'
-                                          ? 'text-blue-600 dark:text-blue-400'
-                                          : game.status === 'Resolution'
-                                            ? 'text-blue-600 dark:text-blue-400'
-                                            : game.status === 'Finalized'
-                                              ? 'text-gray-600 dark:text-gray-400'
-                                              : 'text-red-600 dark:text-red-400'}"
+                                <div
+                                    class="flex flex-wrap items-center gap-2"
                                 >
-                                    {#if game.status === "Active" && openCeremony}
-                                        PLAYING
-                                    {:else if game.status === "Active" && !participationIsEnded}
-                                        PARTICIPATIONS MUST BE SUBMITED
-                                    {:else if game.status === "Active" && participationIsEnded}
-                                        {#if resolutionAllowed}
-                                            AWAITING RESOLUTION
-                                        {:else}
-                                            SUSPENDED
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            JUDGE PERIOD
-                                        {:else}
-                                            READY TO FINALIZE
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
-                                        FINALIZED STATE
-                                    {:else}
-                                        CANCELLED (DRAINING)
-                                    {/if}
-                                </h3>
+                                    <h3
+                                        class={`text-lg font-bold ${phaseTone.titleText}`}
+                                    >
+                                        {gamePhase.title}
+                                    </h3>
+                                    <span
+                                        class={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] ${phaseTone.contractBadge}`}
+                                    >
+                                        {gamePhase.contractLabel}
+                                    </span>
+                                </div>
                                 <p
-                                    class="text-sm text-gray-500 dark:text-gray-400"
+                                    class="text-sm text-gray-500 dark:text-gray-400 mt-1"
                                 >
-                                    {#if game.status === "Active" && openCeremony}
-                                        Seed ceremony is open. Collaborate to
-                                        ensure a random seed.
-                                        <br />
-                                        The competition is live. Implement and submit
-                                        your solution.
-                                    {:else if game.status === "Active" && !participationIsEnded}
-                                        A seed has been agreed upon. Execute and
-                                        publish your results.
-                                    {:else if game.status === "Active" && participationIsEnded}
-                                        {#if resolutionAllowed}
-                                            Time is up. The creator must now
-                                            resolve the competition.
-                                        {:else}
-                                            The creator failed to resolve the
-                                            competition in time.
-                                            <br />
-                                            <strong
-                                                >Players can recover their fees.
-                                                Resolver stake is lost.</strong
-                                            >
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            Judges are validating the winner.
-                                            New candidates can be proposed.
-                                        {:else}
-                                            Judge period ended. The competition
-                                            can be finalized.
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
-                                        The competition has ended and prizes
-                                        have been distributed.
-                                    {:else}
-                                        The competition was cancelled after the
-                                        creator’s secret was compromised.
-                                    {/if}
+                                    The platform is currently in
+                                    <span class="font-medium">
+                                        {gamePhase.title}</span
+                                    >. These are the actions that are allowed
+                                    and disallowed right now.
                                 </p>
                             </div>
                         </div>
 
                         <!-- Content Grid: Allowed vs Restricted -->
 
-                        <div
-                            class="grid grid-cols-1 md:grid-cols-1 divide-y md:divide-y-0 md:divide-x {$mode ===
-                            'dark'
-                                ? 'divide-slate-700'
-                                : 'divide-gray-100'}"
-                        >
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 p-4">
                             <!-- Allowed Actions -->
-                            <div class="p-4">
+                            <div
+                                class="rounded-xl border border-green-100 bg-green-50/70 dark:border-green-900/40 dark:bg-green-950/20 p-4"
+                            >
                                 <h4
                                     class="text-sm font-semibold uppercase tracking-wider text-green-600 dark:text-green-400 mb-3 flex items-center"
                                 >
@@ -3554,220 +4382,23 @@
                                     What can happen?
                                 </h4>
                                 <ul class="space-y-2">
-                                    {#if game.status === "Active" && openCeremony}
+                                    {#each allowedPhaseActions as action}
                                         <li
                                             class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
                                         >
                                             <span
                                                 class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Anyone:</span
-                                            > Contribute to the random number generation
-                                            process (free) to ensure the competition's
-                                            seed is random.
+                                                >{action.actor}:</span
+                                            > {action.text}
                                         </li>
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Anyone:</span
-                                            >
-                                            Cancel the competition by revealing the
-                                            secret and receive a portion of the creator’s
-                                            stake.
-                                        </li>
-                                    {:else if game.status === "Active"}
-                                        {#if openCeremony}
-                                            <!-- CEREMONY PHASE -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Contribute to the random number generation
-                                                process (free).
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Players:</span
-                                                >
-                                                Join the competition and submit bot
-                                                hash.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Cancel the competition (if secret
-                                                leaked).
-                                            </li>
-                                        {:else if !participationIsEnded}
-                                            <!-- PLAYING PHASE -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Players:</span
-                                                >
-                                                Submit scores.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Cancel the competition (if secret
-                                                leaked).
-                                            </li>
-                                        {:else}
-                                            <!-- AWAITING RESOLUTION PHASE -->
-                                            {#if resolutionAllowed}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Creator:</span
-                                                    >
-                                                    Resolve the game by revealing
-                                                    the secret.
-                                                </li>
-                                            {/if}
-                                            {#if !gameSuspended}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Anyone:</span
-                                                    >
-                                                    Cancel the competition (if secret
-                                                    leaked).
-                                                </li>
-                                            {/if}
-                                            {#if gameSuspended}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Players:</span
-                                                    >
-                                                    Claim full refund immediately
-                                                    (Creator resolution deadline
-                                                    passed).
-                                                </li>
-                                            {/if}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Rescue funds (if stuck after grace
-                                                period).
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            <!-- JUDGE PERIOD -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Judges:</span
-                                                >
-                                                Validate, invalidate, or mark the
-                                                candidate's service as unavailable.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Propose a new winner (if higher score).
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Include omitted participations.
-                                            </li>
-                                        {:else}
-                                            <!-- POST-JUDGE PERIOD -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Winner/Resolver:</span
-                                                >
-                                                Finalize the competition and distribute
-                                                prizes.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Participants:</span
-                                                >
-                                                Claim refunds (if grace period passes).
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Everyone:</span
-                                            > View results and history.
-                                        </li>
-                                    {:else}
-                                        <!-- Cancelled -->
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Players:</span
-                                            > Claim full refund immediately.
-                                        </li>
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Creator:</span
-                                            > Drain stake (slowly, over time).
-                                        </li>
-                                    {/if}
+                                    {/each}
                                 </ul>
                             </div>
 
                             <!-- Restricted Actions -->
-                            <div class="p-4">
+                            <div
+                                class="rounded-xl border border-red-100 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20 p-4"
+                            >
                                 <h4
                                     class="text-sm font-semibold uppercase tracking-wider text-red-500 dark:text-red-400 mb-3 flex items-center"
                                 >
@@ -3775,159 +4406,32 @@
                                     What cannot happen?
                                 </h4>
                                 <ul class="space-y-2">
-                                    {#if game.status === "Active"}
-                                        {#if openCeremony}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Submit Score:</span
-                                                >
-                                                Wait for ceremony to end.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Resolve Competition:</span
-                                                >
-                                                Cannot resolve during ceremony.
-                                            </li>
-                                        {:else if !participationIsEnded}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Resolve Competition:</span
-                                                >
-                                                Wait for deadline to expire.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Ceremony:</span
-                                                >
-                                                Ceremony is closed.
-                                            </li>
-                                        {:else}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Submit Score:</span
-                                                >
-                                                Deadline has passed.
-                                            </li>
-                                            {#if gameSuspended}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                                >
-                                                    <span class="font-medium"
-                                                        >Resolve Competition:</span
-                                                    >
-                                                    Resolution deadline has passed.
-                                                    Creator did not resolve in time.
-                                                </li>
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                                >
-                                                    <span class="font-medium"
-                                                        >Cancel Game:</span
-                                                    >
-                                                    Cannot cancel after resolution
-                                                    deadline has passed.
-                                                </li>
-                                            {/if}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Ceremony:</span
-                                                >
-                                                Ceremony is closed.
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Submit participation:</span
-                                                >
-                                                Participation period has ended.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Finalize Competition:</span
-                                                >
-                                                Wait for judge period to end.
-                                            </li>
-                                        {:else}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Invalidate Winner:</span
-                                                >
-                                                Judge period has ended.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Propose Winner:</span
-                                                >
-                                                Judge period has ended.
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
+                                    {#each restrictedPhaseActions as action}
                                         <li
                                             class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
                                         >
                                             <span class="font-medium"
-                                                >Modifying state:</span
-                                            > The competition is closed.
+                                                >{action.actor}:</span
+                                            > {action.text}
                                         </li>
-                                    {:else}
-                                        <!-- Cancelled -->
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                        >
-                                            <span class="font-medium"
-                                                >Winning:</span
-                                            > No winner can be declared.
-                                        </li>
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                        >
-                                            <span class="font-medium"
-                                                >Resuming:</span
-                                            > The competition is permanently invalid.
-                                        </li>
-                                    {/if}
+                                    {/each}
                                 </ul>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div
-                    class="actions-side md:border-l {$mode === 'dark'
-                        ? 'border-slate-700'
-                        : 'border-gray-200'} md:pl-8"
-                >
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <ShieldCheck class="w-5 h-5 mr-2 text-blue-500" />
-                        Trust & Security
-                    </h2>
+                        </div>
 
-                    <div class="grid grid-cols-1 gap-y-6">
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <h2 class="text-xl font-semibold mb-5 flex items-center">
+                                <ShieldCheck class="w-5 h-5 mr-2 text-blue-500" />
+                                Trust & Security
+                            </h2>
+
+                            <div class="grid grid-cols-1 gap-y-6">
                         {#if riskLevel === "Low"}
                             <div class="info-block">
                                 <div
@@ -4144,6 +4648,7 @@
                                 </div>
                             {/if}
                         {/if}
+                        </div>
                     </div>
                 </div>
 
@@ -5237,30 +5742,60 @@
                                             <p
                                                 class="text-sm text-muted-foreground mb-4"
                                             >
-                                                Verify the reputation of the
-                                                judges to ensure fair play.
+                                                Install and run the judge-check
+                                                service to verify the reputation
+                                                of the judges before
+                                                participating.
                                             </p>
-                                            <div
-                                                class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
-                                            >
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() =>
-                                                        navigator.clipboard.writeText(
-                                                            `nodo gop_judges_check ${game?.boxId}`,
-                                                        )}
-                                                    title="Copy command"
+                                            <div class="space-y-2">
+                                                <div
+                                                    class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
                                                 >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary"
-                                                    >nodo</span
+                                                    <button
+                                                        type="button"
+                                                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                        on:click={() =>
+                                                            navigator.clipboard.writeText(
+                                                                `nodo download ${JUDGE_CHECK_SERVICE}`,
+                                                            )}
+                                                        title="Copy command"
+                                                    >
+                                                        <Copy class="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span class="text-primary"
+                                                        >nodo</span
+                                                    >
+                                                    download {JUDGE_CHECK_SERVICE}
+                                                </div>
+                                                <div
+                                                    class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
                                                 >
-                                                gop_judges_check {game?.boxId.slice(
-                                                    0,
-                                                    10,
-                                                )}...
+                                                    <button
+                                                        type="button"
+                                                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                        on:click={() =>
+                                                            navigator.clipboard.writeText(
+                                                                "nodo execute gop_judges_check",
+                                                            )}
+                                                        title="Copy command"
+                                                    >
+                                                        <Copy class="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span class="text-primary"
+                                                        >nodo</span
+                                                    >
+                                                    execute gop_judges_check
+                                                </div>
+                                                <p
+                                                    class="text-xs text-muted-foreground"
+                                                >
+                                                    Requires Celaut Nodo.
+                                                    Follow {NODO_INSTALLATION},
+                                                    then open the service web UI,
+                                                    enter the game id or the
+                                                    judges you want to verify,
+                                                    and wait for the verdict.
+                                                </p>
                                             </div>
                                         </div>
 
@@ -5285,31 +5820,24 @@
                                             <p
                                                 class="text-sm text-muted-foreground mb-4"
                                             >
-                                                Use the CLI to generate your bot
-                                                template and integrate with
-                                                LLMs.
+                                                Build your robot by following
+                                                the development guide and its
+                                                recommendations.
                                             </p>
                                             <div
-                                                class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
+                                                class="bg-muted/50 p-3 rounded-lg text-xs break-all"
                                             >
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() =>
-                                                        navigator.clipboard.writeText(
-                                                            `nodo gop_create_bot ${game?.boxId}`,
-                                                        )}
-                                                    title="Copy command"
+                                                <span class="font-mono text-primary"
+                                                    >{ROBOT_DEVELOPMENT_GUIDE}</span
                                                 >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary"
-                                                    >nodo</span
+                                                <p
+                                                    class="mt-2 text-muted-foreground"
                                                 >
-                                                gop_create_bot {game?.boxId.slice(
-                                                    0,
-                                                    10,
-                                                )}...
+                                                    Follow the guide and all
+                                                    its instructions and
+                                                    suggestions to create your
+                                                    robot.
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -5345,7 +5873,7 @@
                                                 to automatically generate and
                                                 submit the participation, or
                                                 monitor the <a
-                                                    href="https://t.me/gameofprompts"
+                                                    href="https://t.me/unstopbots"
                                                     target="_blank"
                                                     class="underline font-semibold hover:text-yellow-500"
                                                     >Game of Prompts Telegram
@@ -5874,28 +6402,43 @@
                                                                 class="text-xs text-yellow-600/90 mb-1.5 block"
                                                                 >Simulate Error</Label
                                                             >
-                                                            <select
+                                                            <Select
                                                                 bind:value={
                                                                     devGenErrorType
                                                                 }
-                                                                class="w-full h-8 text-xs rounded-md bg-transparent border border-yellow-500/30 focus:border-yellow-500/50 text-foreground px-2"
                                                             >
-                                                                <option
-                                                                    value="none"
-                                                                    >None
-                                                                    (Valid)</option
+                                                                <SelectTrigger
+                                                                    class="cyber-select w-full h-8 text-xs"
+                                                                    aria-label="Simulate error"
                                                                 >
-                                                                <option
-                                                                    value="wrong_commitment"
-                                                                    >Invalid
-                                                                    Commitment</option
-                                                                >
-                                                                <option
-                                                                    value="wrong_score"
-                                                                    >Score
-                                                                    Mismatch</option
-                                                                >
-                                                            </select>
+                                                                    <SelectValue placeholder="Select error type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent class="cyber-select-content">
+                                                                    <SelectItem
+                                                                        value="none"
+                                                                        label="None (Valid)"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        None (Valid)
+                                                                    </SelectItem>
+                                                                    <SelectItem
+                                                                        value="wrong_commitment"
+                                                                        label="Invalid Commitment"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        Invalid
+                                                                        Commitment
+                                                                    </SelectItem>
+                                                                    <SelectItem
+                                                                        value="wrong_score"
+                                                                        label="Score Mismatch"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        Score
+                                                                        Mismatch
+                                                                    </SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
                                                         </div>
                                                     </div>
 
@@ -7193,7 +7736,7 @@
     }
 
     .countdown-container {
-        padding-top: 1.5rem;
+        padding-top: 0;
     }
 
     .timeleft {
@@ -7205,12 +7748,36 @@
         @apply text-foreground;
     }
 
+    .timeleft-header {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+
+    .timeleft-label-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        @apply bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200;
+    }
+
     .timeleft-label {
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-size: 1.125rem;
+        font-weight: 700;
         text-align: left;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.14em;
+        line-height: 1.2;
+        font-family:
+            "Avenir Next",
+            "Segoe UI",
+            "Helvetica Neue",
+            Arial,
+            sans-serif;
     }
 
     .secondary-text {
@@ -7262,6 +7829,34 @@
 
     .timeleft.ended {
         opacity: 0.7;
+    }
+
+    @media (max-width: 640px) {
+        .timeleft {
+            gap: 1rem;
+        }
+
+        .timeleft-header {
+            margin-top: 0.25rem;
+            gap: 0.625rem;
+        }
+
+        .timeleft-label {
+            font-size: 1rem;
+        }
+
+        .countdown-items {
+            gap: 0.75rem;
+        }
+
+        .item {
+            width: calc(50% - 0.375rem);
+            height: 76px;
+        }
+
+        .item > div:first-child {
+            font-size: 1.75rem;
+        }
     }
 
     /* Prize Distribution Bar Styles */

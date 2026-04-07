@@ -16,7 +16,7 @@ import {
     type MalformedParticipationReason,
     resolve_participation_commitment
 } from "../common/game";
-import { CACHE_DURATION_MS, explorer_uri } from "./envs";
+import { CACHE_DURATION_MS, explorer_uri, isDevMode } from "./envs";
 import {
     getGopGameResolutionTemplateHash,
     getGopParticipationTemplateHash,
@@ -46,6 +46,13 @@ import { calculate_reputation as calculate_reputation_proof } from "reputation-s
 import { get } from "svelte/store";
 import { games, judges as judgesStore, isLoadingGames } from "../common/store";
 import { getGameConstants } from "$lib/common/constants";
+import {
+    buildDevCompetitionsMap,
+    getDevCompetition,
+    getDevCompetitionHistory,
+    getDevCompetitionParticipations,
+    isDevCompetitionId,
+} from "$lib/dev/dev-competitions";
 
 export interface TokenEIP4 {
     name: string,
@@ -205,6 +212,10 @@ async function fetchReputationOpinionsForTarget(
 }
 
 export async function getTransactionInfo(transactionId: string): Promise<any> {
+    if (transactionId.startsWith("devtx_")) {
+        return null;
+    }
+
     const url = `${get(explorer_uri)}/api/v1/transactions/${transactionId}`;
     try {
         const response = await fetch(url);
@@ -864,6 +875,10 @@ export async function fetchFinalizedGames(): Promise<Map<string, GameFinalized>>
  * @returns A promise that resolves to an array of AnyGame objects representing the game's history, sorted by creation height.
  */
 export async function fetchGameHistory(gameId: string): Promise<AnyGame[]> {
+    if (isDevCompetitionId(gameId)) {
+        return getDevCompetitionHistory(gameId);
+    }
+
     const history: AnyGame[] = [];
     const templateHashes = [
         getGopGameActiveTemplateHash(),
@@ -1021,6 +1036,10 @@ async function _parseParticipationBox(box: any, participationTokenId: string): P
  * @returns A `Promise` with an array of `Participation`.
  */
 export async function fetchParticipations(game: AnyGame): Promise<AnyParticipation[]> {
+    if (isDevCompetitionId(game.gameId)) {
+        return getDevCompetitionParticipations(game.gameId);
+    }
+
     const gameNftId = game.gameId;
     const gameDeadline = game.deadlineBlock;
 
@@ -1169,6 +1188,10 @@ export async function fetchParticipations(game: AnyGame): Promise<AnyParticipati
  * @returns A `Promise` with an array of batch boxes.
  */
 export async function fetchParticipationBatches(game: AnyGame): Promise<Box<Amount>[]> {
+    if (isDevCompetitionId(game.gameId)) {
+        return [];
+    }
+
     const gameNftId = game.gameId;
     const batches: Box<Amount>[] = [];
     const scriptHash = getGopParticipationBatchTemplateHash();
@@ -1223,6 +1246,13 @@ export async function fetchGoPGames(force: boolean = false, avoidFullLoad: boole
     if (force && avoidFullLoad) {
         alert("Incorrect use of fetchGoPGames function. Check code.");
         return new Map();
+    }
+
+    if (get(isDevMode)) {
+        const devGames = buildDevCompetitionsMap();
+        games.set({ data: devGames, last_fetch: Date.now() });
+        isLoadingGames.set(false);
+        return devGames;
     }
 
     const current = get(games);
@@ -1314,6 +1344,10 @@ export async function fetchGoPGames(force: boolean = false, avoidFullLoad: boole
  */
 export async function fetchGame(id: string): Promise<AnyGame | null> {
     console.log("FETCH GAME FOR ID: ", id);
+    if (isDevCompetitionId(id)) {
+        return getDevCompetition(id);
+    }
+
     // 1) try store first
     try {
         const current = get(games);

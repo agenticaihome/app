@@ -4,9 +4,9 @@ import {
     type Box,
     type InputBox,
     type Amount,
-    type TokenEIP4 // <-- Importar TokenEIP4
+    type TokenEIP4 // <-- Import TokenEIP4
 } from '@fleet-sdk/core';
-import type { GameContent } from "../common/game"; // <-- Importar GameContent
+import type { GameContent } from "../common/game"; // <-- Import GameContent
 import { base } from '$app/paths';
 
 export function hexToUtf8(hexString: string): string | null {
@@ -65,10 +65,10 @@ export function parseLongColl(renderedValue: any): bigint[] | null {
             if (typeof item === 'string' || typeof item === 'number' || typeof item === 'bigint') {
                 return BigInt(item);
             }
-            throw new Error(`No se puede convertir el item '${item}' a BigInt.`);
+            throw new Error(`Cannot convert item '${item}' to BigInt.`);
         });
     } catch (e) {
-        console.error("parseLongColl: Error convirtiendo items a BigInt:", renderedValue, e);
+        console.error("parseLongColl: Error converting items to BigInt:", renderedValue, e);
         return null;
     }
 }
@@ -85,13 +85,13 @@ export function hexToBytes(hexString: string | undefined | null): Uint8Array | n
         for (let i = 0; i < byteArray.length; i++) {
             const byte = parseInt(hexString.substring(i * 2, i * 2 + 2), 16);
             if (isNaN(byte)) {
-                throw new Error("Se encontró un carácter hexadecimal inválido durante el parseInt.");
+                throw new Error("An invalid hexadecimal character was found during parseInt.");
             }
             byteArray[i] = byte;
         }
         return byteArray;
     } catch (e) {
-        console.error("hexToBytes: Error convirtiendo hex a bytes:", hexString, e);
+        console.error("hexToBytes: Error converting hex to bytes:", hexString, e);
         return null;
     }
 }
@@ -116,7 +116,7 @@ export function parseCollByteToHex(renderedValue: any): string | null {
         try {
             return uint8ArrayToHex(new Uint8Array(renderedValue));
         } catch (e) {
-            console.error("parseCollByteToHex: Error convirtiendo array de bytes a hex:", renderedValue, e);
+            console.error("parseCollByteToHex: Error converting byte array to hex:", renderedValue, e);
             return null;
         }
     }
@@ -143,7 +143,7 @@ export function bigintToLongByteArray(value: bigint): Uint8Array {
     const MAX_LONG = (2n ** 63n) - 1n;
 
     if (value < MIN_LONG || value > MAX_LONG) {
-        throw new Error(`Valor ${value} está fuera del rango para un Long de 64 bits con signo.`);
+        throw new Error(`Value ${value} is out of range for a signed 64-bit Long.`);
     }
 
     const buffer = new ArrayBuffer(8);
@@ -170,11 +170,11 @@ export function parseBox(e: Box<Amount>): InputBox {
 }
 
 /**
- * Parsea los detalles del contenido de un juego a partir de un string JSON.
- * @param rawJsonDetails String JSON con los detalles del juego (de R9).
- * @param gameBoxId El ID de la caja, usado como identificador de respaldo.
- * @param nft Datos opcionales del token EIP-4 del NFT del juego.
- * @returns El objeto GameContent parseado.
+ * Parses game content details from a JSON string.
+ * @param rawJsonDetails JSON string with game details (from R9).
+ * @param gameBoxId Box ID used as a fallback identifier.
+ * @param nft Optional EIP-4 token data for the game NFT.
+ * @returns The parsed GameContent object.
  */
 export function parseGameContent(
     rawJsonDetails: string | null,
@@ -213,7 +213,7 @@ export function parseGameContent(
                 indetermismIndex: parsed.indetermismIndex || undefined,
             };
         } catch (error) {
-            console.warn(`Error al parsear rawJsonDetails para el juego ${gameBoxId}. Usando valores por defecto. Error: ${error}`);
+            console.warn(`Error parsing rawJsonDetails for game ${gameBoxId}. Using default values. Error: ${error}`);
         }
     }
 

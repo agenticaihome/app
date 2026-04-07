@@ -880,14 +880,14 @@
         const status = getSubphaseStatus(phase, subphase);
 
         if (status === "current") {
-            return `border ${phaseTone.currentChip}`;
+            return "border-gray-300 bg-white text-gray-950 shadow-sm dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-50";
         }
 
         if (status === "completed") {
-            return `border ${phaseTone.completedChip}`;
+            return "border-gray-200 bg-gray-50 text-gray-700 dark:border-slate-700 dark:bg-slate-900/45 dark:text-slate-200";
         }
 
-        return "border border-gray-200 bg-background text-gray-600 dark:border-gray-700 dark:text-gray-300";
+        return "border-gray-200 bg-white text-gray-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-gray-300";
     }
 
     function getSubphaseIndexClasses(
@@ -897,14 +897,14 @@
         const status = getSubphaseStatus(phase, subphase);
 
         if (status === "current") {
-            return "bg-current/10 text-current ring-1 ring-inset ring-current/15";
+            return "bg-gray-900 text-white ring-1 ring-inset ring-gray-900/10 dark:bg-gray-100 dark:text-gray-900 dark:ring-white/10";
         }
 
         if (status === "completed") {
-            return "bg-black/10 text-current dark:bg-white/10";
+            return "bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200";
         }
 
-        return "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400";
+        return "bg-gray-100 text-gray-500 dark:bg-slate-900 dark:text-gray-400";
     }
 
     function getSubphaseStatusBadgeClasses(
@@ -914,14 +914,14 @@
         const status = getSubphaseStatus(phase, subphase);
 
         if (status === "current") {
-            return phaseTone.contractBadge;
-        }
-
-        if (status === "completed") {
             return "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
         }
 
-        return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
+        if (status === "completed") {
+            return "bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200";
+        }
+
+        return "bg-gray-100 text-gray-600 dark:bg-slate-900 dark:text-gray-300";
     }
 
     function getSubphaseStatusLabel(
@@ -4016,58 +4016,42 @@
                                         At a Glance
                                     </p>
 
-                                    <div class="mt-4 space-y-3">
-                                        <div
-                                            class="rounded-xl border {$mode === 'dark'
-                                                ? 'border-slate-700 bg-slate-950/30'
-                                                : 'border-white bg-white'} p-4 shadow-sm"
-                                        >
+                                    <div class="mt-4 space-y-4">
+                                        <div class="flex flex-col gap-2">
                                             <p
                                                 class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
                                             >
                                                 On-chain state
                                             </p>
-                                            <p
-                                                class="mt-2 text-base font-semibold"
-                                            >
+                                            <p class="text-base font-semibold">
                                                 {gamePhase.contractLabel}
                                             </p>
                                         </div>
 
-                                        <div
-                                            class="rounded-xl border {$mode === 'dark'
-                                                ? 'border-slate-700 bg-slate-950/30'
-                                                : 'border-white bg-white'} p-4 shadow-sm"
-                                        >
+                                        <div class="flex flex-col gap-2">
                                             <p
                                                 class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
                                             >
                                                 UI subphase
                                             </p>
-                                            <p
-                                                class="mt-2 text-base font-semibold"
-                                            >
+                                            <p class="text-base font-semibold">
                                                 {gamePhase.label}
                                             </p>
                                         </div>
 
-                                        <div
-                                            class="rounded-xl border {$mode === 'dark'
-                                                ? 'border-slate-700 bg-slate-950/30'
-                                                : 'border-white bg-white'} p-4 shadow-sm"
-                                        >
+                                        <div class="flex flex-col gap-2">
                                             <p
                                                 class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
                                             >
                                                 Next milestone
                                             </p>
                                             <p
-                                                class="mt-2 text-base font-semibold leading-snug"
+                                                class="text-base font-semibold leading-snug"
                                             >
                                                 {currentMilestoneTitle}
                                             </p>
                                             <p
-                                                class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400"
+                                                class="text-xs leading-5 text-gray-500 dark:text-gray-400"
                                             >
                                                 {currentMilestoneDescription}
                                             </p>
@@ -4103,7 +4087,7 @@
                                     class="flex flex-wrap items-center gap-2"
                                 >
                                     <span
-                                        class={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] ${phaseTone.contractBadge}`}
+                                        class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] text-gray-700 dark:bg-slate-800 dark:text-slate-200"
                                     >
                                         {gamePhase.contractLabel}
                                     </span>
@@ -4280,13 +4264,13 @@
 
                             {#if alternativeContractCard}
                                 <div
-                                    class="mt-4 rounded-xl border border-dashed border-red-200 bg-red-50/60 dark:border-red-900/50 dark:bg-red-950/20 p-4"
+                                    class="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50/80 dark:border-slate-700 dark:bg-slate-900/45 p-4"
                                 >
                                     <div
                                         class="flex flex-col gap-3 sm:flex-row sm:items-start"
                                     >
                                         <div
-                                            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 shrink-0"
+                                            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200 shrink-0"
                                         >
                                             <XCircle class="w-5 h-5" />
                                         </div>
@@ -4295,23 +4279,23 @@
                                                 class="flex flex-wrap items-center gap-2"
                                             >
                                                 <span
-                                                    class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                                    class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200"
                                                 >
                                                     Alternative branch
                                                 </span>
                                                 <span
-                                                    class="text-sm font-semibold text-red-700 dark:text-red-300"
+                                                    class="text-sm font-semibold text-gray-900 dark:text-slate-100"
                                                 >
                                                     {alternativeContractCard.label}
                                                 </span>
                                                 <span
-                                                    class="text-[10px] uppercase tracking-[0.18em] text-red-600/80 dark:text-red-300/80"
+                                                    class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400"
                                                 >
                                                     Exits from ACTIVE
                                                 </span>
                                             </div>
                                             <p
-                                                class="mt-2 text-sm leading-6 text-red-700 dark:text-red-300/90"
+                                                class="mt-2 text-sm leading-6 text-gray-600 dark:text-slate-300"
                                             >
                                                 {alternativeContractCard.description}
                                                 This path is only taken if the
@@ -4329,43 +4313,16 @@
                             ? 'border-slate-700'
                             : 'border-gray-200'} shadow-sm"
                         >
-                        <!-- Header with State Title -->
-                        <div
-                            class="p-4 border-b {$mode === 'dark'
-                                ? 'border-slate-700'
-                                : 'border-gray-100'} flex items-center gap-3"
-                        >
-                            <div class={`p-2 rounded-lg ${phaseTone.iconBg}`}>
-                                <svelte:component
-                                    this={phaseIcon}
-                                    class="w-5 h-5"
-                                />
-                            </div>
-                            <div>
-                                <div
-                                    class="flex flex-wrap items-center gap-2"
-                                >
-                                    <h3
-                                        class={`text-lg font-bold ${phaseTone.titleText}`}
-                                    >
-                                        {gamePhase.title}
-                                    </h3>
-                                    <span
-                                        class={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] ${phaseTone.contractBadge}`}
-                                    >
-                                        {gamePhase.contractLabel}
-                                    </span>
-                                </div>
-                                <p
-                                    class="text-sm text-gray-500 dark:text-gray-400 mt-1"
-                                >
-                                    The platform is currently in
-                                    <span class="font-medium">
-                                        {gamePhase.title}</span
-                                    >. These are the actions that are allowed
-                                    and disallowed right now.
-                                </p>
-                            </div>
+                        <div class="p-4">
+                            <p
+                                class="text-sm leading-6 text-gray-500 dark:text-gray-400"
+                            >
+                                The platform is currently in
+                                <span class="font-medium text-gray-900 dark:text-gray-100">
+                                    {gamePhase.title}</span
+                                >. These are the actions that are allowed and
+                                disallowed right now.
+                            </p>
                         </div>
 
                         <!-- Content Grid: Allowed vs Restricted -->
@@ -4426,8 +4383,7 @@
                                 ? 'border-slate-700 bg-slate-900/40'
                                 : 'border-gray-200 bg-white'} p-5 md:p-6"
                         >
-                            <h2 class="text-xl font-semibold mb-5 flex items-center">
-                                <ShieldCheck class="w-5 h-5 mr-2 text-blue-500" />
+                            <h2 class="text-xl font-semibold mb-5">
                                 Trust & Security
                             </h2>
 

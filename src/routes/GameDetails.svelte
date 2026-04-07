@@ -1257,9 +1257,6 @@
     let clockCountdownInterval: ReturnType<typeof setInterval> | null = null;
     let createdDateDisplay: string = "";
 
-    // Game Progress details toggle
-    let showProgressDetails = false;
-
     // Modal State
     let showActionModal = false;
     let showParticipantGuide = true;
@@ -4371,16 +4368,8 @@
                             </div>
                         </div>
 
-                        <!-- Toggle for detailed actions -->
-                        <button
-                            on:click={() => showProgressDetails = !showProgressDetails}
-                            class="w-full px-4 py-2 text-sm font-medium flex items-center justify-between border-t {$mode === 'dark' ? 'border-slate-700 hover:bg-slate-800/50' : 'border-gray-100 hover:bg-gray-50'} transition-colors"
-                        >
-                            <span class="text-muted-foreground">{showProgressDetails ? 'Hide' : 'Show'} phase details</span>
-                            <span class="text-muted-foreground text-xs">{showProgressDetails ? '▲' : '▼'}</span>
-                        </button>
+                        <!-- Content Grid: Allowed vs Restricted -->
 
-                        {#if showProgressDetails}
                         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 p-4">
                             <!-- Allowed Actions -->
                             <div
@@ -4429,7 +4418,6 @@
                                 </ul>
                             </div>
                         </div>
-                        {/if}
 
                         </div>
 

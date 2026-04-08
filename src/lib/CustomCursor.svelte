@@ -8,9 +8,6 @@
 		const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 		if (isTouch || window.matchMedia('(max-width:768px)').matches) return;
 
-		document.body.classList.add('has-custom-cursor');
-		document.documentElement.classList.add('has-custom-cursor');
-
 		const cornersWrapper = wrapper.querySelector('.corners-ring') as HTMLElement;
 		const dot = wrapper.querySelector('.tcd') as HTMLElement;
 		const cornerEls = Array.from(wrapper.querySelectorAll('.tcc')) as HTMLElement[];
@@ -25,6 +22,14 @@
 		let colorRaf: number | undefined;
 		let curX = window.innerWidth / 2;
 		let curY = window.innerHeight / 2;
+		let customCursorEnabled = false;
+
+		function enableCustomCursor() {
+			if (customCursorEnabled) return;
+			customCursorEnabled = true;
+			document.body.classList.add('has-custom-cursor');
+			document.documentElement.classList.add('has-custom-cursor');
+		}
 
 		function showCursorCorners() {
 			cornersWrapper.style.opacity = '1';
@@ -90,6 +95,7 @@
 			curX = e.clientX;
 			curY = e.clientY;
 			raf = requestAnimationFrame(() => {
+				enableCustomCursor();
 				wrapper.style.left = curX + 'px';
 				wrapper.style.top = curY + 'px';
 				wrapper.style.opacity = '1';

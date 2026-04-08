@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { mode } from "mode-watcher";
 	import { onMount } from "svelte";
+	import { base } from "$app/paths";
 
 	export let urlTheme: string | null = null;
 
@@ -40,9 +41,9 @@
 		<div class="logo-wrap">
 			<div class="scanline-overlay"></div>
 			<div class="glitch-wrapper">
-				<img src="/complete-logo.png" alt="Game of Prompts" class="logo-img" />
-				<img src="/complete-logo.png" alt="" class="logo-img glitch-r" aria-hidden="true" />
-				<img src="/complete-logo.png" alt="" class="logo-img glitch-b" aria-hidden="true" />
+				<img src={`${base}/complete-logo.png`} alt="Game of Prompts" class="logo-img" />
+				<img src={`${base}/complete-logo.png`} alt="" class="logo-img glitch-r" aria-hidden="true" />
+				<img src={`${base}/complete-logo.png`} alt="" class="logo-img glitch-b" aria-hidden="true" />
 			</div>
 			<div class="logo-glow"></div>
 		</div>

@@ -47,7 +47,7 @@
     } from "$lib/ergo/fetch";
     import { remove_opinion } from "reputation-system";
     // UI COMPONENTS
-    import { Button } from "$lib/components/ui/button";
+    import { Button, buttonVariants } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label/index.js";
     import {
@@ -1264,6 +1264,10 @@
     let showSolverIdStep = false;
     let showJudgeGuide = true;
     let showBotAssistantModal = false;
+    let showRobotDevelopmentGuideModal = false;
+    let isRobotDevelopmentGuideLoading = false;
+    let robotDevelopmentGuideContent = "";
+    let robotDevelopmentGuideError: string | null = null;
     let currentActionType:
         | "submit_score"
         | "resolve_game"
@@ -2701,6 +2705,7 @@
         isSubmitting = false;
         transactionId = null;
         showBotAssistantModal = false;
+        showRobotDevelopmentGuideModal = false;
 
         // Reset guide states
         if (type === "invalidate_winner" || type === "judge_unavailable") {
@@ -2727,8 +2732,38 @@
 
     function closeModal() {
         showBotAssistantModal = false;
+        showRobotDevelopmentGuideModal = false;
         showActionModal = false;
         currentActionType = null;
+    }
+
+    async function openRobotDevelopmentGuide() {
+        showRobotDevelopmentGuideModal = true;
+        robotDevelopmentGuideError = null;
+
+        if (robotDevelopmentGuideContent || isRobotDevelopmentGuideLoading) {
+            return;
+        }
+
+        isRobotDevelopmentGuideLoading = true;
+
+        try {
+            const response = await fetch(ROBOT_DEVELOPMENT_GUIDE);
+
+            if (!response.ok) {
+                throw new Error(
+                    `Unable to load guide (${response.status} ${response.statusText})`,
+                );
+            }
+
+            robotDevelopmentGuideContent = await response.text();
+        } catch (error) {
+            robotDevelopmentGuideError = formatUserFacingError(error, {
+                fallback: "Unable to load the robot development guide right now.",
+            });
+        } finally {
+            isRobotDevelopmentGuideLoading = false;
+        }
     }
 
     function shareGame() {
@@ -2828,6 +2863,20 @@
             .replace(/[^\w\s-]/g, "")
             .replace(/\s+/g, "-");
         // Add scroll-mt-24 to ensure header is not hidden behind fixed elements when scrolling
+        return `<h${depth} id="${id}" class="scroll-mt-24">${text}</h${depth}>`;
+    };
+    const guideRenderer = new marked.Renderer();
+    guideRenderer.heading = function ({
+        text,
+        depth,
+    }: {
+        text: string;
+        depth: number;
+    }) {
+        const id = text
+            .toLowerCase()
+            .replace(/[^\w\s-]/g, "")
+            .replace(/\s+/g, "-");
         return `<h${depth} id="${id}" class="scroll-mt-24">${text}</h${depth}>`;
     };
 
@@ -5820,19 +5869,24 @@
                                                 recommendations.
                                             </p>
                                             <div
-                                                class="bg-muted/50 p-3 rounded-lg text-xs break-all"
+                                                class="bg-muted/50 p-3 rounded-lg text-sm"
                                             >
-                                                <span class="font-mono text-primary"
-                                                    >{ROBOT_DEVELOPMENT_GUIDE}</span
-                                                >
                                                 <p
-                                                    class="mt-2 text-muted-foreground"
+                                                    class="text-muted-foreground"
                                                 >
-                                                    Follow the guide and all
-                                                    its instructions and
-                                                    suggestions to create your
-                                                    robot.
+                                                    Open the full robot
+                                                    development guide here and
+                                                    read it without leaving the
+                                                    participation flow.
                                                 </p>
+                                                <Button
+                                                    variant="outline"
+                                                    class="mt-3 w-full justify-center gap-2"
+                                                    on:click={openRobotDevelopmentGuide}
+                                                >
+                                                    <FileText class="w-4 h-4" />
+                                                    Read development guide
+                                                </Button>
                                             </div>
                                             <div class="mt-4">
                                                 <Button
@@ -7417,6 +7471,115 @@
                             </div>
                         </div>
                     {/if}
+
+                    {#if showRobotDevelopmentGuideModal}
+                        <div
+                            class="absolute inset-0 z-30 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+                            on:click|self={() =>
+                                (showRobotDevelopmentGuideModal = false)}
+                            role="presentation"
+                        >
+                            <div
+                                class="w-full max-w-6xl xl:max-w-7xl rounded-xl border shadow-2xl p-0 max-h-[92vh] overflow-hidden flex flex-col {$mode === 'dark'
+                                    ? 'bg-slate-900/95 text-gray-100 border-slate-700'
+                                    : 'bg-white/95 text-gray-800 border-gray-200'}"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="robot-development-guide-modal-title"
+                            >
+                                <div
+                                    class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b px-5 py-4 md:px-7 md:py-5 backdrop-blur-sm {$mode ===
+                                    'dark'
+                                        ? 'border-slate-700 bg-slate-900/90'
+                                        : 'border-gray-200 bg-white/90'}"
+                                >
+                                    <div>
+                                        <h4
+                                            id="robot-development-guide-modal-title"
+                                            class="text-xl font-semibold"
+                                        >
+                                            Robot Development Guide
+                                        </h4>
+                                        <p
+                                            class="text-sm text-muted-foreground mt-1"
+                                        >
+                                            Read the guide directly here while
+                                            preparing your submission.
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                        <a
+                                            href={ROBOT_DEVELOPMENT_GUIDE}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class={`${buttonVariants({ variant: "outline" })} gap-2`}
+                                        >
+                                            <ExternalLink class="w-4 h-4" />
+                                            Open original guide
+                                        </a>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            on:click={() =>
+                                                (showRobotDevelopmentGuideModal = false)}
+                                            aria-label="Close development guide modal"
+                                            class="flex-shrink-0"
+                                        >
+                                            <X class="w-5 h-5" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div class="flex-1 min-h-0 overflow-y-auto px-5 py-5 md:px-8 md:py-7 overscroll-contain">
+                                    {#if isRobotDevelopmentGuideLoading}
+                                        <div
+                                            class="h-full min-h-[18rem] flex flex-col items-center justify-center text-center text-muted-foreground"
+                                        >
+                                            <Loader2
+                                                class="w-8 h-8 animate-spin mb-3"
+                                            />
+                                            <p class="text-sm">
+                                                Loading guide...
+                                            </p>
+                                        </div>
+                                    {:else if robotDevelopmentGuideError}
+                                        <div
+                                            class="min-h-[18rem] flex flex-col items-center justify-center text-center"
+                                        >
+                                            <p
+                                                class="text-sm text-muted-foreground max-w-md"
+                                            >
+                                                {robotDevelopmentGuideError}
+                                            </p>
+                                            <Button
+                                                variant="outline"
+                                                class="mt-4"
+                                                on:click={openRobotDevelopmentGuide}
+                                            >
+                                                Try again
+                                            </Button>
+                                        </div>
+                                    {:else}
+                                        <div
+                                            class="guide-prose prose prose-base md:prose-lg {$mode ===
+                                            'dark'
+                                                ? 'prose-invert'
+                                                : ''} max-w-none"
+                                        >
+                                            {@html marked.parse(
+                                                robotDevelopmentGuideContent,
+                                                {
+                                                    breaks: true,
+                                                    gfm: true,
+                                                    renderer: guideRenderer,
+                                                },
+                                            )}
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
             </div>
         {/if}
@@ -7673,6 +7836,55 @@
     }
     .prose :global(p) {
         margin-bottom: 0.75em;
+    }
+    .guide-prose :global(h1) {
+        @apply text-3xl md:text-4xl font-bold tracking-tight mb-6 mt-2;
+    }
+    .guide-prose :global(h2) {
+        @apply text-2xl md:text-3xl font-semibold mt-10 mb-4 pb-2 border-b border-border;
+    }
+    .guide-prose :global(h3) {
+        @apply text-xl md:text-2xl font-semibold mt-8 mb-3;
+    }
+    .guide-prose :global(h4) {
+        @apply text-lg font-semibold mt-6 mb-2;
+    }
+    .guide-prose :global(p) {
+        @apply leading-8 mb-5;
+    }
+    .guide-prose :global(ul),
+    .guide-prose :global(ol) {
+        @apply my-5 pl-6;
+    }
+    .guide-prose :global(li) {
+        @apply mb-2 leading-8;
+    }
+    .guide-prose :global(blockquote) {
+        @apply my-6 border-l-4 border-amber-500/50 bg-amber-500/10 px-4 py-3 italic rounded-r-lg;
+    }
+    .guide-prose :global(pre) {
+        @apply my-6 overflow-x-auto rounded-xl border border-border bg-slate-950/95 p-4 text-sm shadow-inner;
+    }
+    .guide-prose :global(code) {
+        @apply rounded bg-muted px-1.5 py-0.5 text-[0.9em];
+    }
+    .guide-prose :global(pre code) {
+        @apply bg-transparent p-0 text-inherit;
+    }
+    .guide-prose :global(hr) {
+        @apply my-8 border-border;
+    }
+    .guide-prose :global(table) {
+        @apply my-6 w-full border-collapse text-sm;
+    }
+    .guide-prose :global(th) {
+        @apply border border-border bg-muted/60 px-3 py-2 text-left font-semibold;
+    }
+    .guide-prose :global(td) {
+        @apply border border-border px-3 py-2 align-top;
+    }
+    .guide-prose :global(a) {
+        @apply text-blue-500 underline decoration-blue-500/40 underline-offset-4 transition-colors hover:text-blue-400;
     }
 
     .stat-block {

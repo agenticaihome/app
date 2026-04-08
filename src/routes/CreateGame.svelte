@@ -53,6 +53,7 @@
     import {
         FileSourceCreation,
         fetchFileSourcesByHash,
+        HASH_ALGORITHM_IDS,
     } from "source-application";
     import { fetchJudges } from "$lib/ergo/reputation/fetch";
 
@@ -68,6 +69,7 @@
     // --- State declarations
     let gameServiceIdStore = writable("");
     let gameImageHashStore = writable("");
+    let eip4ImageHashStore = writable("");
     let gamePaperHashStore = writable("");
     let gameSoundtrackHashStore = writable("");
 
@@ -127,14 +129,17 @@
             if (!response.ok) throw new Error("Failed to fetch image");
             const blob = await response.blob();
             const arrayBuffer = await blob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
 
             const hashBufferSha = await crypto.subtle.digest(
                 "SHA-256",
-                arrayBuffer,
+                bytes,
             );
-            const hashHex = uint8ArrayToHex(new Uint8Array(hashBufferSha));
+            const sha256Hex = uint8ArrayToHex(new Uint8Array(hashBufferSha));
+            const blake2bHex = uint8ArrayToHex(fleetBlake2b256(bytes));
 
-            gameImageHashStore.set(hashHex);
+            eip4ImageHashStore.set(sha256Hex);
+            gameImageHashStore.set(blake2bHex);
         } catch (e: any) {
             console.error(e);
             alert("Error fetching or hashing image: " + e.message);
@@ -829,7 +834,7 @@
                 gameDetailsJson: gameDetails,
                 perJudgeCommissionPercentage: perJudgeComissionPercentage,
                 timeWeight: calculateTimeWeight(),
-                eip4ImageHash: useEip4 ? get(gameImageHashStore) : undefined,
+                eip4ImageHash: useEip4 ? get(eip4ImageHashStore) : undefined,
                 eip4ImageLink: useEip4 ? eip4ImageUrl : undefined,
             });
             transactionId = result;
@@ -2442,25 +2447,58 @@
                                                 class="text-xs text-muted-foreground"
                                             >
                                                 Enter the URL to automatically
-                                                calculate the SHA-256 hash
-                                                below. use consistent URLs (e.g.
-                                                IPFS gateway).
+                                                calculate both hashes:
+                                                SHA-256 for EIP-004 metadata
+                                                and Blake2b256 for game box and
+                                                sources. Use consistent URLs
+                                                (e.g. IPFS gateway).
+                                            </p>
+
+                                            <Label
+                                                for="eip4ImageHash"
+                                                class="mb-1.5 mt-3 block"
+                                                >EIP-004 Artwork Hash
+                                                (SHA-256)</Label
+                                            >
+                                            <div class="flex gap-2">
+                                                <Input
+                                                    id="eip4ImageHash"
+                                                    bind:value={$eip4ImageHashStore}
+                                                    placeholder="SHA-256 hash (64-character hex)"
+                                                    maxlength={64}
+                                                    pattern="[a-fA-F0-9]{64}"
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    on:click={() =>
+                                                        eip4ImageHashStore.set(
+                                                            "",
+                                                        )}
+                                                    class="shrink-0"
+                                                    title="Clear hash"
+                                                >
+                                                    <Trash2 class="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                            <p
+                                                class="text-xs mt-1 text-muted-foreground"
+                                            >
+                                                Used only for NFT mint metadata
+                                                (EIP-004), not for game box
+                                                source anchoring.
                                             </p>
                                         </div>
                                     {/if}
 
                                     <Label for="gameImageHash"
-                                        >Game Image Hash ({useEip4
-                                            ? "SHA-256"
-                                            : "Blake2b256"})</Label
+                                        >Game Image Hash (Blake2b256)</Label
                                     >
                                     <div class="flex gap-2">
                                         <Input
                                             id="gameImageHash"
                                             bind:value={$gameImageHashStore}
-                                            placeholder={useEip4
-                                                ? "SHA-256 hash (64-character hex)"
-                                                : "Blake2b256 hash (64-character hex)"}
+                                            placeholder="Blake2b256 hash (64-character hex)"
                                             maxlength={64}
                                             pattern="[a-fA-F0-9]{64}"
                                         />
@@ -2478,8 +2516,9 @@
                                     <p
                                         class="text-xs mt-1 text-muted-foreground"
                                     >
-                                        The {useEip4 ? "SHA-256" : "Blake2b256"}
-                                        hash of the game's image file
+                                        The Blake2b256 hash of the game's image
+                                        file used in the game box and source
+                                        anchors
                                     </p>
                                 </div>
                                 <div class="form-group lg:col-span-4">
@@ -2860,6 +2899,9 @@
                             explorerUri={$explorer_uri}
                             source_explorer_url={$source_explorer_url}
                             hash={activeHashStore}
+                            fixedHashFunctionId={modalFileType === "image"
+                                ? HASH_ALGORITHM_IDS.blake2b256
+                                : undefined}
                             onSourceAdded={handleSourceAdded}
                             class="border-none shadow-none bg-transparent rounded-none"
                         />

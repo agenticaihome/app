@@ -4043,6 +4043,7 @@
 
                                     {#if shouldShowCountdown}
                                         <div
+                                            data-hover-corners
                                             class="countdown-container mt-5 rounded-2xl border {$mode ===
                                             'dark'
                                                 ? 'border-slate-700 bg-slate-950/30'
@@ -4092,6 +4093,7 @@
                                 </div>
 
                                 <div
+                                    data-hover-corners
                                     class="rounded-2xl border {$mode === 'dark'
                                         ? 'border-slate-700 bg-slate-950/20'
                                         : 'border-gray-200 bg-gray-50/70'} p-4 md:p-5"
@@ -4186,6 +4188,7 @@
                             <div class="mt-5 space-y-3">
                                 {#each currentSubphaseSequence as subphase, index (subphase)}
                                     <div
+                                        data-hover-corners
                                         class={`rounded-xl border p-4 md:p-5 ${getSubphaseCardClasses(
                                             gamePhase,
                                             subphase,
@@ -4282,6 +4285,7 @@
                             >
                                 {#each mainContractStateCards as card, index (card.id)}
                                     <div
+                                        data-hover-corners
                                         class={`rounded-xl p-4 ${getContractCardClasses(
                                             card,
                                             gamePhase,
@@ -4350,6 +4354,7 @@
 
                             {#if alternativeContractCard}
                                 <div
+                                    data-hover-corners
                                     class="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50/80 dark:border-slate-700 dark:bg-slate-900/45 p-4"
                                 >
                                     <div
@@ -4416,6 +4421,7 @@
                         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 p-4">
                             <!-- Allowed Actions -->
                             <div
+                                data-hover-corners
                                 class="rounded-xl border border-green-100 bg-green-50/70 dark:border-green-900/40 dark:bg-green-950/20 p-4"
                             >
                                 <h4
@@ -4440,6 +4446,7 @@
 
                             <!-- Restricted Actions -->
                             <div
+                                data-hover-corners
                                 class="rounded-xl border border-red-100 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20 p-4"
                             >
                                 <h4
@@ -4477,6 +4484,7 @@
                         {#if riskLevel === "Low"}
                             <div class="info-block">
                                 <div
+                                    data-hover-corners
                                     class="mb-4 p-3 rounded bg-green-500/10 border border-green-500/20"
                                 >
                                     <span
@@ -4497,6 +4505,7 @@
                         {:else if riskLevel === "Medium"}
                             <div class="info-block">
                                 <div
+                                    data-hover-corners
                                     class="mb-4 p-3 rounded bg-yellow-500/10 border border-yellow-500/20"
                                 >
                                     <span
@@ -4516,6 +4525,7 @@
                         {:else}
                             <div class="info-block">
                                 <div
+                                    data-hover-corners
                                     class="mb-4 p-3 rounded bg-red-500/10 border border-red-500/20"
                                 >
                                     <span class="text-sm font-bold text-red-500"

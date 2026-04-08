@@ -226,6 +226,9 @@ export async function create_game(
         const imageHashBytes = hexToBytes(eip4ImageHash);
         if (imageHashBytes) {
             mintOutput.setAdditionalRegisters({
+                R4: SColl(SByte, stringToBytes("utf8", gameTitle)).toHex(),
+                R5: SColl(SByte, stringToBytes("utf8", gameDescription)).toHex(),
+                R6: SColl(SByte, stringToBytes("utf8", "0")).toHex(),
                 R7: SColl(SByte, [0x01, 0x01]).toHex(),
                 R8: SColl(SByte, imageHashBytes).toHex(),
                 R9: SColl(SByte, stringToBytes("utf8", eip4ImageLink)).toHex()

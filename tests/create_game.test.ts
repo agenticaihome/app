@@ -240,4 +240,52 @@ describe.each(baseModes)("Game Creation (create_game) - (%s)", (mode) => {
     expect(createdGameBox.additionalRegisters.R8).to.equal(gameBoxOutput.additionalRegisters.R8);
     expect(createdGameBox.additionalRegisters.R9).to.equal(gameBoxOutput.additionalRegisters.R9);
   });
+
+  it("Should mint an EIP-004 NFT with densely packed registers", () => {
+    const inputUTXO = creator.utxos.toArray()[0];
+    const imageHashBytes = new Uint8Array(32).fill(7);
+    const imageLink = "https://example.com/game.png";
+
+    const mintOutput = new OutputBuilder(
+      SAFE_MIN_BOX_VALUE,
+      creator.address
+    )
+      .mintToken({
+        amount: 1n,
+        name: "EIP4 Game NFT",
+        decimals: 0,
+        description: "NFT with artwork metadata"
+      })
+      .setAdditionalRegisters({
+        R4: SColl(SByte, stringToBytes("utf8", "EIP4 Game NFT")).toHex(),
+        R5: SColl(SByte, stringToBytes("utf8", "NFT with artwork metadata")).toHex(),
+        R6: SColl(SByte, stringToBytes("utf8", "0")).toHex(),
+        R7: SColl(SByte, [0x01, 0x01]).toHex(),
+        R8: SColl(SByte, imageHashBytes).toHex(),
+        R9: SColl(SByte, stringToBytes("utf8", imageLink)).toHex()
+      });
+
+    const transaction = new TransactionBuilder(mockChain.height)
+      .from(inputUTXO)
+      .to(mintOutput)
+      .sendChangeTo(creator.address)
+      .payFee(RECOMMENDED_MIN_FEE_VALUE)
+      .build();
+
+    const executionResult = mockChain.execute(transaction, { signers: [creator] });
+
+    expect(executionResult).to.be.true;
+
+    const mintedBox = creator.utxos
+      .toArray()
+      .find((box) => box.assets.some((asset) => asset.tokenId === inputUTXO.boxId && asset.amount === 1n));
+
+    expect(mintedBox).toBeDefined();
+    expect(mintedBox!.additionalRegisters.R4).to.equal(mintOutput.additionalRegisters.R4);
+    expect(mintedBox!.additionalRegisters.R5).to.equal(mintOutput.additionalRegisters.R5);
+    expect(mintedBox!.additionalRegisters.R6).to.equal(mintOutput.additionalRegisters.R6);
+    expect(mintedBox!.additionalRegisters.R7).to.equal(mintOutput.additionalRegisters.R7);
+    expect(mintedBox!.additionalRegisters.R8).to.equal(mintOutput.additionalRegisters.R8);
+    expect(mintedBox!.additionalRegisters.R9).to.equal(mintOutput.additionalRegisters.R9);
+  });
 });

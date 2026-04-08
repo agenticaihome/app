@@ -1280,6 +1280,7 @@
 
                     <!-- Content -->
                     <div
+                        data-hover-corners
                         class="flex flex-col gap-1 bg-card/50 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors"
                     >
                         <div class="flex items-center justify-between gap-2">

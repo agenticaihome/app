@@ -4,6 +4,7 @@
 	import { isDevMode } from "$lib/ergo/envs";
 	import CustomCursor from "$lib/CustomCursor.svelte";
 	import HoverCornersAuto from "$lib/HoverCornersAuto.svelte";
+	import SplashScreen from "$lib/SplashScreen.svelte";
 	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -52,6 +53,7 @@
 </script>
 
 <ModeWatcher defaultMode="dark" />
+<SplashScreen urlTheme={$page.url.searchParams.get("theme")} />
 <CustomCursor />
 <HoverCornersAuto />
 

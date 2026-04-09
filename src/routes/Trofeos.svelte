@@ -6,6 +6,7 @@
     import { fetchGoPGames } from "$lib/ergo/fetch";
     import { explorer_uri, isDevMode } from "$lib/ergo/envs";
     import { DEV_COMPETITIONS } from "$lib/dev/dev-competitions";
+    import { hoverCorners } from "$lib/hoverCorners";
     import { fetchFileSourcesByHash } from "source-application";
     import {
         WalletButton,
@@ -183,6 +184,7 @@
                 <button
                     type="button"
                     class="trophy-card gop-game-card"
+                    use:hoverCorners
                     on:click={() => openGame(game)}
                 >
                     <div class="trophy-media">

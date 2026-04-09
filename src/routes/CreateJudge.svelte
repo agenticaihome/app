@@ -1,15 +1,139 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { Button } from "$lib/components/ui/button";
-    import { create_profile } from "reputation-system";
+    import {
+        create_opinion,
+        create_profile,
+        fetchAllUserProfiles,
+        type RPBox,
+        type ReputationProof,
+    } from "reputation-system";
     import { JUDGE } from "$lib/ergo/reputation/types";
     import { web_explorer_uri_tx, explorer_uri } from "$lib/ergo/envs";
     import { get } from "svelte/store";
+    import { address, connected, reputation_proof } from "$lib/common/store";
+    import { fetchTypeNfts } from "$lib/ergo/reputation/fetch";
 
     let transactionId: string | null = null;
     let isSubmitting: boolean = false;
     let errorMessage: string | null = null;
     let burned_amount_erg: number = 0; // Default to 0 (optional burn)
     let copiedTx: boolean = false;
+    let registrationMode: "new" | "existing" = "new";
+    let userProfiles: ReputationProof[] = [];
+    let selectedProfileTokenId = "";
+    let isLoadingProfiles = false;
+    let profilesLoadedForWallet = false;
+    let loadedAddress: string | null = null;
+
+    function isJudgeProfile(profile: ReputationProof): boolean {
+        return profile.current_boxes.some(
+            (box) =>
+                box.type.tokenId === JUDGE &&
+                box.object_pointer === profile.token_id,
+        );
+    }
+
+    function getMainBox(profile: ReputationProof): RPBox | undefined {
+        return profile.current_boxes.find(
+            (box) =>
+                box.object_pointer === profile.token_id && box.is_locked === false,
+        );
+    }
+
+    function getProfileLabel(profile: ReputationProof): string {
+        const typeNames = profile.types
+            .map((type) => type.typeName)
+            .filter(Boolean)
+            .join(", ");
+        const baseLabel = `Profile ${profile.token_id.slice(0, 8)}...${profile.token_id.slice(-6)}`;
+        return typeNames ? `${baseLabel} (${typeNames})` : baseLabel;
+    }
+
+    async function loadUserProfiles() {
+        if (!$connected) {
+            userProfiles = [];
+            selectedProfileTokenId = "";
+            profilesLoadedForWallet = false;
+            loadedAddress = null;
+            return;
+        }
+
+        isLoadingProfiles = true;
+
+        try {
+            const types = await fetchTypeNfts();
+            const profiles = await fetchAllUserProfiles(
+                get(explorer_uri),
+                true,
+                [],
+                types,
+            );
+            userProfiles = profiles;
+
+            if (profiles.length === 0) {
+                registrationMode = "new";
+                selectedProfileTokenId = "";
+            } else {
+                const activeTokenId = get(reputation_proof)?.token_id;
+                const preferredProfile =
+                    profiles.find((profile) => profile.token_id === activeTokenId) ??
+                    profiles[0];
+                selectedProfileTokenId = preferredProfile?.token_id ?? "";
+                if (registrationMode === "new" && profiles.length > 0) {
+                    registrationMode = "existing";
+                }
+            }
+
+            profilesLoadedForWallet = true;
+            loadedAddress = $address;
+        } catch (error: any) {
+            console.error("Error loading user profiles", error);
+            errorMessage =
+                error?.message || "Could not load your existing profiles.";
+        } finally {
+            isLoadingProfiles = false;
+        }
+    }
+
+    onMount(loadUserProfiles);
+
+    $: if ($connected && $address !== loadedAddress) {
+        profilesLoadedForWallet = false;
+    }
+
+    $: if ($connected && !profilesLoadedForWallet && !isLoadingProfiles) {
+        loadUserProfiles();
+    }
+
+    $: if (!$connected) {
+        userProfiles = [];
+        selectedProfileTokenId = "";
+        profilesLoadedForWallet = false;
+        loadedAddress = null;
+        registrationMode = "new";
+    }
+
+    $: selectedExistingProfile =
+        userProfiles.find((profile) => profile.token_id === selectedProfileTokenId) ??
+        null;
+    $: selectedExistingMainBox = selectedExistingProfile
+        ? getMainBox(selectedExistingProfile)
+        : null;
+    $: selectedExistingAlreadyJudge = selectedExistingProfile
+        ? isJudgeProfile(selectedExistingProfile)
+        : false;
+    $: canSubmitExisting =
+        !!selectedExistingProfile &&
+        !!selectedExistingMainBox &&
+        !selectedExistingAlreadyJudge;
+    $: submitDisabled =
+        isSubmitting ||
+        (registrationMode === "existing" ? !canSubmitExisting : false);
+    $: submitLabel =
+        registrationMode === "existing"
+            ? "Mark Profile as Judge"
+            : "Create Judge Profile";
 
     async function submit() {
         isSubmitting = true;
@@ -21,19 +145,44 @@
             if (burned_amount_erg < 0) {
                 throw new Error("Burned amount cannot be negative");
             }
-            const burned_amount = BigInt(
-                Math.floor(burned_amount_erg * 10 ** 9),
-            ); // Convert to nanoErgs
+            let tx: string | null = null;
 
-            // create_profile(explorerUri, total_supply, type_nft_id, content, sacrified_erg, sacrified_tokens)
-            const tx = await create_profile(
-                get(explorer_uri),
-                1, // total_supply for a judge profile (usually 1 for a unique profile)
-                JUDGE,
-                null, // content
-                burned_amount,
-                [], // sacrified_tokens
-            );
+            if (registrationMode === "existing") {
+                if (!selectedExistingProfile) {
+                    throw new Error("Please select a profile");
+                }
+                if (selectedExistingAlreadyJudge) {
+                    throw new Error("This profile is already marked as judge");
+                }
+                if (!selectedExistingMainBox) {
+                    throw new Error("No unlocked main box found for this profile");
+                }
+
+                tx = await create_opinion(
+                    get(explorer_uri),
+                    1,
+                    JUDGE,
+                    selectedExistingProfile.token_id,
+                    true,
+                    null,
+                    false,
+                    selectedExistingMainBox,
+                );
+            } else {
+                const burned_amount = BigInt(
+                    Math.floor(burned_amount_erg * 10 ** 9),
+                ); // Convert to nanoErgs
+
+                tx = await create_profile(
+                    get(explorer_uri),
+                    1, // total_supply for a judge profile (usually 1 for a unique profile)
+                    JUDGE,
+                    null, // content
+                    burned_amount,
+                    [], // sacrified_tokens
+                );
+            }
+
             transactionId = tx;
         } catch (error: any) {
             console.error(error);
@@ -96,45 +245,143 @@
                 </li>
                 <li>
                     <strong>Burn ERG for Credibility:</strong> Optionally burn ERG
-                    to strengthen your reputation proof. This permanent sacrifice
+                    to strengthen your reputation profile. This permanent sacrifice
                     signals your commitment to honesty, making you stand out to game
                     creators.
                 </li>
             </ul>
 
-            <div class="form-group mt-4">
-                <label
-                    for="burned_amount"
-                    class="block text-sm font-medium text-muted-foreground"
-                    >Amount of ERG to Burn (Optional)</label
+            <div class="form-group mt-6">
+                <span class="block text-sm font-medium text-muted-foreground"
+                    >How do you want to register?</span
                 >
-                <input
-                    type="number"
-                    id="burned_amount"
-                    bind:value={burned_amount_erg}
-                    min="0"
-                    step="0.001"
-                    placeholder="Enter ERG amount (e.g., 1.5)"
-                    class="mt-1 w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-background text-foreground"
-                />
-                <p class="text-sm text-muted-foreground mt-1">
-                    Burning ERG enhances your reputation proof, signaling
-                    honesty. This amount is permanently burned and cannot be
-                    recovered.
-                </p>
+                <div class="mode-grid mt-3">
+                    <label class="mode-card">
+                        <input
+                            type="radio"
+                            bind:group={registrationMode}
+                            value="existing"
+                            disabled={userProfiles.length === 0}
+                        />
+                        <div>
+                            <strong>Use an existing profile</strong>
+                            <p>
+                                Add a self-definition box of type `JUDGE`
+                                pointing to that profile's reputation token.
+                            </p>
+                        </div>
+                    </label>
+
+                    <label class="mode-card">
+                        <input
+                            type="radio"
+                            bind:group={registrationMode}
+                            value="new"
+                        />
+                        <div>
+                            <strong>Create a new judge profile</strong>
+                            <p>
+                                Mint a brand new reputation profile specifically
+                                for judging.
+                            </p>
+                        </div>
+                    </label>
+                </div>
             </div>
+
+            {#if registrationMode === "existing"}
+                <div class="form-group mt-4">
+                    <label
+                        for="existing_profile"
+                        class="block text-sm font-medium text-muted-foreground"
+                        >Select one of your profiles</label
+                    >
+                    <select
+                        id="existing_profile"
+                        bind:value={selectedProfileTokenId}
+                        class="mt-1 w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-background text-foreground"
+                        disabled={isLoadingProfiles || userProfiles.length === 0}
+                    >
+                        {#if userProfiles.length === 0}
+                            <option value="">
+                                No existing profiles found
+                            </option>
+                        {:else}
+                            {#each userProfiles as profile}
+                                <option value={profile.token_id}>
+                                    {getProfileLabel(profile)}
+                                </option>
+                            {/each}
+                        {/if}
+                    </select>
+
+                    {#if isLoadingProfiles}
+                        <p class="text-sm text-muted-foreground mt-1">
+                            Loading your profiles...
+                        </p>
+                    {/if}
+
+                    {#if selectedExistingProfile}
+                        <div class="selection-hint mt-3">
+                            <p>
+                                Selected token:
+                                <code>{selectedExistingProfile.token_id}</code>
+                            </p>
+                            {#if selectedExistingAlreadyJudge}
+                                <p class="warning-text">
+                                    This profile already defines itself as a
+                                    judge.
+                                </p>
+                            {:else if !selectedExistingMainBox}
+                                <p class="warning-text">
+                                    This profile does not have an unlocked main
+                                    box available right now.
+                                </p>
+                            {:else}
+                                <p class="text-sm text-muted-foreground">
+                                    A `JUDGE` opinion will be created with
+                                    `object_pointer` set to this profile's
+                                    `reputation_token_id`.
+                                </p>
+                            {/if}
+                        </div>
+                    {/if}
+                </div>
+            {:else}
+                <div class="form-group mt-4">
+                    <label
+                        for="burned_amount"
+                        class="block text-sm font-medium text-muted-foreground"
+                        >Amount of ERG to Burn (Optional)</label
+                    >
+                    <input
+                        type="number"
+                        id="burned_amount"
+                        bind:value={burned_amount_erg}
+                        min="0"
+                        step="0.001"
+                        placeholder="Enter ERG amount (e.g., 1.5)"
+                        class="mt-1 w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-background text-foreground"
+                    />
+                    <p class="text-sm text-muted-foreground mt-1">
+                        Burning ERG enhances your reputation profile, signaling
+                        honesty. This amount is permanently burned and cannot be
+                        recovered.
+                    </p>
+                </div>
+            {/if}
 
             <div class="form-actions mt-8 flex justify-center">
                 <Button
                     size="lg"
                     class="w-full sm:w-auto text-base"
                     on:click={submit}
-                    disabled={isSubmitting}
+                    disabled={submitDisabled}
                 >
                     {#if isSubmitting}
                         <span class="spinner mr-2"></span> Registering...
                     {:else}
-                        Register
+                        {submitLabel}
                     {/if}
                 </Button>
             </div>
@@ -143,7 +390,13 @@
                 <div class="status-pill">Pending on-chain confirmation</div>
                 <h3 class="result-title">Registration Submitted</h3>
                 <p class="result-description">
-                    Your judge profile transaction has been sent to the blockchain.
+                    {#if registrationMode === "existing"}
+                        Your judge self-definition transaction has been sent to
+                        the blockchain.
+                    {:else}
+                        Your judge profile transaction has been sent to the
+                        blockchain.
+                    {/if}
                     Confirmation can take a few moments.
                 </p>
 
@@ -230,6 +483,36 @@
     }
     .judge-description li {
         @apply text-base;
+    }
+    .mode-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+    .mode-card {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        padding: 1rem;
+        border-radius: 0.85rem;
+        border: 1px solid color-mix(in oklab, hsl(var(--foreground)) 12%, transparent);
+        background: color-mix(in oklab, hsl(var(--background)) 92%, #0f172a 8%);
+        cursor: pointer;
+    }
+    .mode-card input {
+        margin-top: 0.2rem;
+    }
+    .mode-card p {
+        @apply text-sm text-muted-foreground mt-1;
+    }
+    .selection-hint {
+        @apply rounded-lg border p-3 text-sm;
+        border-color: color-mix(in oklab, hsl(var(--foreground)) 12%, transparent);
+        background: color-mix(in oklab, hsl(var(--background)) 90%, #0f172a 10%);
+    }
+    .warning-text {
+        color: rgb(239 68 68);
+        margin-top: 0.35rem;
     }
     .result-container {
         @apply py-8 px-4 text-center;

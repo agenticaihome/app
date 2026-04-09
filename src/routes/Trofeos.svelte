@@ -4,7 +4,8 @@
     import { game_detail, games, isLoadingGames } from "$lib/common/store";
     import { type AnyGame as Game } from "$lib/common/game";
     import { fetchGoPGames } from "$lib/ergo/fetch";
-    import { explorer_uri } from "$lib/ergo/envs";
+    import { explorer_uri, isDevMode } from "$lib/ergo/envs";
+    import { DEV_COMPETITIONS } from "$lib/dev/dev-competitions";
     import { fetchFileSourcesByHash } from "source-application";
     import {
         WalletButton,
@@ -21,8 +22,13 @@
 
     let isBootstrapping = true;
     let trophyGames: Game[] = [];
+    let hasWalletContext = false;
     let resolvedImages = new Map<string, string>();
     const imageLoadsInFlight = new Set<string>();
+    const DEV_TROPHY_GAME_IDS = DEV_COMPETITIONS.slice(0, 4).map(
+        (competition) => competition.gameId,
+    );
+    const DEV_TROPHY_BALANCE = 1n;
 
     onMount(async () => {
         try {
@@ -51,9 +57,22 @@
             .sort(sortGamesByNewest);
     }
 
+    $: hasWalletContext = $walletConnected || $isDevMode;
+
     $: trophyGames = getTrophyGames(
         $games.data,
-        ($walletBalance?.tokens ?? []) as { tokenId: string; amount: bigint }[],
+        ([
+            ...(($walletBalance?.tokens ?? []) as {
+                tokenId: string;
+                amount: bigint;
+            }[]),
+            ...($isDevMode
+                ? DEV_TROPHY_GAME_IDS.map((tokenId) => ({
+                      tokenId,
+                      amount: DEV_TROPHY_BALANCE,
+                  }))
+                : []),
+        ] as { tokenId: string; amount: bigint }[]),
     );
 
     async function resolveGameImage(game: Game) {
@@ -120,15 +139,20 @@
         <p class="subtitle">
             NFTs from competitions you won and currently keep in this wallet.
         </p>
+        {#if $isDevMode}
+            <p class="dev-note">
+                Dev mode preview: showing mock trophy ownership to simulate a logged wallet.
+            </p>
+        {/if}
         <div class="counts-row">
             <div class="badge">
                 <span>Trophies</span>
-                <strong>{#if !$walletConnected}-{:else}{trophyGames.length}{/if}</strong>
+                <strong>{#if !hasWalletContext}-{:else}{trophyGames.length}{/if}</strong>
             </div>
         </div>
     </section>
 
-    {#if !$walletConnected}
+    {#if !hasWalletContext}
         <section class="empty-panel gop-game-card">
             <div class="empty-icon"><Wallet class="h-10 w-10" /></div>
             <h3>Connect your wallet to see your trophies</h3>
@@ -217,6 +241,13 @@
         margin-top: 0.85rem;
         display: flex;
         gap: 0.75rem;
+    }
+
+    .dev-note {
+        margin: 0.6rem 0 0;
+        color: #86efac;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
     }
 
     .badge {

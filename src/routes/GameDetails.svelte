@@ -6076,6 +6076,7 @@
                                                     placeholder="e.g., a1b2..."
                                                     class="font-mono"
                                                 />
+                                                {#if $isDevMode}
                                                 <Button
                                                     variant="outline"
                                                     on:click={() => {
@@ -6093,6 +6094,7 @@
                                                 >
                                                     <Wand2 class="h-4 w-4" />
                                                 </Button>
+                                                {/if}
                                             </div>
                                             <p
                                                 class="text-xs text-muted-foreground"

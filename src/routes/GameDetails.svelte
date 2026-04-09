@@ -5875,67 +5875,86 @@
                                                 <h4
                                                     class="font-semibold text-lg"
                                                 >
-                                                    1. Check Judges
+                                                    1. {uniqueJudges.length > 0
+                                                        ? "Check Judges"
+                                                        : "No Judges"}
                                                 </h4>
                                             </div>
-                                            <p
-                                                class="text-sm text-muted-foreground mb-4"
-                                            >
-                                                Install and run the judge-check
-                                                service to verify the reputation
-                                                of the judges before
-                                                participating.
-                                            </p>
-                                            <div class="space-y-2">
-                                                <div
-                                                    class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                        on:click={() =>
-                                                            navigator.clipboard.writeText(
-                                                                `nodo download ${JUDGE_CHECK_SERVICE}`,
-                                                            )}
-                                                        title="Copy command"
-                                                    >
-                                                        <Copy class="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <span class="text-primary"
-                                                        >nodo</span
-                                                    >
-                                                    download {JUDGE_CHECK_SERVICE}
-                                                </div>
-                                                <div
-                                                    class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                        on:click={() =>
-                                                            navigator.clipboard.writeText(
-                                                                "nodo execute gop_judges_check",
-                                                            )}
-                                                        title="Copy command"
-                                                    >
-                                                        <Copy class="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <span class="text-primary"
-                                                        >nodo</span
-                                                    >
-                                                    execute gop_judges_check
-                                                </div>
+                                            {#if uniqueJudges.length > 0}
                                                 <p
-                                                    class="text-xs text-muted-foreground"
+                                                    class="text-sm text-muted-foreground mb-4"
                                                 >
-                                                    Requires Celaut Nodo.
-                                                    Follow {NODO_INSTALLATION},
-                                                    then open the service web UI,
-                                                    enter the game id or the
-                                                    judges you want to verify,
-                                                    and wait for the verdict.
+                                                    Install and run the
+                                                    judge-check service to
+                                                    verify the reputation of
+                                                    the judges before
+                                                    participating.
                                                 </p>
-                                            </div>
+                                                <div class="space-y-2">
+                                                    <div
+                                                        class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                            on:click={() =>
+                                                                navigator.clipboard.writeText(
+                                                                    `nodo download ${JUDGE_CHECK_SERVICE}`,
+                                                                )}
+                                                            title="Copy command"
+                                                        >
+                                                            <Copy class="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <span
+                                                            class="text-primary"
+                                                            >nodo</span
+                                                        >
+                                                        download
+                                                        {JUDGE_CHECK_SERVICE}
+                                                    </div>
+                                                    <div
+                                                        class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                            on:click={() =>
+                                                                navigator.clipboard.writeText(
+                                                                    "nodo execute gop_judges_check",
+                                                                )}
+                                                            title="Copy command"
+                                                        >
+                                                            <Copy class="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <span
+                                                            class="text-primary"
+                                                            >nodo</span
+                                                        >
+                                                        execute
+                                                        gop_judges_check
+                                                    </div>
+                                                    <p
+                                                        class="text-xs text-muted-foreground"
+                                                    >
+                                                        Requires Celaut Nodo.
+                                                        Follow
+                                                        {NODO_INSTALLATION},
+                                                        then open the service
+                                                        web UI, enter the game
+                                                        id or the judges you
+                                                        want to verify, and
+                                                        wait for the verdict.
+                                                    </p>
+                                                </div>
+                                            {:else}
+                                                <p
+                                                    class="text-sm text-muted-foreground"
+                                                >
+                                                    This game has no judges, so
+                                                    there is nothing to verify
+                                                    in this step.
+                                                </p>
+                                            {/if}
                                         </div>
 
                                         <!-- Step 2: Create Bot -->

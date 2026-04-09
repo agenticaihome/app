@@ -29,7 +29,6 @@ import {
     getGopGameActiveTemplateHash,
     getGopEndGameTemplateHash,
     getGopParticipationBatchTemplateHash,
-    getGopFalseTemplateHash,
     getGopMintIdtErgoTreeHex
 } from "./contract"; // Assumes this file exports functions to get script hashes
 import {
@@ -957,26 +956,35 @@ export async function fetchGameHistory(gameId: string): Promise<AnyGame[]> {
 
 export async function fetchSolverIdBox(solverId: string): Promise<Box<Amount> | null> {
     const url = `${get(explorer_uri)}/api/v1/boxes/unspent/search`;
+    const registerKeys = ["R4", "R5", "R6", "R7", "R8", "R9"] as const;
     try {
-        // Search for boxes where R4 == solverId
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ergoTreeTemplateHash: getGopFalseTemplateHash(),
-                registers: {
-                    R4: solverId
-                }
+        const responses = await Promise.all(
+            registerKeys.map(async (registerKey) => {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        registers: {
+                            [registerKey]: solverId,
+                        },
+                    }),
+                });
+
+                if (!response.ok) return [];
+
+                const data = await response.json();
+                return (data.items || []) as Box[];
             }),
-        });
+        );
 
-        if (!response.ok) return null;
+        const uniqueBoxes = new Map<string, Box<Amount>>();
+        for (const items of responses) {
+            for (const item of items) {
+                uniqueBoxes.set(item.boxId, item);
+            }
+        }
 
-        const data = await response.json();
-        const items: Box[] = data.items || [];
-
-        // Return the first one found. 
-        return items.length > 0 ? items[0] : null;
+        return uniqueBoxes.values().next().value ?? null;
     } catch (error) {
         console.error("Error fetching solver ID box:", error);
         return null;

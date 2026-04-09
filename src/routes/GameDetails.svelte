@@ -4374,9 +4374,7 @@
                                             gamePhase,
                                         )}`}
                                     >
-                                        <div
-                                            class="flex items-start justify-between gap-4"
-                                        >
+                                        <div class="flex items-start gap-4">
                                             <div
                                                 class="flex items-start gap-3 min-w-0 flex-1"
                                             >
@@ -4388,15 +4386,26 @@
                                                     {index + 1}
                                                 </div>
                                                 <div class="min-w-0">
-                                                    <p
-                                                        class="text-[10px] uppercase tracking-[0.18em] opacity-70"
-                                                    >
-                                                        {getContractStateMeta(
-                                                            card.id,
-                                                        ).eyebrow}
-                                                    </p>
                                                     <div
-                                                        class="mt-1 flex items-center gap-2"
+                                                        class="flex flex-wrap items-center gap-2"
+                                                    >
+                                                        <p
+                                                            class="text-[10px] uppercase tracking-[0.18em] opacity-70"
+                                                        >
+                                                            {getContractStateMeta(
+                                                                card.id,
+                                                            ).eyebrow}
+                                                        </p>
+                                                        <span
+                                                            class={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getContractBadgeClasses(
+                                                                card,
+                                                            )}`}
+                                                        >
+                                                            {card.badge}
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        class="mt-2 flex items-center gap-2"
                                                     >
                                                         <svelte:component
                                                             this={card.icon}
@@ -4409,16 +4418,9 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span
-                                                class={`ml-2 shrink-0 self-start rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getContractBadgeClasses(
-                                                    card,
-                                                )}`}
-                                            >
-                                                {card.badge}
-                                            </span>
                                         </div>
                                         <p
-                                            class="mt-3 text-sm leading-6 opacity-80"
+                                            class="mt-4 text-sm leading-6 opacity-80"
                                         >
                                             {card.description}
                                         </p>

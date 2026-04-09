@@ -2899,9 +2899,7 @@
                             explorerUri={$explorer_uri}
                             source_explorer_url={$source_explorer_url}
                             hash={activeHashStore}
-                            fixedHashFunctionId={modalFileType === "image"
-                                ? HASH_ALGORITHM_IDS.blake2b256
-                                : undefined}
+                            fixedHashFunctionId={HASH_ALGORITHM_IDS.blake2b256}
                             onSourceAdded={handleSourceAdded}
                             class="border-none shadow-none bg-transparent rounded-none"
                         />

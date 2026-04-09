@@ -3620,6 +3620,27 @@
 
                                     <div class="info-block">
                                         <span class="info-label"
+                                            >Time Factor<button
+                                                type="button"
+                                                class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                on:click|stopPropagation={() =>
+                                                    openDidacticModal(
+                                                        "Time Factor",
+                                                        "Weight used to reward earlier submissions when computing effective score. A higher value increases the advantage of uploading sooner.",
+                                                    )}
+                                            >
+                                                <Info class="w-3.5 h-3.5" />
+                                            </button></span
+                                        >
+                                        <span
+                                            class="info-value font-mono text-xs break-all"
+                                        >
+                                            {game.timeWeight?.toString() ?? "0"}
+                                        </span>
+                                    </div>
+
+                                    <div class="info-block">
+                                        <span class="info-label"
                                             >Seed<button
                                                 type="button"
                                                 class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"

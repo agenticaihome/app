@@ -46,7 +46,10 @@ type DevScenarioKey =
     | "ready_to_finalize"
     | "cancelled_locked"
     | "cancelled_draining"
-    | "finalized";
+    | "finalized"
+    | "finalized_aurora"
+    | "finalized_zenith"
+    | "finalized_gauntlet";
 
 interface DevCompetitionDefinition {
     key: DevScenarioKey;
@@ -238,6 +241,30 @@ export const DEV_COMPETITIONS: DevCompetitionDefinition[] = [
         description:
             "Fixture for Finalized. Payouts are done and the lifecycle is fully closed.",
         imageURL: DEV_IMAGES[1],
+    },
+    {
+        key: "finalized_aurora",
+        gameId: `${DEV_GAME_ID_PREFIX}finalized-aurora`,
+        title: "Aurora Champions Cup",
+        description:
+            "Additional Finalized fixture. Winner payouts were executed and the trophy is archived.",
+        imageURL: DEV_IMAGES[2],
+    },
+    {
+        key: "finalized_zenith",
+        gameId: `${DEV_GAME_ID_PREFIX}finalized-zenith`,
+        title: "Zenith Solver Masters",
+        description:
+            "Additional Finalized fixture. Competition is closed and immutable on-chain.",
+        imageURL: DEV_IMAGES[3],
+    },
+    {
+        key: "finalized_gauntlet",
+        gameId: `${DEV_GAME_ID_PREFIX}finalized-gauntlet`,
+        title: "Gauntlet Legacy Run",
+        description:
+            "Additional Finalized fixture. All dispute windows are over and results are definitive.",
+        imageURL: DEV_IMAGES[0],
     },
 ];
 
@@ -1064,11 +1091,55 @@ function buildScenarioState(
             });
             return { game: current, history: [active, current], participations };
         }
-        case "finalized": {
+        case "finalized":
+        case "finalized_aurora":
+        case "finalized_zenith":
+        case "finalized_gauntlet": {
+            const finalizedConfig: Record<
+                "finalized" | "finalized_aurora" | "finalized_zenith" | "finalized_gauntlet",
+                {
+                    activeValue: bigint;
+                    resolutionValue: bigint;
+                    finalizedValue: bigint;
+                    baseScore: bigint;
+                }
+            > = {
+                finalized: {
+                    activeValue: 4_000_000_000n,
+                    resolutionValue: 5_600_000_000n,
+                    finalizedValue: 2_250_000_000n,
+                    baseScore: 101n,
+                },
+                finalized_aurora: {
+                    activeValue: 4_250_000_000n,
+                    resolutionValue: 5_950_000_000n,
+                    finalizedValue: 2_480_000_000n,
+                    baseScore: 109n,
+                },
+                finalized_zenith: {
+                    activeValue: 3_900_000_000n,
+                    resolutionValue: 5_450_000_000n,
+                    finalizedValue: 2_180_000_000n,
+                    baseScore: 104n,
+                },
+                finalized_gauntlet: {
+                    activeValue: 4_100_000_000n,
+                    resolutionValue: 5_720_000_000n,
+                    finalizedValue: 2_360_000_000n,
+                    baseScore: 112n,
+                },
+            };
+            const config = finalizedConfig[
+                definition.key as
+                    | "finalized"
+                    | "finalized_aurora"
+                    | "finalized_zenith"
+                    | "finalized_gauntlet"
+            ];
             const active = makeActive({
                 boxIdSuffix: "active",
                 creationHeight: createdAt,
-                value: 4_000_000_000n,
+                value: config.activeValue,
                 deadlineBlock: referenceHeight - 25,
                 ceremonyDeadline: referenceHeight - 35,
                 seed: repeatHex("dc"),
@@ -1082,7 +1153,7 @@ function buildScenarioState(
                 seeds: [
                     {
                         suffix: "alpha",
-                        actualScore: 101n,
+                        actualScore: config.baseScore,
                         creationHeightOffset: 5,
                         solverIdCreationOffset: 2,
                         status: "Consumed",
@@ -1090,7 +1161,7 @@ function buildScenarioState(
                     },
                     {
                         suffix: "beta",
-                        actualScore: 86n,
+                        actualScore: config.baseScore - 15n,
                         creationHeightOffset: 6,
                         solverIdCreationOffset: 3,
                         status: "Consumed",
@@ -1098,7 +1169,7 @@ function buildScenarioState(
                     },
                     {
                         suffix: "gamma",
-                        actualScore: 80n,
+                        actualScore: config.baseScore - 21n,
                         creationHeightOffset: 7,
                         solverIdCreationOffset: 4,
                         status: "Consumed",
@@ -1111,7 +1182,7 @@ function buildScenarioState(
             const resolution = buildResolution({
                 keySuffix: "resolution",
                 creationHeight: referenceHeight - 18,
-                value: 5_600_000_000n,
+                value: config.resolutionValue,
                 deadlineBlock: active.deadlineBlock,
                 resolutionDeadline: referenceHeight - 12,
                 winnerCandidateCommitment,
@@ -1120,7 +1191,7 @@ function buildScenarioState(
             const current = buildFinalized({
                 keySuffix: "current",
                 creationHeight: referenceHeight - 8,
-                value: 2_250_000_000n,
+                value: config.finalizedValue,
                 deadlineBlock: active.deadlineBlock,
                 judgeFinalizationBlock: resolution.resolutionDeadline,
                 winnerFinalizationDeadline:

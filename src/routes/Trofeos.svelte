@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import { get } from "svelte/store";
     import { game_detail, games, isLoadingGames } from "$lib/common/store";
-    import { type AnyGame as Game } from "$lib/common/game";
+    import { GameState, type AnyGame as Game } from "$lib/common/game";
     import { fetchGoPGames } from "$lib/ergo/fetch";
     import { explorer_uri, isDevMode } from "$lib/ergo/envs";
     import { DEV_COMPETITIONS } from "$lib/dev/dev-competitions";
@@ -25,9 +25,11 @@
     let hasWalletContext = false;
     let resolvedImages = new Map<string, string>();
     const imageLoadsInFlight = new Set<string>();
-    const DEV_TROPHY_GAME_IDS = DEV_COMPETITIONS.slice(0, 4).map(
-        (competition) => competition.gameId,
-    );
+    const DEV_TROPHY_GAME_IDS = DEV_COMPETITIONS.filter(
+        (competition) =>
+            competition.key === "finalized" ||
+            competition.key.startsWith("finalized_"),
+    ).map((competition) => competition.gameId);
     const DEV_TROPHY_BALANCE = 1n;
 
     onMount(async () => {
@@ -53,7 +55,11 @@
         );
 
         return Array.from(allGames.values())
-            .filter((game) => ownedTokenIds.has(game.gameId))
+            .filter(
+                (game) =>
+                    ownedTokenIds.has(game.gameId) &&
+                    game.status === GameState.Finalized,
+            )
             .sort(sortGamesByNewest);
     }
 

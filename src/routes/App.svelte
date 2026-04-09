@@ -62,7 +62,9 @@
         source_explorer_url,
         forum_explorer_url,
         VALIDATE_WEB_EXPLORER,
+        isDevMode,
     } from "$lib/ergo/envs";
+    import * as Dialog from "$lib/components/ui/dialog";
     import { Button } from "$lib/components/ui/button";
     import { fetchTypeNfts } from "$lib/ergo/reputation/fetch";
     import { JUDGE } from "$lib/ergo/reputation/types";
@@ -85,6 +87,7 @@
     let mobileMenuOpen = false;
     let showSettings = false;
     let showInvalidExplorerModal = false;
+    let showDevModeInviteModal = false;
     let navHidden = false;
     let lastScrollY = 0;
     let scrollTicking = false;
@@ -99,6 +102,7 @@
     ];
     let activeMessageIndex = 0;
     let scrollingTextElement: HTMLElement;
+    const DEV_MODE_INVITE_SEEN_KEY = "seenDevModeInviteAfterKya";
 
     function handleAnimationIteration() {
         activeMessageIndex = (activeMessageIndex + 1) % footerMessages.length;
@@ -341,6 +345,28 @@
                 }
             }, stepDuration);
         });
+    }
+
+    function handleKyaClose() {
+        if (!browser || get(isDevMode)) return;
+        const alreadySeenInvite =
+            localStorage.getItem(DEV_MODE_INVITE_SEEN_KEY) === "true";
+        if (!alreadySeenInvite) {
+            showDevModeInviteModal = true;
+        }
+    }
+
+    function dismissDevModeInvite() {
+        if (browser) {
+            localStorage.setItem(DEV_MODE_INVITE_SEEN_KEY, "true");
+        }
+        showDevModeInviteModal = false;
+    }
+
+    async function enableDevModeFromInvite() {
+        if (!browser) return;
+        isDevMode.set(true);
+        dismissDevModeInvite();
     }
 </script>
 
@@ -606,7 +632,7 @@
 
 <footer class="page-footer">
     <div class="footer-left">
-        <Kya />
+        <Kya on:close={handleKyaClose} />
         <FaqModal />
         <a
             href="http://github.com/game-of-prompts"
@@ -660,6 +686,24 @@
         {/if}
     </div>
 </footer>
+
+<Dialog.Root bind:open={showDevModeInviteModal}>
+    <Dialog.Content class="w-[560px] max-w-[92vw]">
+        <Dialog.Header>
+            <Dialog.Title>Want to explore the full system?</Dialog.Title>
+            <Dialog.Description>
+                If you enable `dev mode`, you will see example competitions to
+                explore the complete Game of Prompts flow.
+            </Dialog.Description>
+        </Dialog.Header>
+        <Dialog.Footer class="mt-4 gap-2">
+            <Button variant="outline" on:click={dismissDevModeInvite}>
+                Not now
+            </Button>
+            <Button on:click={enableDevModeFromInvite}>Enable dev mode</Button>
+        </Dialog.Footer>
+    </Dialog.Content>
+</Dialog.Root>
 
 <WalletAddressChangeHandler />
 

@@ -165,105 +165,105 @@ export const DEV_COMPETITIONS: DevCompetitionDefinition[] = [
     {
         key: "strategy_upload",
         gameId: `${DEV_GAME_ID_PREFIX}strategy-upload`,
-        title: "Neon Labyrinth Sprint",
+        title: "Snake Hyperlane Trials",
         description:
-            "Fixture for the Strategy & Upload subphase. Solver uploads are still open and the ceremony is still collecting entropy.",
+            "Classic arcade challenge inspired by Snake. The solver controls a growing agent in a constrained arena and is scored by survival time, path quality, and maximum length reached.",
         imageURL: DEV_IMAGES[0],
     },
     {
         key: "seed_lockdown",
         gameId: `${DEV_GAME_ID_PREFIX}seed-lockdown`,
-        title: "Aurora Seed Lock",
+        title: "Pac-Maze Lockdown",
         description:
-            "Fixture for Seed Lockdown. Uploads are closed, but the ceremony is still open for last-minute randomness.",
+            "Classic maze challenge inspired by Pac-Man. The solver must optimize routing under ghost pressure, balancing pellet collection, risk management, and sustained point generation.",
         imageURL: DEV_IMAGES[1],
     },
     {
         key: "playing",
         gameId: `${DEV_GAME_ID_PREFIX}playing`,
-        title: "Paper Mech Arena",
+        title: "Voxel Frontier Ops",
         description:
-            "Fixture for the Playing subphase. The seed is fixed and players are submitting active runs.",
+            "Open-world voxel challenge where an autonomous solver gathers resources, crafts tools, and executes mission plans under constraints on time and material efficiency.",
         imageURL: DEV_IMAGES[2],
     },
     {
         key: "awaiting_resolution",
         gameId: `${DEV_GAME_ID_PREFIX}awaiting-resolution`,
-        title: "Clockwork Reef Finals",
+        title: "Black Swan Trading Sim",
         description:
-            "Fixture for Awaiting Resolution. Participation is closed and the creator still has time to reveal the secret.",
+            "Financial trading simulation with historical and synthetic market shocks. Solvers run strategy bots scored by net return, drawdown control, and risk-adjusted performance.",
         imageURL: DEV_IMAGES[3],
     },
     {
         key: "suspended",
         gameId: `${DEV_GAME_ID_PREFIX}suspended`,
-        title: "Silent Orbit Failure",
+        title: "Proteome Fold Crisis",
         description:
-            "Fixture for Suspended. The creator missed the resolution window and players can reclaim funds.",
+            "Computational biology challenge where the solver predicts stable 3D protein conformations from amino-acid sequences using energy minimization and structural quality metrics.",
         imageURL: DEV_IMAGES[0],
     },
     {
         key: "judging",
         gameId: `${DEV_GAME_ID_PREFIX}judging`,
-        title: "Jury of Echoes",
+        title: "Code Golf Tribunal",
         description:
-            "Fixture for Judging. The secret was revealed and judges are validating the current winner candidate.",
+            "Code optimization challenge where the solver submits executable solutions for benchmark tasks, scored by correctness, runtime efficiency, and implementation compactness.",
         imageURL: DEV_IMAGES[1],
     },
     {
         key: "ready_to_finalize",
         gameId: `${DEV_GAME_ID_PREFIX}ready-to-finalize`,
-        title: "Final Whistle Protocol",
+        title: "NLP Command Relay",
         description:
-            "Fixture for Ready to Finalize. Judge time is over and the payout path can be executed.",
+            "Natural language interaction challenge where the solver interprets constrained instructions, extracts intent, and executes valid actions with strict output formatting.",
         imageURL: DEV_IMAGES[2],
     },
     {
         key: "cancelled_locked",
         gameId: `${DEV_GAME_ID_PREFIX}cancelled-locked`,
-        title: "Premature Reveal Incident",
+        title: "RTS Economy Collapse",
         description:
-            "Fixture for Cancelled / Cooldown. Refunds are available, but creator stake drain is still locked.",
+            "Strategy and resource-management game focused on base growth, tech progression, and unit timing. Scoring rewards objective speed, economic stability, and resource efficiency.",
         imageURL: DEV_IMAGES[3],
     },
     {
         key: "cancelled_draining",
         gameId: `${DEV_GAME_ID_PREFIX}cancelled-draining`,
-        title: "Early Secret Fallout",
+        title: "SigmaUSD Stress Test",
         description:
-            "Fixture for Cancelled / Draining. The cooldown already passed and stake draining is now unlocked.",
+            "Smart-contract trading challenge inspired by SigmaUSD dynamics, where solvers optimize mint/redeem timing and portfolio exposure against volatility and liquidity constraints.",
         imageURL: DEV_IMAGES[0],
     },
     {
         key: "finalized",
         gameId: `${DEV_GAME_ID_PREFIX}finalized`,
-        title: "Archive of Champions",
+        title: "Arcade Legends Final",
         description:
-            "Fixture for Finalized. Payouts are done and the lifecycle is fully closed.",
+            "Arcade championship scenario combining reflex control, route planning, and scoring consistency across multiple rounds of increasing difficulty.",
         imageURL: DEV_IMAGES[1],
     },
     {
         key: "finalized_aurora",
         gameId: `${DEV_GAME_ID_PREFIX}finalized-aurora`,
-        title: "Aurora Champions Cup",
+        title: "Protein Folding Grand Prix",
         description:
-            "Additional Finalized fixture. Winner payouts were executed and the trophy is archived.",
+            "Scientific prediction challenge focused on low-energy protein folds and structural similarity to hidden references, emphasizing robust generalization across sequences.",
         imageURL: DEV_IMAGES[2],
     },
     {
         key: "finalized_zenith",
         gameId: `${DEV_GAME_ID_PREFIX}finalized-zenith`,
-        title: "Zenith Solver Masters",
+        title: "Quant Trader Open",
         description:
-            "Additional Finalized fixture. Competition is closed and immutable on-chain.",
+            "Quant trading arena where solver bots compete on return quality, downside control, and consistent benchmark outperformance across changing market regimes.",
         imageURL: DEV_IMAGES[3],
     },
     {
         key: "finalized_gauntlet",
         gameId: `${DEV_GAME_ID_PREFIX}finalized-gauntlet`,
-        title: "Gauntlet Legacy Run",
+        title: "Language Agent Masters",
         description:
-            "Additional Finalized fixture. All dispute windows are over and results are definitive.",
+            "Language-agent challenge that combines instruction following, information extraction, and tool-usable responses scored on precision, relevance, and task completion.",
         imageURL: DEV_IMAGES[0],
     },
 ];

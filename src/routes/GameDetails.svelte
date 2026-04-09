@@ -2820,6 +2820,15 @@
     let resolverPct = 0;
     let judgesTotalPct = 0;
     let developersPct = 0;
+    let showTrophyIncentive = false;
+    let showTimeFactorIncentive = false;
+    $: showTrophyIncentive =
+        !!game && game.status !== GameState.Cancelled_Draining;
+    $: showTimeFactorIncentive =
+        !!game &&
+        (game.status === GameState.Active ||
+            game.status === GameState.Resolution) &&
+        game.timeWeight > 0n;
 
     // --- Image Resolution Logic ---
     let resolvedImageSrc = game?.content?.imageURL ?? "";
@@ -3156,6 +3165,59 @@
                 </div>
             </section>
         </div>
+
+        {#if showTrophyIncentive}
+            <div class="w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8">
+                <section
+                    class="mb-6 md:mb-8 overflow-hidden rounded-none md:rounded-xl border-y md:border border-border/60 bg-card shadow-[0_10px_28px_rgba(0,0,0,0.12)]"
+                >
+                    <div
+                        class="flex flex-col lg:flex-row lg:items-center gap-4 px-4 py-4 md:px-6 md:py-5 bg-[radial-gradient(circle_at_top_left,rgba(74,222,128,0.10),transparent_40%)]"
+                    >
+                        <div
+                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-green-400/20 bg-green-400/10 text-green-400"
+                        >
+                            <Trophy class="h-5 w-5" />
+                        </div>
+
+                        <div class="flex-1 space-y-2">
+                            <div
+                                class="inline-flex items-center gap-2 rounded-full border border-green-400/25 bg-green-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-green-500"
+                            >
+                                <Sparkles class="h-3.5 w-3.5" />
+                                Winner Incentive
+                            </div>
+
+                            <p class="text-sm md:text-[15px] text-foreground/90">
+                                {#if game.status === GameState.Finalized}
+                                    This competition NFT was awarded to the
+                                    winner as a trophy, in addition to the
+                                    economic prize.
+                                {:else}
+                                    The winner also receives the competition
+                                    NFT as a trophy, on top of the economic
+                                    prize.
+                                {/if}
+                            </p>
+
+                            {#if showTimeFactorIncentive}
+                                <div
+                                    class="inline-flex max-w-full items-start gap-2 rounded-xl border border-border/70 bg-background/65 px-3 py-2 text-sm text-muted-foreground"
+                                >
+                                    <Clock3 class="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                                    <span>
+                                        Uploading the robot earlier increases
+                                        the effective score via the time
+                                        factor, so earlier submissions can earn
+                                        more points.
+                                    </span>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </section>
+            </div>
+        {/if}
 
         <div
             class="game-container w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8 py-0 md:py-8"

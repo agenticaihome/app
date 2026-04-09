@@ -15,6 +15,7 @@
     import CreateGame from "./CreateGame.svelte";
     import Demo from "./Demo.svelte";
     import TokenAcquisition from "./TokenAcquisition.svelte";
+    import Trofeos from "./Trofeos.svelte";
     import GameDetails from "./GameDetails.svelte";
     import FaqModal from "./FaqModal.svelte";
     import { ErgoPlatform } from "$lib/ergo/platform";
@@ -379,6 +380,13 @@
                         >Create Competition</a
                     >
                 </li>
+                <li class:active={activeTab === "trophies"}>
+                    <a
+                        href="#"
+                        on:click|preventDefault={() => changeTab("trophies")}
+                        >Trophies</a
+                    >
+                </li>
                 <li class:active={activeTab === "judges"}>
                     <a
                         href="#"
@@ -464,6 +472,11 @@
                     >Create Competition</a
                 >
             </li>
+            <li class:active={activeTab === "trophies"}>
+                <a href="#" on:click|preventDefault={() => changeTab("trophies")}
+                    >Trophies</a
+                >
+            </li>
             <li class:active={activeTab === "judges"}>
                 <a href="#" on:click|preventDefault={() => changeTab("judges")}
                     >Judges</a
@@ -538,6 +551,11 @@
         {#if activeTab === "createGame"}
             <div transition:fade={{ duration: 300 }}>
                 <CreateGame />
+            </div>
+        {/if}
+        {#if activeTab === "trophies"}
+            <div transition:fade={{ duration: 300 }}>
+                <Trofeos />
             </div>
         {/if}
         {#if activeTab === "judges"}

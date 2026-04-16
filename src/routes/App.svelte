@@ -15,7 +15,8 @@
     import CreateGame from "./CreateGame.svelte";
     import Demo from "./Demo.svelte";
     import TokenAcquisition from "./TokenAcquisition.svelte";
-    import Trofeos from "./Trofeos.svelte";
+    import MyTrophies from "./MyTrophies.svelte";
+    import Throne from "./Throne.svelte";
     import GameDetails from "./GameDetails.svelte";
     import FaqModal from "./FaqModal.svelte";
     import { ErgoPlatform } from "$lib/ergo/platform";
@@ -410,7 +411,14 @@
                     <a
                         href="#"
                         on:click|preventDefault={() => changeTab("trophies")}
-                        >Trophies</a
+                        >My Trophies</a
+                    >
+                </li>
+                <li class:active={activeTab === "throne"}>
+                    <a
+                        href="#"
+                        on:click|preventDefault={() => changeTab("throne")}
+                        >Throne</a
                     >
                 </li>
                 <li class:active={activeTab === "judges"}>
@@ -500,7 +508,12 @@
             </li>
             <li class:active={activeTab === "trophies"}>
                 <a href="#" on:click|preventDefault={() => changeTab("trophies")}
-                    >Trophies</a
+                    >My Trophies</a
+                >
+            </li>
+            <li class:active={activeTab === "throne"}>
+                <a href="#" on:click|preventDefault={() => changeTab("throne")}
+                    >Throne</a
                 >
             </li>
             <li class:active={activeTab === "judges"}>
@@ -581,7 +594,12 @@
         {/if}
         {#if activeTab === "trophies"}
             <div transition:fade={{ duration: 300 }}>
-                <Trofeos />
+                <MyTrophies />
+            </div>
+        {/if}
+        {#if activeTab === "throne"}
+            <div transition:fade={{ duration: 300 }}>
+                <Throne />
             </div>
         {/if}
         {#if activeTab === "judges"}

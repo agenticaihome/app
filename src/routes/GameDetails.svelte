@@ -6058,7 +6058,7 @@
                                                 >
                                                 the deadline. Publishing the hash
                                                 is <b>free</b> - no participation
-                                                fee required yet.
+                                                fee required yet (only network fees).
                                             </li>
                                             <li>
                                                 After the ceremony reveals the

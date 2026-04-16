@@ -6077,7 +6077,7 @@
                                                     href="https://t.me/unstopbots"
                                                     target="_blank"
                                                     class="underline font-semibold hover:text-yellow-500"
-                                                    >Game of Prompts Telegram
+                                                    >UnstopBots Telegram
                                                     channel</a
                                                 > where a bot notifies these events.
                                             </li>

@@ -14,6 +14,7 @@
         calculateEffectiveScore,
         isDevFriendly,
     } from "$lib/common/game";
+    import { sha256 } from "$lib/common/utils";
     import {
         GameContractPhase,
         GAME_PHASE_DEFINITIONS,
@@ -504,6 +505,7 @@
     let errorMessage: string | null = null;
     let warningMessage: string | null = null;
     let jsonUploadError: string | null = null;
+    let checksumStatus: 'valid' | 'invalid' | 'missing' | null = null;
     let isSubmitting: boolean = false;
     let showShareModal = false;
 
@@ -2597,12 +2599,38 @@
         const target = event.target as HTMLInputElement;
         jsonUploadError = null;
         errorMessage = null;
+        checksumStatus = null;
         if (target.files && target.files[0]) {
             const file = target.files[0];
             if (file.type === "application/json") {
                 try {
                     const fileContent = await file.text();
                     const jsonData = JSON.parse(fileContent);
+
+                    // --- Checksum integrity verification ---
+                    if ("checksum" in jsonData && typeof jsonData.checksum === "string") {
+                        const expectedChecksum = jsonData.checksum;
+                        const { checksum: _, ...dataWithoutChecksum } = jsonData;
+                        const canonicalJson = JSON.stringify(dataWithoutChecksum);
+                        const computedChecksum = await sha256(canonicalJson);
+                        if (computedChecksum !== expectedChecksum) {
+                            checksumStatus = 'invalid';
+                            jsonUploadError = "Checksum verification failed. The file may have been tampered with. Please provide the data manually.";
+                            commitmentC_input = "";
+                            solverId_input = "";
+                            hashLogs_input = "";
+                            judgeReferenceSeed_input = "";
+                            judgeReferenceScore_input = "";
+                            user_score = null;
+                            scores_list = [];
+                            target.value = "";
+                            return;
+                        }
+                        checksumStatus = 'valid';
+                    } else {
+                        checksumStatus = 'missing';
+                    }
+
                     if (
                         jsonData.solver_id &&
                         typeof jsonData.solver_id === "string"
@@ -6208,7 +6236,7 @@
                                         </Button>
                                         <Button
                                             on:click={() => {
-                                                if (solverId_box_found) {
+                                                if (solverId_box_found || get(isDevMode)) {
                                                     showSolverIdStep = false;
                                                 } else {
                                                     checkSolverIdBox().then(
@@ -6223,7 +6251,7 @@
                                                 }
                                             }}
                                             disabled={!solverId_box_found &&
-                                                !transactionId}
+                                                !transactionId && !get(isDevMode)}
                                         >
                                             Continue <ArrowRight
                                                 class="ml-2 h-4 w-4"
@@ -6340,6 +6368,17 @@
                                                 {jsonUploadError}
                                             </p>
                                         {/if}
+                                        {#if checksumStatus === 'valid'}
+                                            <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-green-400' : 'text-green-600'}">
+                                                <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                                Checksum verified — file integrity confirmed.
+                                            </p>
+                                        {:else if checksumStatus === 'missing'}
+                                            <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}">
+                                                <span class="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>
+                                                No checksum found in file — integrity could not be verified.
+                                            </p>
+                                        {/if}
                                     </div>
 
                                     <!-- "Or Fill Manually" Divider -->
@@ -6400,7 +6439,7 @@
                                                 'dark'
                                                     ? 'text-gray-200'
                                                     : 'text-gray-700'}"
-                                                >Solver ID / Name</Label
+                                                >Solver ID</Label
                                             >
                                             <Input
                                                 id="solverId"
@@ -7340,6 +7379,17 @@
                                     {#if jsonUploadError}
                                         <p class="text-sm text-red-500">
                                             {jsonUploadError}
+                                        </p>
+                                    {/if}
+                                    {#if checksumStatus === 'valid'}
+                                        <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-green-400' : 'text-green-600'}">
+                                            <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                            Checksum verified — file integrity confirmed.
+                                        </p>
+                                    {:else if checksumStatus === 'missing'}
+                                        <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}">
+                                            <span class="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>
+                                            No checksum found in file — integrity could not be verified.
                                         </p>
                                     {/if}
                                     <p class="text-xs text-muted-foreground">

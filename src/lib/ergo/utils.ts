@@ -224,7 +224,18 @@ export function parseGameContent(
 }
 
 export async function fetchServiceDownloadUrl(serviceId: string): Promise<string> {
-    const serviceDownloadUrl = await fetchFileSourcesByHash(serviceId, get(explorer_uri));
+    // TODO Could validate source reputation, format, hashes, etc ...
+    const sources = await fetchFileSourcesByHash(serviceId, get(explorer_uri));
+    if (sources.length === 0) {
+        console.warn(`No sources found for serviceId ${serviceId}`);
+        return "N/A";
+    }
+    const primaryUrl = sources[0].source.urlLink;
+    if (!primaryUrl) {
+        console.warn(`No URL found in sources for serviceId ${serviceId}`);
+        return "N/A";
+    }
+    const serviceDownloadUrl = primaryUrl.startsWith('http') ? primaryUrl : `https://${primaryUrl}`;
     return serviceDownloadUrl;
 }
 

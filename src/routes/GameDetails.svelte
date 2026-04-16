@@ -112,6 +112,7 @@
         uint8ArrayToHex,
         pkHexToBase58Address,
         hexToBytes,
+        fetchServiceDownloadUrl,
     } from "$lib/ergo/utils";
     import { mode } from "mode-watcher";
     import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
@@ -1352,6 +1353,7 @@
     let paperToc: { level: number; text: string; id: string }[] = [];
     let soundtrackSources: any[] = [];
     let soundtrackUrl: string | null = null;
+    let serviceDownload: string | null = null;
     let audioElement: HTMLAudioElement;
     let showAudioControls = false;
     let loadedHandlerAdded = false;
@@ -1845,11 +1847,15 @@
                     game.content.image,
                     explorer,
                 );
-            if (game.content.serviceId)
+            if (game?.content.serviceId) {
                 serviceSources = await fetchFileSourcesByHash(
                     game.content.serviceId,
                     explorer,
                 );
+                serviceDownload = await fetchServiceDownloadUrl(
+                    game?.content.serviceId,
+                );
+            }
 
             if (game.content.paper) {
                 paperSources = await fetchFileSourcesByHash(
@@ -6307,12 +6313,12 @@
                                                 <button
                                                     type="button"
                                                     class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() => navigator.clipboard.writeText(`nodo download ${game?.content.serviceDownloadUrl}`)}
+                                                    on:click={() => navigator.clipboard.writeText(`nodo download ${serviceDownload}`)}
                                                     title="Copy command"
                                                 >
                                                     <Copy class="w-3.5 h-3.5" />
                                                 </button>
-                                                <span class="text-primary">nodo</span> download {game?.content.serviceDownloadUrl}
+                                                <span class="text-primary">nodo</span> download {serviceDownload}
                                             </div>
                                         </div>
 

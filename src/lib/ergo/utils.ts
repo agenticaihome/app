@@ -8,6 +8,9 @@ import {
 } from '@fleet-sdk/core';
 import type { GameContent } from "../common/game"; // <-- Import GameContent
 import { base } from '$app/paths';
+import { fetchFileSourcesByHash } from "source-application";
+import { explorer_uri } from "./envs";
+import { get } from "svelte/store";
 
 export function hexToUtf8(hexString: string): string | null {
     try {
@@ -193,8 +196,7 @@ export function parseGameContent(
         description: defaultDescription,
         serviceId: "",
         imageURL: defaultImageUrl,
-        soundtrackURL: defaultSoundtrackUrl,
-        serviceDownloadUrl: "",
+        soundtrackURL: defaultSoundtrackUrl
     };
 
     if (rawJsonDetails) {
@@ -219,6 +221,11 @@ export function parseGameContent(
     }
 
     return content;
+}
+
+export async function fetchServiceDownloadUrl(serviceId: string): Promise<string> {
+    const serviceDownloadUrl = await fetchFileSourcesByHash(serviceId, get(explorer_uri));
+    return serviceDownloadUrl;
 }
 
 export function pkHexToBase58Address(pkHex?: string): string {

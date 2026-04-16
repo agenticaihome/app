@@ -52,6 +52,7 @@ export interface GameContent {
     soundtrack?: string; // Blake2b256 hash of the soundtrack file
     soundtrackURL: string; // Default soundtrack URL
     indetermismIndex?: number; // How many times a game needs to be executed to reproduce a logs (using the same seed).
+    serviceDownloadUrl: string;  // The best source app url to download the service.
 }
 
 // =================================================================

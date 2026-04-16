@@ -193,7 +193,8 @@ export function parseGameContent(
         description: defaultDescription,
         serviceId: "",
         imageURL: defaultImageUrl,
-        soundtrackURL: defaultSoundtrackUrl
+        soundtrackURL: defaultSoundtrackUrl,
+        serviceDownloadUrl: "",
     };
 
     if (rawJsonDetails) {

@@ -805,7 +805,8 @@ export async function fetchFinalizedGames(): Promise<Map<string, GameFinalized>>
             description: "Unknown",
             serviceId: "",
             imageURL: "",
-            soundtrackURL: ""
+            soundtrackURL: "",
+            serviceDownloadUrl: ""
         };
         let judges: string[] = [];
 
@@ -1528,7 +1529,8 @@ export async function fetchGame(id: string): Promise<AnyGame | null> {
                 description: "Unknown",
                 serviceId: "",
                 imageURL: "",
-                soundtrackURL: ""
+                soundtrackURL: "",
+                serviceDownloadUrl: ""
             };
             try {
                 if (currentBox.additionalRegisters && currentBox.additionalRegisters.R9) {

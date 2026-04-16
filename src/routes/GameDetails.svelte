@@ -1264,6 +1264,7 @@
     let showActionModal = false;
     let showParticipantGuide = true;
     let showSolverIdStep = false;
+    let showExecutionStep = false;
     let showJudgeGuide = true;
     let showBotAssistantModal = false;
     let showRobotDevelopmentGuideModal = false;
@@ -1447,6 +1448,22 @@
     let scores_list: number[] = [];
     let secret_S_input_resolve = "";
     let secret_S_input_cancel = "";
+    let walletErgoTreeHex = "";
+    let participationChecksum = "";
+
+    $: if ($address && game && !participationChecksum) {
+        try {
+            const ergoAddr = ErgoAddress.fromBase58($address);
+            walletErgoTreeHex = typeof ergoAddr.ergoTree === "string" 
+                ? ergoAddr.ergoTree 
+                : uint8ArrayToHex(ergoAddr.ergoTree);
+            sha256(game.seed + walletErgoTreeHex).then(res => {
+                participationChecksum = res;
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
 
     $: if (solverId_input) solverId_checked = false;
 
@@ -3056,7 +3073,7 @@
                         <div
                             class="stat-blocks-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full"
                         >
-                            {#each [{ label: "Reputation", value: game.reputation.toFixed(4), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commissions", value: `${totalPct}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool that goes to commissions" }] as stat}
+                            {#each [{ label: "Reputation", value: game.reputation.toFixed(4), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and contract developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commissions", value: `${totalPct}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool that goes to commissions" }] as stat}
                                 <div
                                     class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                                 >
@@ -6238,6 +6255,7 @@
                                             on:click={() => {
                                                 if (solverId_box_found || get(isDevMode)) {
                                                     showSolverIdStep = false;
+                                                    showExecutionStep = true;
                                                 } else {
                                                     checkSolverIdBox().then(
                                                         () => {
@@ -6245,6 +6263,7 @@
                                                                 solverId_box_found
                                                             ) {
                                                                 showSolverIdStep = false;
+                                                                showExecutionStep = true;
                                                             }
                                                         },
                                                     );
@@ -6259,6 +6278,101 @@
                                         </Button>
                                     </div>
                                 </div>
+                            {:else if showExecutionStep}
+                                <div
+                                    class="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
+                                >
+                                    <div class="text-center mb-8">
+                                        <h3 class="text-2xl font-bold mb-2">
+                                            Game Service Execution
+                                        </h3>
+                                        <p class="text-muted-foreground">
+                                            Follow these instructions to run the game service and generate your participation data.
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="space-y-6">
+                                        <!-- Step 1 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">1. Download Game Service</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                Download the specific game service using Celaut Nodo.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo download ${game?.content.serviceDownloadUrl}`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> download {game?.content.serviceDownloadUrl}
+                                            </div>
+                                        </div>
+
+                                        <!-- Step 2 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-green-500/10 rounded-lg text-green-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">2. Execute Game Service</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                Run your participation. The checksum serves to validate the integrity of both the seed and your ErgoTree.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo execute ${game?.content.serviceId} -e seed ${game?.seed} -e ergotree ${walletErgoTreeHex} -e checksum ${participationChecksum}`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> execute {game?.content.serviceId} -e seed {game?.seed} -e ergotree {walletErgoTreeHex} -e checksum {participationChecksum}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Step 3 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">3. Upload Results</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground">
+                                                Once the execution completes, download the generated JSON file containing your results and proceed to the next step to upload it on the form.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+                                        <Button
+                                            variant="ghost"
+                                            on:click={() => {
+                                                showExecutionStep = false;
+                                                showSolverIdStep = true;
+                                            }}
+                                        >
+                                            Back
+                                        </Button>
+                                        <Button
+                                            on:click={() => {
+                                                showExecutionStep = false;
+                                            }}
+                                        >
+                                            Continue <ArrowRight class="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
                             {:else}
                                 <div class="space-y-6 max-w-3xl mx-auto">
                                     <!-- Back to Guide Button -->
@@ -6267,7 +6381,7 @@
                                             variant="outline"
                                             size="sm"
                                             on:click={() =>
-                                                (showParticipantGuide = true)}
+                                                (showExecutionStep = true)}
                                             class="gap-2"
                                         >
                                             <svg
@@ -6284,7 +6398,7 @@
                                                     d="m15 18-6-6 6-6"
                                                 /></svg
                                             >
-                                            Back to Participant Guide
+                                            Back
                                         </Button>
                                     </div>
 

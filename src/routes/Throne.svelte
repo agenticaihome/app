@@ -223,10 +223,7 @@
         align-items: end;
         grid-template-columns: 100px minmax(0, 1fr);
         gap: 1.4rem;
-        background:
-            radial-gradient(circle at top left, rgba(250, 204, 21, 0.22), transparent 28%),
-            radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 30%),
-            linear-gradient(135deg, rgba(18, 18, 18, 0.96), rgba(9, 9, 9, 0.98));
+        background: var(--throne-bg, #ffffff);
         border: 1px solid rgba(245, 158, 11, 0.14);
         box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
     }
@@ -306,8 +303,6 @@
         line-height: 0.96;
         letter-spacing: -0.04em;
         word-break: break-word;
-        color: #fff7d6;
-        text-shadow: 0 0 40px rgba(250, 204, 21, 0.1);
     }
 
     .wallet-full {
@@ -351,6 +346,60 @@
         color: hsl(var(--muted-foreground));
         background: rgba(255, 255, 255, 0.03);
         border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    :global(:root) {
+        --throne-bg: #ffffff;
+    }
+
+    :global(.dark) {
+        --throne-bg:
+            radial-gradient(circle at top left, rgba(250, 204, 21, 0.22), transparent 28%),
+            radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 30%),
+            linear-gradient(135deg, rgba(18, 18, 18, 0.96), rgba(9, 9, 9, 0.98));
+    }
+
+    :global(.dark) .throne-hero {
+        border: 1px solid rgba(245, 158, 11, 0.14);
+    }
+
+    :global(.dark) .hero-copy h2 {
+        color: #fff7d6;
+        text-shadow: 0 0 40px rgba(250, 204, 21, 0.1);
+    }
+
+    :global(:root:not(.dark)) .throne-hero {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    :global(:root:not(.dark)) .hero-copy h2 {
+        color: #111827;
+        text-shadow: none;
+    }
+
+    :global(:root:not(.dark)) .wallet-full {
+        color: rgba(0, 0, 0, 0.7);
+    }
+
+    :global(:root:not(.dark)) .hero-description {
+        color: rgba(0, 0, 0, 0.8);
+    }
+
+    :global(:root:not(.dark)) .eyebrow {
+        color: #b45309;
+    }
+
+    :global(:root:not(.dark)) .stat-pill {
+        color: #92400e;
+        background: rgba(245, 158, 11, 0.12);
+        border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    :global(:root:not(.dark)) .stat-pill.subtle {
+        color: rgba(0, 0, 0, 0.6);
+        background: rgba(0, 0, 0, 0.04);
+        border-color: rgba(0, 0, 0, 0.08);
     }
 
     .gallery-head {

@@ -1738,6 +1738,8 @@
                         game.judges.length) /
                     denominator;
                 developersPct = Number(game.devCommission ?? 0) / denominator;
+                creatorSlashRatioPct =
+                    Number(game.creatorSlashRatio ?? 0) / denominator;
                 totalPct = resolverPct + judgesTotalPct + developersPct;
                 winnerPct = Math.max(0, 100 - totalPct);
                 overAllocated =
@@ -2871,6 +2873,7 @@
     let resolverPct = 0;
     let judgesTotalPct = 0;
     let developersPct = 0;
+    let creatorSlashRatioPct = 0;
     let showTrophyIncentive = false;
     let showTimeFactorIncentive = false;
     $: showTrophyIncentive =
@@ -3544,6 +3547,17 @@
                                     The winner's prize will be 0.
                                 </p>
                             {/if}
+
+                            <div class="mt-4 border-t border-border/60 pt-4">
+                                <div class="flex justify-between text-sm">
+                                    <span>Creator Slash Ratio:</span>
+                                    <span class="font-mono"
+                                        >{clampPct(creatorSlashRatioPct).toFixed(
+                                            0,
+                                        )}%</span
+                                    >
+                                </div>
+                            </div>
                         </div>
 
                         <div

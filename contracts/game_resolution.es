@@ -2,6 +2,7 @@
 // - Added creatorSlashRatio at R8[8]
 // - Moved resolution deadline to R8[9]
 // - Updated invalidation logic to compute resolver penalization based on creatorSlashRatio.
+// - Added constant COMMISSION_DENOMINATOR for percentage calculations.
 
 {
   // =================================================================
@@ -22,6 +23,7 @@
   val REPUTATION_PROOF_SCRIPT_HASH = fromBase16("`+REPUTATION_PROOF_SCRIPT_HASH+`")
   val END_GAME_SCRIPT_HASH = fromBase16("`+END_GAME_SCRIPT_HASH+`")
   val FALSE_SCRIPT_HASH = fromBase16("`+FALSE_SCRIPT_HASH+`")
+  val COMMISSION_DENOMINATOR = fromBase16("`+COMMISSION_DENOMINATOR+`")
 
 
   // =================================================================

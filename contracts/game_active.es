@@ -1,7 +1,3 @@
-// CHANGES
-// - Added creatorSlashRatio at R8[8]
-// - Action 1 must specify deadline at R8[9]
-
 {
   // =================================================================
   // === CONSTANTES Y HASHES DE SCRIPTS

@@ -98,7 +98,7 @@
     if (mainGameBoxes.size == 1) {
       val mainGameBox = mainGameBoxes(0)
       val isResolved = mainGameBox.R4[Int].get == 1
-      val resolutionDeadline = mainGameBox.R8[Coll[Long]].get(7)
+      val resolutionDeadline = mainGameBox.R8[Coll[Long]].get(9)
 
       val resolutionPeriodIsOver = HEIGHT >= resolutionDeadline
       resolutionPeriodIsOver && isResolved
@@ -113,7 +113,7 @@
     if (mainGameBoxes.size == 1) {
       val mainGameBox = mainGameBoxes(0)
       val isResolved = mainGameBox.R4[Int].get == 1
-      val resolutionDeadline = mainGameBox.R8[Coll[Long]].get(7)
+      val resolutionDeadline = mainGameBox.R8[Coll[Long]].get(9)
 
       val isBeforeDeadline = HEIGHT < resolutionDeadline
       val winnerCandidateCommitment = mainGameBox.R6[(Coll[Byte], Coll[Byte])].get._2
@@ -137,7 +137,7 @@
             val r6 = gameBox.R6[(Coll[Byte], Coll[Byte])].get
             val winnerCandidateCommitment = r6._2
             val gameProvenance = gameBox.R9[Coll[Coll[Byte]]].get
-            val resolverPK = gameProvenance(2)
+            val resolverPK = gameProvenance(3)
             val participationTokenId = gameProvenance(1)
             
             val targetBoxes = OUTPUTS.filter({(b:Box) => 

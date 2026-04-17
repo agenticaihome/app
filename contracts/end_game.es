@@ -24,7 +24,7 @@
   // R5: Coll[Byte]                 - Seed
   // R6: (Coll[Byte], Coll[Byte])   - (revealedSecretS, winnerCandidateCommitment): El secreto y el candidato a ganador.
   // R7: Coll[Coll[Byte]]           - participatingJudges: Lista de IDs de tokens de reputación de los jueces.
-  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, resolutionDeadline]
+  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, creatorSlashRatio, resolutionDeadline]
   // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript, resolverErgoTree]
 
   // =================================================================
@@ -48,7 +48,8 @@
   val perJudgeCommissionPercentage = numericalParams(5)
   val resolverCommissionPercentage = numericalParams(6)
   val dev_commission_percentage = numericalParams(7)
-  val resolutionDeadline = numericalParams(8)
+  val creatorSlashRatio = numericalParams(8)
+  val resolutionDeadline = numericalParams(9)
 
   val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   // gameProvenance(0) = gameDetailsJsonHex

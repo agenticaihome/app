@@ -1,3 +1,8 @@
+// CHANGES
+// - Added creatorSlashRatio at R8[8]
+// - Moved resolution deadline to R8[9]
+// - Updated invalidation logic to compute resolver penalization based on creatorSlashRatio.
+
 {
   // =================================================================
   // === CONSTANTES Y HASHES DE SCRIPTS
@@ -27,7 +32,7 @@
   // R5: Coll[Byte]                 - Seed
   // R6: (Coll[Byte], Coll[Byte])   - (revealedSecretS, winnerCandidateCommitment): El secreto y el candidato a ganador.
   // R7: Coll[Coll[Byte]]           - participatingJudges: Lista de IDs de tokens de reputación de los jueces.
-  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, resolutionDeadline]
+  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, creatorSlashRatio, resolutionDeadline]
   // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript, resolverErgoTree]
 
   // =================================================================
@@ -51,7 +56,8 @@
   val perJudgeCommissionPercentage = numericalParams(5)
   val resolverCommissionPercentage = numericalParams(6)
   val devCommissionPercentage = numericalParams(7)
-  val resolutionDeadline = numericalParams(8)
+  val creatorSlashRatio = numericalParams(8)
+  val resolutionDeadline = numericalParams(9)
 
   val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   // gameProvenance(0) = gameDetailsJsonHex
@@ -150,8 +156,9 @@
         if (recreatedGameBox.R6[(Coll[Byte], Coll[Byte])].get._2 == Coll[Byte]() && invalidatedCandidateBoxes.size == 1) {
           val invalidatedCandidateBox = invalidatedCandidateBoxes(0)
           
-          val expectedJudgeComm = perJudgeCommissionPercentage + (if (penalizeResolver) resolverCommissionPercentage else 0L)
-          val expectedResolverComm = if (penalizeResolver) 0L else resolverCommissionPercentage
+          val resolverPenalization = if (penalizeResolver) resolverCommissionPercentage * creatorSlashRatio / COMMISSION_DENOMINATOR else 0L
+          val expectedJudgeComm = perJudgeCommissionPercentage + resolverPenalization
+          val expectedResolverComm = resolverCommissionPercentage - resolverPenalization
 
           val gameBoxIsRecreatedCorrectly = {
             recreatedGameBox.tokens(0)._1 == gameNftId &&
@@ -166,11 +173,12 @@
             recreatedGameBox.R8[Coll[Long]].get(5) == expectedJudgeComm &&
             recreatedGameBox.R8[Coll[Long]].get(6) == expectedResolverComm &&
             recreatedGameBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
+            recreatedGameBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
             recreatedGameBox.R9[Coll[Coll[Byte]]].get == gameProvenance
           }
           
           val fundsReturnedToPool = box_value(recreatedGameBox) >= box_value(SELF) + box_value(invalidatedCandidateBox)
-          val deadlineIsExtended = recreatedGameBox.R8[Coll[Long]].get(8) >= HEIGHT + JUDGE_PERIOD
+          val deadlineIsExtended = recreatedGameBox.R8[Coll[Long]].get(9) >= HEIGHT + JUDGE_PERIOD
           
           fundsReturnedToPool && deadlineIsExtended && gameBoxIsRecreatedCorrectly
         } else { false }
@@ -284,7 +292,8 @@
                 recreatedGameBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
                 recreatedGameBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
                 recreatedGameBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
-                recreatedGameBox.R8[Coll[Long]].get(8) == resolutionDeadline &&
+                recreatedGameBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
+                recreatedGameBox.R8[Coll[Long]].get(9) == resolutionDeadline &&
                 recreatedGameBox.R9[Coll[Coll[Byte]]].get(0) == gameProvenance(0) &&
                 recreatedGameBox.R9[Coll[Coll[Byte]]].get(1) == gameProvenance(1) &&
                 recreatedGameBox.R9[Coll[Coll[Byte]]].get(2) == devScript &&

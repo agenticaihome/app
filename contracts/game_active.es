@@ -1,3 +1,7 @@
+// CHANGES
+// - Added creatorSlashRatio at R8[8]
+// - Action 1 must specify deadline at R8[9]
+
 {
   // =================================================================
   // === CONSTANTES Y HASHES DE SCRIPTS
@@ -34,7 +38,7 @@
   // R5: Coll[Byte]         - seed
   // R6: Coll[Byte]         - secretHash: Hash del secreto 'S' (blake2b256(S)).
   // R7: Coll[Coll[Byte]]   - invitedJudgesReputationProofs
-  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage].
+  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, creatorSlashRatio].
   // R9: Coll[Coll[Byte]]   - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript]
 
 
@@ -65,6 +69,7 @@
   val perJudgeCommissionPercentage = numericalParams(5)
   val resolverCommissionPercentage = numericalParams(6)
   val devCommissionPercentage = numericalParams(7)
+  val creatorSlashRatio = numericalParams(8)
 
   val ceremonyDeadline = deadline - PARTICIPATION_TIME_WINDOW
 
@@ -213,7 +218,8 @@
               resolutionBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
               resolutionBox.R8[Coll[Long]].get(6) >= resolverCommissionPercentage &&
               resolutionBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
-              resolutionBox.R8[Coll[Long]].get(8) >= HEIGHT + JUDGE_PERIOD &&
+              resolutionBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
+              resolutionBox.R8[Coll[Long]].get(9) >= HEIGHT + JUDGE_PERIOD &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(0) == gameDetailsJsonHex &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(1) == participationTokenId &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(2) == devScript &&

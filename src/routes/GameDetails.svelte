@@ -3548,16 +3548,6 @@
                                 </p>
                             {/if}
 
-                            <div class="mt-4 border-t border-border/60 pt-4">
-                                <div class="flex justify-between text-sm">
-                                    <span>Creator Slash Ratio:</span>
-                                    <span class="font-mono"
-                                        >{clampPct(creatorSlashRatioPct).toFixed(
-                                            0,
-                                        )}%</span
-                                    >
-                                </div>
-                            </div>
                         </div>
 
                         <div
@@ -3659,6 +3649,17 @@
                                             title={game.content.serviceId}
                                         >
                                             {game.content.serviceId}
+                                        </span>
+                                    </div>
+
+                                    <div class="info-block">
+                                        <span class="info-label"
+                                            >Creator Splash Ratio</span
+                                        >
+                                        <span class="info-value font-mono">
+                                            {clampPct(creatorSlashRatioPct).toFixed(
+                                                0,
+                                            )}%
                                         </span>
                                     </div>
 

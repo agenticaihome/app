@@ -338,7 +338,8 @@
           recreatedGameBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
           recreatedGameBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
           recreatedGameBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
-          recreatedGameBox.R8[Coll[Long]].get(8) == resolutionDeadline &&
+          recreatedGameBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
+          recreatedGameBox.R8[Coll[Long]].get(9) == resolutionDeadline &&
           recreatedGameBox.R9[Coll[Coll[Byte]]].get == gameProvenance
         }
 

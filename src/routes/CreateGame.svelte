@@ -59,6 +59,7 @@
 
     import { getGameConstants } from "$lib/common/constants";
     const constants = getGameConstants();
+    declare const ergo: any;
 
     let platform = new ErgoPlatform();
 
@@ -100,6 +101,7 @@
     let participationFeeAmount: number | undefined;
     let commissionPercentage: number | undefined;
     let perJudgeComissionPercentage: number | undefined;
+    let creatorSlashRatioPercentage: number | undefined = 100;
     let transactionId: string | string[] | null = null;
     let errorMessage: string | null = null;
 
@@ -663,6 +665,7 @@
     $: judgesCount = judges.filter((e) => e.value && e.value.trim()).length;
     $: resolverPct = asNumber(commissionPercentage);
     $: perJudgePct = asNumber(perJudgeComissionPercentage);
+    $: creatorSlashRatioPct = clampPct(asNumber(creatorSlashRatioPercentage));
     $: judgesTotalPct = judgesCount * perJudgePct;
     const developersPct = 5;
     $: totalAllocated = resolverPct + judgesTotalPct + developersPct;
@@ -736,7 +739,8 @@
             resolverStakeAmount === undefined ||
             participationFeeAmount === undefined ||
             commissionPercentage === undefined ||
-            perJudgeComissionPercentage === undefined
+            perJudgeComissionPercentage === undefined ||
+            creatorSlashRatioPercentage === undefined
         ) {
             errorMessage = "Please fill all required fields correctly.";
             isSubmitting = false;
@@ -830,6 +834,7 @@
                         ? undefined
                         : participationTokenId,
                 commissionPercentage: commissionPercentage,
+                creatorSlashRatioPercentage: creatorSlashRatioPercentage,
                 judges: judgesArray,
                 gameDetailsJson: gameDetails,
                 perJudgeCommissionPercentage: perJudgeComissionPercentage,
@@ -1127,6 +1132,14 @@
                                         <span>Judge Comm.:</span>
                                         <span class="font-mono"
                                             >{perJudgeComissionPercentage}% (x{judgesCount})</span
+                                        >
+                                    </div>
+                                    <div
+                                        class="flex justify-between text-sm border-b border-border/50 pb-1"
+                                    >
+                                        <span>Creator Slash Ratio:</span>
+                                        <span class="font-mono"
+                                            >{creatorSlashRatioPct}%</span
                                         >
                                     </div>
                                 </div>
@@ -1920,6 +1933,40 @@
                                         required
                                     />
                                 </div>
+                                <div class="form-group lg:col-span-2">
+                                    <div class="flex items-center gap-2 mb-1.5">
+                                        <Label
+                                            for="creatorSlashRatioPercentage"
+                                            class="mb-0"
+                                            >Creator Slash Ratio (%)</Label
+                                        >
+                                        <div class="group relative">
+                                            <button
+                                                type="button"
+                                                tabindex="-1"
+                                                on:click={() =>
+                                                    openDidacticModal(
+                                                        "Creator Slash Ratio",
+                                                        "Percentage of the resolver commission that gets slashed during judge invalidation flows.",
+                                                    )}
+                                            >
+                                                <Info
+                                                    class="w-3.5 h-3.5 text-muted-foreground cursor-help hover:text-primary transition-colors"
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <Input
+                                        id="creatorSlashRatioPercentage"
+                                        bind:value={creatorSlashRatioPercentage}
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.0001"
+                                        placeholder="e.g., 100 for full slash"
+                                        required
+                                    />
+                                </div>
                                 <div class="form-group lg:col-span-4">
                                     <div class="flex items-center gap-2 mb-1.5">
                                         <Label
@@ -2567,6 +2614,7 @@
                                     resolverStakeAmount === undefined ||
                                     participationFeeAmount === undefined ||
                                     commissionPercentage === undefined ||
+                                    creatorSlashRatioPercentage === undefined ||
                                     overAllocated > 0 ||
                                     contentTooLarge}
                                 class="w-full text-lg font-bold py-6 shadow-lg shadow-primary/20"

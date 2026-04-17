@@ -91,7 +91,7 @@ export async function judges_invalidate_unavailable(
             // --- R7: participatingJudges: Coll[Coll[Byte]] ---
             R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
 
-            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
+            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline]
             R8: SColl(SLong, [
                 BigInt(game.createdAt),
                 BigInt(game.timeWeight),
@@ -101,6 +101,7 @@ export async function judges_invalidate_unavailable(
                 BigInt(game.perJudgeCommission),
                 BigInt(game.resolverCommission),  // Resolver commission is NOT penalized in unavailable case
                 BigInt(game.devCommission),
+                BigInt(game.creatorSlashRatio),
                 BigInt(newDeadline)
             ]).toHex(),
 

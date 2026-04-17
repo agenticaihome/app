@@ -47,6 +47,7 @@ export async function create_game(
     resolverStakeAmount: bigint,
     participationFeeAmount: bigint,
     commissionPercentage: number,
+    creatorSlashRatioPercentage: number,
     judges: string[],
     gameDetailsJson: string,
     perJudgeCommissionPercentage: number,
@@ -76,6 +77,7 @@ export async function create_game(
         judges,
         gameDetailsJsonBrief: gameDetailsJson.substring(0, 100) + "...",
         seedHex: seedHex.substring(0, 10) + "...",
+        creatorSlashRatioPercentage,
         eip4ImageHash,
         eip4ImageLink
     });
@@ -138,8 +140,9 @@ export async function create_game(
         deadlineBlock: deadlineBlock,
         resolverStakeAmount: resolverStakeAmount,
         participationFeeAmount: participationFeeAmount,
-        perJudgeCommissionPercentage: Math.round(perJudgeCommissionPercentage * 10000),
+        perJudgeCommissionPercentage: Math.round(perJudgeCommissionPercentage * 10000),  // 10000 based on comission denominator of 10^6 on constants.ts
         commissionPercentage: Math.round(commissionPercentage * 10000),
+        creatorSlashRatioPercentage: Math.round(creatorSlashRatioPercentage * 10000),
         gameDetailsBytes: gameDetailsBytes,
         participationTokenIdBytes: participationTokenIdBytes
     };
@@ -172,6 +175,7 @@ export async function create_game(
     const comission = BigInt(Math.round((commissionPercentage / 100) * getGameConstants().COMMISSION_DENOMINATOR));
     const perJudgeComission = BigInt(Math.round((perJudgeCommissionPercentage / 100) * getGameConstants().COMMISSION_DENOMINATOR));
     const devCommission = BigInt(Math.round((DEV_COMMISSION_PERCENTAGE / 100) * getGameConstants().COMMISSION_DENOMINATOR));
+    const creatorSlashRatio = BigInt(Math.round((creatorSlashRatioPercentage / 100) * getGameConstants().COMMISSION_DENOMINATOR));
     const devScriptBytes = hexToBytes(DEV_SCRIPT);
     if (!devScriptBytes) throw new Error("Invalid DEV_SCRIPT constant");
 
@@ -183,7 +187,8 @@ export async function create_game(
         participationFeeAmount,
         perJudgeComission,
         comission,
-        devCommission
+        devCommission,
+        creatorSlashRatio
     ]).toHex();
     const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes, devScriptBytes]).toHex();
 

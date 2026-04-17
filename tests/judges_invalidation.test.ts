@@ -25,6 +25,7 @@ import { DefaultGameConstants, getGameConstants } from "$lib/common/constants";
 import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from "$lib/ergo/envs";
 
 const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
+const CREATOR_SLASH_RATIO = BigInt(COMMISSION_DENOMINATOR);
 
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
 const USD_BASE_TOKEN_NAME = "USD";
@@ -114,7 +115,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge3TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -150,7 +151,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
 
                 // gameProvenance (R9) corregido: Coll[Coll[Byte]] con elementos planos
@@ -233,6 +235,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -321,7 +324,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge1TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -358,7 +361,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
 
                 // gameProvenance (R9) corregido: Coll[Coll[Byte]] con elementos planos
@@ -437,6 +441,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -530,7 +535,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge1TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -558,7 +563,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -651,6 +657,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -732,7 +739,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge1TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -760,7 +767,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -839,6 +847,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -925,7 +934,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge3TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -953,7 +962,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -1031,6 +1041,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1091,7 +1102,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge3TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -1119,7 +1130,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -1201,6 +1213,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1260,7 +1273,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge3TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -1288,7 +1301,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -1368,6 +1382,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1428,7 +1443,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge3TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -1456,7 +1471,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -1536,6 +1552,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1594,7 +1611,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge3TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -1622,7 +1639,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -1702,6 +1720,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1760,7 +1779,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
 
         // 3. Crear la caja `game_resolution`
         const participationFee = 5_000_000n;
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, participationFee, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, participationFee, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -1788,7 +1807,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -1868,6 +1888,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 
@@ -1925,7 +1946,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
         judge3TokenId = Buffer.from(randomBytes(32)).toString("hex");
 
         // 3. Crear la caja `game_resolution`;
-        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(resolutionDeadline)];
+        const numericalParams: bigint[] = [1n, 20n, 700_000n, 2_000_000_000n, 1_000_000n, 1n, 10n, BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), CREATOR_SLASH_RATIO, BigInt(resolutionDeadline)];
         const judges = [judge1TokenId, judge2TokenId, judge3TokenId].map(id => Buffer.from(id, "hex"));
 
         gameResolutionContract.addUTxOs({
@@ -1953,7 +1974,8 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
                     numericalParams[5],         // perJudgeCommissionPercentage
                     numericalParams[6],         // resolverCommissionPercentage
                     BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
-                    numericalParams[7]          // resolutionDeadline
+                    numericalParams[8],          // creatorSlashRatio
+                    numericalParams[9]          // resolutionDeadline
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
@@ -2033,6 +2055,7 @@ describe.each(baseModes)("Game Resolution Invalidation by Judges - (%s)", (mode)
             numericalParams[5] + numericalParams[6],   // perJudgeCommissionPercentage + resolverCommissionPercentage
             0n,                         // resolverCommissionPercentage
             BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+            CREATOR_SLASH_RATIO,
             extendedDeadline            // resolutionDeadline
         ];
 

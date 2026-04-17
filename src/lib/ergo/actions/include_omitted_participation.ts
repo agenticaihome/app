@@ -65,7 +65,7 @@ export async function include_omitted_participation(
             // --- R7: participatingJudges: Coll[Coll[Byte]] ---
             R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
 
-            // --- R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline] ---
+            // --- R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline] ---
             R8: SColl(SLong, [
                 BigInt(game.createdAt),
                 BigInt(game.timeWeight),
@@ -75,6 +75,7 @@ export async function include_omitted_participation(
                 BigInt(game.perJudgeCommission),
                 BigInt(game.resolverCommission),
                 BigInt(game.devCommission),
+                BigInt(game.creatorSlashRatio),
                 BigInt(game.resolutionDeadline)
             ]).toHex(),
 

@@ -14,7 +14,7 @@ import type {
 } from "$lib/common/game";
 import { current_height } from "$lib/common/store";
 import { DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
-import type { Platform } from "$lib/common/platform";
+import type { CreateGoPGamePlatformParams, Platform } from "$lib/common/platform";
 import type { ErgoPlatform } from "$lib/ergo/platform";
 import {
     bigintToLongByteArray,
@@ -88,7 +88,7 @@ class DevErgoPlatform implements Platform {
         return new Map();
     }
 
-    async createGoPGame(): Promise<string[] | null> {
+    async createGoPGame(_params: CreateGoPGamePlatformParams): Promise<string[] | null> {
         throw new Error("Dev fixtures do not support on-chain actions.");
     }
 
@@ -505,6 +505,7 @@ function buildScenarioState(
     const perJudgeCommission = 12_500n;
     const resolverCommission = 75_000;
     const devCommission = DEV_COMMISSION_PERCENTAGE * 10_000;
+    const creatorSlashRatio = constants.COMMISSION_DENOMINATOR;
     const content = makeGameContent(definition);
     const judges = [
         `dev-judge-${definition.key}-01`,
@@ -551,6 +552,7 @@ function buildScenarioState(
         createdAt,
         devScript: DEV_SCRIPT,
         devCommission,
+        creatorSlashRatio,
     });
 
     const buildResolution = (params: {
@@ -589,6 +591,7 @@ function buildScenarioState(
         resolverCommission,
         devScript: DEV_SCRIPT,
         devCommission,
+        creatorSlashRatio,
         content,
         value: params.value,
         reputationOpinions: [],

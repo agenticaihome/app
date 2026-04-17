@@ -4,6 +4,9 @@
 
 import { SInt, SLong, SColl, SPair, SByte, serializeBox } from '@fleet-sdk/serializer';
 import { getGopGameActiveErgoTreeHex, getGopGameResolutionErgoTreeHex, getGopGameCancellationErgoTreeHex } from '../contract';
+import { getGameConstants } from '../../common/constants';
+import { DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from '../envs';
+import { hexToBytes } from '../utils';
 
 /**
  * Calculate the UTF-8 byte length of a string
@@ -58,6 +61,8 @@ export interface GameBoxInputs {
     perJudgeCommissionPercentage: number;
     /** Commission percentage for resolver */
     commissionPercentage: number;
+    /** Slash ratio applied to resolver commission on invalidation */
+    creatorSlashRatioPercentage: number;
     /** Game details JSON bytes */
     gameDetailsBytes: Uint8Array;
     /** Participation token ID bytes (empty if ERG mode) */
@@ -99,9 +104,14 @@ export function estimateTotalBoxSizeFromInputs(
         participationFeeAmount,
         perJudgeCommissionPercentage,
         commissionPercentage,
+        creatorSlashRatioPercentage,
         gameDetailsBytes,
         participationTokenIdBytes
     } = inputs;
+    const devScriptBytes = hexToBytes(DEV_SCRIPT) ?? new Uint8Array(0);
+    const devCommission = BigInt(
+        Math.round((DEV_COMMISSION_PERCENTAGE / 100) * getGameConstants().COMMISSION_DENOMINATOR)
+    );
 
     // Whether this is a token game or ERG game
     const isTokenGame = participationTokenIdBytes.length > 0;
@@ -118,9 +128,11 @@ export function estimateTotalBoxSizeFromInputs(
         resolverStakeAmount,
         participationFeeAmount,
         BigInt(perJudgeCommissionPercentage),
-        BigInt(commissionPercentage)
+        BigInt(commissionPercentage),
+        devCommission,
+        BigInt(creatorSlashRatioPercentage)
     ]).toHex();
-    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes]).toHex();
+    const r9Hex = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes, devScriptBytes]).toHex();
 
     const activeRegisters = {
         R4: r4Hex,
@@ -184,8 +196,8 @@ export function estimateTotalBoxSizeFromInputs(
         // Resolution R7: Judges (worst case: all judges participate)
         const resR7 = r7Hex;
 
-        // Resolution R8: Config (6 elements in resolution vs 5 in active)
-        // [deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
+        // Resolution R8: numericalParameters
+        // [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline]
         const resR8 = SColl(SLong, [
             0n, // Dummy createdAt
             0n, // Dummy timeWeight
@@ -194,13 +206,15 @@ export function estimateTotalBoxSizeFromInputs(
             participationFeeAmount,
             BigInt(perJudgeCommissionPercentage),
             BigInt(commissionPercentage),
+            devCommission,
+            BigInt(creatorSlashRatioPercentage),
             BigInt(deadlineBlock + 1000) // Dummy resolutionDeadline
         ]).toHex();
 
-        // Resolution R9: [GameDetails, TokenId, ResolverErgoTree]
+        // Resolution R9: [GameDetails, TokenId, devScript, ResolverErgoTree]
         // ResolverErgoTree is approximately 100 bytes
         const dummyResolverErgoTree = new Uint8Array(100).fill(0);
-        const resR9 = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes, dummyResolverErgoTree]).toHex();
+        const resR9 = SColl(SColl(SByte), [gameDetailsBytes, participationTokenIdBytes, devScriptBytes, dummyResolverErgoTree]).toHex();
 
         const resolutionRegisters = {
             R4: resR4,
@@ -320,6 +334,7 @@ export function estimateTotalBoxSize(
         participationFeeAmount: BigInt(100000),
         perJudgeCommissionPercentage: 5,
         commissionPercentage: 10,
+        creatorSlashRatioPercentage: getGameConstants().COMMISSION_DENOMINATOR,
         gameDetailsBytes: jsonBytes,
         participationTokenIdBytes: tokenIdBytes
     };

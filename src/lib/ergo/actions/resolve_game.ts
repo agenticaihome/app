@@ -203,6 +203,7 @@ export async function resolve_game(
         game.perJudgeCommission,
         BigInt(game.resolverCommission),
         BigInt(game.devCommission),
+        BigInt(game.creatorSlashRatio),
         resolutionDeadline
     ];
 

@@ -16,6 +16,7 @@ export interface CreateGoPGamePlatformParams {
     resolverStakeAmount: BigInt;
     participationFeeAmount: BigInt;
     commissionPercentage: number;
+    creatorSlashRatioPercentage: number;
     gameDetailsJson: string; // String JSON con título, descripción, etc.
 }
 

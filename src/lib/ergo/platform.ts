@@ -41,6 +41,7 @@ interface CreateGoPGamePlatformParams {
     resolverStakeAmount: bigint | BigInt;
     participationFeeAmount: bigint | BigInt;
     commissionPercentage: number;
+    creatorSlashRatioPercentage: number;
     judges: string[];
     gameDetailsJson: string; // JSON string with title, description, serviceId, etc.
     perJudgeCommissionPercentage: number;
@@ -134,6 +135,7 @@ export class ErgoPlatform implements Platform {
                 params.resolverStakeAmount as bigint,
                 params.participationFeeAmount as bigint,
                 params.commissionPercentage,
+                params.creatorSlashRatioPercentage,
                 params.judges,
                 params.gameDetailsJson,
                 params.perJudgeCommissionPercentage,

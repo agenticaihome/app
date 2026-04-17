@@ -10,12 +10,15 @@ import { SByte, SColl, SInt, SLong, SPair } from "@fleet-sdk/serializer";
 import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { prependHexPrefix } from "$lib/utils";
-import { DefaultGameConstants } from "$lib/common/constants";
+import { DefaultGameConstants, getGameConstants } from "$lib/common/constants";
 import { getGopGameActiveErgoTree, getGopParticipationErgoTree } from "$lib/ergo/contract";
+import { DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
 import { hexToBytes } from "$lib/ergo/utils";
 
 
 const GRACE_PERIOD = DefaultGameConstants.PARTICIPATION_GRACE_PERIOD;
+const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
+const CREATOR_SLASH_RATIO = BigInt(COMMISSION_DENOMINATOR);
 
 const ERG_BASE_TOKEN = "";
 const ERG_BASE_TOKEN_NAME = "ERG";
@@ -96,13 +99,15 @@ describe.each(baseModes)("Participant Reclaim After Grace Period - (%s)", (mode)
           resolverStake,
           participationFee,
           500n,  // 5.00% comisión por juez
-          1000n  // 10.00% comisión del creador
+          1000n, // 10.00% comisión del resolvedor
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+          CREATOR_SLASH_RATIO
         ]).toHex(),
-        // R9: [gameDetailsJsonHex, ParticipationTokenID, creatorErgoTree]
+        // R9: [gameDetailsJsonHex, ParticipationTokenID, devScript]
         R9: SColl(SColl(SByte), [
           stringToBytes("utf8", "{}"),
           hexToBytes(mode.token) ?? new Uint8Array(0),
-          prependHexPrefix(creator.address.getPublicKeys()[0], "0008cd")
+          hexToBytes(DEV_SCRIPT) ?? new Uint8Array(0)
         ]).toHex()
       },
     });

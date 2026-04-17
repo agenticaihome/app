@@ -274,9 +274,9 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             catch (e) { console.warn(`Could not JSON.parse R8 for ${box.boxId}: ${r8RenderedValue}`); }
         } else if (Array.isArray(r8RenderedValue)) { parsedR8Array = r8RenderedValue; }
         const numericalParams = parseLongColl(parsedR8Array);
-        // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission]
-        if (!numericalParams || numericalParams.length < 8) throw new Error("R8 does not contain the 8 expected numerical parameters.");
-        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission] = numericalParams;
+        // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio]
+        if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio] = numericalParams;
 
         if (!await fetch_conditions(gameId, Number(createdAt), Number(deadlineBlock))) {
             console.warn(`parseGameActiveBox: Box ${box.boxId} failed validity conditions.`);
@@ -321,6 +321,7 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             constants: getGameConstants(),
             seed: seed,
             ceremonyDeadline: Number(deadlineBlock) - getGameConstants().PARTICIPATION_TIME_WINDOW,
+            creatorSlashRatio: Number(creatorSlashRatio),
         };
 
         gameActive.reputation = calculate_reputation(gameActive);
@@ -419,11 +420,11 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             .map(parseCollByteToHex)
             .filter((judge): judge is string => judge !== null && judge !== undefined);
 
-        // R8: Coll[Long] -> [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, resolutionDeadline]
+        // R8: Coll[Long] -> [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline]
         const r8Array = getArrayFromValue(box.additionalRegisters.R8?.renderedValue);
         const numericalParams = parseLongColl(r8Array);
-        if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
-        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, resolutionDeadline] = numericalParams;
+        if (!numericalParams || numericalParams.length < 10) throw new Error("R8 does not contain the 10 expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline] = numericalParams;
 
         if (!await fetch_conditions(gameId, Number(createdAt), Number(deadlineBlock))) {
             console.warn(`parseGameResolutionBox: Box ${box.boxId} failed validity conditions.`);
@@ -468,6 +469,7 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             timeWeight: timeWeight, // From R8
             resolverCommission: Number(resolverCommission), // Added from R8
             devCommission: Number(devCommission), // Added from R8
+            creatorSlashRatio: Number(creatorSlashRatio), // Added from R8
             devScript,
             constants: getGameConstants(),
             seed: seed, // Added from R5

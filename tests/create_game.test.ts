@@ -23,6 +23,7 @@ import { hexToBytes } from "$lib/ergo/utils";
 import { getGameConstants } from "$lib/common/constants";
 
 const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
+const CREATOR_SLASH_RATIO = BigInt(COMMISSION_DENOMINATOR);
 
 // --- Test Suite ---
 
@@ -126,7 +127,8 @@ describe.each(baseModes)("Game Creation (create_game) - (%s)", (mode) => {
       participationFee,
       50000n,
       100000n,
-      BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))
+      BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+      CREATOR_SLASH_RATIO
     ]).toHex();
     const r9Hex = SColl(SColl(SByte), [stringToBytes("utf8", gameDetailsJson), new Uint8Array(0), hexToBytes(DEV_SCRIPT)!]).toHex();
 

@@ -88,6 +88,7 @@ export interface GameActive {
     createdAt: number;
     devScript: string;
     devCommission: number;
+    creatorSlashRatio: number;
 }
 
 /**
@@ -116,6 +117,7 @@ export interface GameResolution {
     resolverCommission: number;
     devScript: string;
     devCommission: number;
+    creatorSlashRatio: number;
     content: GameContent;
     value: bigint;
     reputationOpinions: RPBox[];

@@ -20,6 +20,7 @@ import { DefaultGameConstants, getGameConstants } from "$lib/common/constants";
 import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from "$lib/ergo/envs";
 
 const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
+const CREATOR_SLASH_RATIO = BigInt(COMMISSION_DENOMINATOR);
 
 const ERG_BASE_TOKEN = "";
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
@@ -133,7 +134,8 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
           participationFee,
           perJudgeCommission,
           resolver_commission_percentage,
-          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR))
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+          CREATOR_SLASH_RATIO
         ]).toHex(),
 
         // R9: JSON Details
@@ -162,6 +164,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       perJudgeCommission,
       resolver_commission_percentage,
       BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+      CREATOR_SLASH_RATIO,
       resolutionDeadline
     ];
 
@@ -376,6 +379,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       perJudgeCommission,
       resolver_commission_percentage,
       BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+      CREATOR_SLASH_RATIO,
       resolutionDeadline
     ];
 
@@ -442,6 +446,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       perJudgeCommission,
       resolver_commission_percentage,
       BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+      CREATOR_SLASH_RATIO,
       resolutionDeadline
     ];
     const resolvedorPkBytes = creatorPkBytes;
@@ -544,6 +549,7 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
       perJudgeCommission,
       resolver_commission_percentage,
       BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+      CREATOR_SLASH_RATIO,
       resolutionDeadline
     ];
 

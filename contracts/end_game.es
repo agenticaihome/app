@@ -61,11 +61,7 @@
   val gameNftId = gameNft._1
 
   val box_value = { (box: Box) =>
-    if (participationTokenId.size == 0) {
-      box.value
-    } else {
-      box.tokens.filter { (token: (Coll[Byte], Long)) => token._1 == participationTokenId }.fold(0L, { (acc: Long, token: (Coll[Byte], Long)) => acc + token._2 })
-    }
+    box.tokens.filter { (token: (Coll[Byte], Long)) => token._1 == participationTokenId }.fold(0L, { (acc: Long, token: (Coll[Byte], Long)) => acc + token._2 })
   }
 
   val getScoreFromBox = { (box: Box) =>

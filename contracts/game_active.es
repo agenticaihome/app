@@ -212,7 +212,7 @@
               resolutionBox.R8[Coll[Long]].get(3) == resolverStake &&
               resolutionBox.R8[Coll[Long]].get(4) == participationFee &&
               resolutionBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
-              resolutionBox.R8[Coll[Long]].get(6) >= resolverCommissionPercentage &&
+              resolutionBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
               resolutionBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
               resolutionBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
               resolutionBox.R8[Coll[Long]].get(9) >= HEIGHT + JUDGE_PERIOD &&

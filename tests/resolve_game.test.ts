@@ -259,6 +259,58 @@ describe.each(baseModes)("Game Resolution (resolve_game) - (%s)", (mode) => {
     expect(executionResult).to.be.true;
   });
 
+  it("should deny the resolver to inflate their commission during resolution transition", () => {
+    const currentHeight = mockChain.height;
+    const inflatedResolverCommissionPercentage = resolver_commission_percentage + 25n;
+
+    const inflatedResolutionOutput = new OutputBuilder(
+      mode.token === ERG_BASE_TOKEN ? resolverStake : RECOMMENDED_MIN_FEE_VALUE,
+      gameResolutionContract.address
+    )
+      .addTokens([
+        { tokenId: gameNftId, amount: 1n },
+        ...(mode.token !== ERG_BASE_TOKEN ? [{ tokenId: mode.token, amount: resolverStake }] : [])
+      ])
+      .setAdditionalRegisters({
+        R4: SInt(1).toHex(),
+        R5: SColl(SByte, hexToBytes(seed)!).toHex(),
+        R6: SPair(SColl(SByte, secret), SColl(SByte, hexToBytes(winnerCandidateCommitment)!)).toHex(),
+        R7: SColl(SColl(SByte), []).toHex(),
+        R8: SColl(SLong, [
+          1n,
+          20n,
+          BigInt(deadlineBlock),
+          resolverStake,
+          participationFee,
+          perJudgeCommission,
+          inflatedResolverCommissionPercentage,
+          BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+          CREATOR_SLASH_RATIO,
+          resolutionDeadline
+        ]).toHex(),
+        R9: SColl(SColl(SByte), [
+          stringToBytes("utf8", "{}"),
+          hexToBytes(mode.token) ?? "",
+          hexToBytes(DEV_SCRIPT)!,
+          creator.address.getPublicKeys()[0]
+        ]).toHex()
+      });
+
+    const tx = new TransactionBuilder(currentHeight)
+      .from([
+        gameActiveContract.utxos.toArray()[0],
+        ...creator.utxos.toArray()])
+      .to([inflatedResolutionOutput])
+      .withDataFrom([participationContract.utxos.toArray()[0], creator.utxos.toArray()[creator.utxos.toArray().length - 1]])
+      .sendChangeTo(creator.address)
+      .payFee(RECOMMENDED_MIN_FEE_VALUE)
+      .build();
+
+    const executionResult = mockChain.execute(tx, { signers: [creator], throw: false });
+
+    expect(executionResult).to.be.false;
+  });
+
   it("should FAIL transition the game to the resolution phase if participation game nft id is wrong", () => {
     const currentHeight = mockChain.height;
 

@@ -287,6 +287,7 @@
             current_height.set(height);
 
             const types = await fetchTypeNfts();
+            // Only profiles that are self-defined as JUDGE
             const profiles = await fetchAllUserProfiles(
                 get(explorer_uri),
                 true,

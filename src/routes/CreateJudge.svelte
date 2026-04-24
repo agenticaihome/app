@@ -63,9 +63,10 @@
 
         try {
             const types = await fetchTypeNfts();
+            // All the user profiles.
             const profiles = await fetchAllUserProfiles(
                 get(explorer_uri),
-                true,
+                null,
                 [],
                 types,
             );

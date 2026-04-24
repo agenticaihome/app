@@ -119,7 +119,7 @@
     import { isDevMode } from "$lib/ergo/envs";
 
     // SOURCE APPLICATION IMPORTS
-    import { FileCard, FileSourceCreation } from "source-application";
+    import { FileCard, FileSourceCreation, HASH_ALGORITHM_IDS } from "source-application";
     import { fetchFileSourcesByHash } from "source-application";
 
     import {
@@ -8103,6 +8103,7 @@
                 source_explorer_url={$source_explorer_url}
                 onSourceAdded={handleFileSourceAdded}
                 hash={writable(modalFileHash)}
+                fixedHashFunctionId={HASH_ALGORITHM_IDS.blake2b256}
                 class="{$mode === 'dark'
                     ? 'bg-slate-900'
                     : 'bg-white'} border border-border rounded-lg shadow-xl w-full max-w-3xl mx-4 p-6"

@@ -6363,14 +6363,38 @@
                                         
                                         <!-- Step 3 -->
                                         <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
-                                            <div class="flex items-center gap-3 mb-2">
+                                            <div class="flex items-center gap-3 mb-3">
                                                 <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">3. Export Solver</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                If you have not exported your solver yet, do it now.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo export ${solverId_input} /route/`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> export {solverId_input} ./
+                                            </div>
+                                        </div>
+
+                                        <!-- Step 4 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <div class="p-2 bg-amber-500/10 rounded-lg text-amber-500">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
                                                 </div>
-                                                <h4 class="font-semibold text-lg">3. Upload Results</h4>
+                                                <h4 class="font-semibold text-lg">4. Upload Results</h4>
                                             </div>
                                             <p class="text-sm text-muted-foreground">
-                                                Once the execution completes, download the generated JSON file containing your results and proceed to the next step to upload it on the form.
+                                                Once execution and export are complete, upload the generated JSON file containing your results in the form below.
                                             </p>
                                         </div>
                                     </div>

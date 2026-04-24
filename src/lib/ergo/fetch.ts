@@ -29,7 +29,11 @@ import {
     getGopGameActiveTemplateHash,
     getGopEndGameTemplateHash,
     getGopParticipationBatchTemplateHash,
-    getGopMintIdtErgoTreeHex
+    getGopMintIdtErgoTreeHex,
+    getGopFalseScriptHash,
+    getReputationProofScriptHash,
+    getReputationProofTemplateHash,
+    getGopFalseTemplateHash
 } from "./contract"; // Assumes this file exports functions to get script hashes
 import {
     hexToUtf8,
@@ -957,7 +961,35 @@ export async function fetchGameHistory(gameId: string): Promise<AnyGame[]> {
 
 
 export async function fetchSolverIdBox(solverId: string): Promise<Box<Amount> | null> {
-    const url = `${get(explorer_uri)}/api/v1/boxes/unspent/search`;
+    const normalizedSolverId = solverId.trim();
+    if (!normalizedSolverId) return null;
+
+    const url = `${get(explorer_uri)}/api/v1/boxes/search`;
+    // TODO A problem here is that standard explorer requires ergoTreeTemplateHash for searching, so we can't search any box on the blockchain.
+
+    // Check on Reputation proof boxes.
+
+    const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ergoTreeTemplateHash: getReputationProofTemplateHash(),
+                        registers: {
+                            R5: normalizedSolverId,
+                        },
+                    }),
+                });
+                
+    if (response.ok) {
+        const data = await response.json();
+        const items = data.items || [];
+        if (items.length > 0) {
+            return items[0] as Box<Amount>;
+        }
+    }
+
+    // Check on False boxes.
+
     const registerKeys = ["R4", "R5", "R6", "R7", "R8", "R9"] as const;
     try {
         const responses = await Promise.all(
@@ -966,8 +998,9 @@ export async function fetchSolverIdBox(solverId: string): Promise<Box<Amount> | 
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
+                        ergoTreeTemplateHash: getGopFalseTemplateHash(),
                         registers: {
-                            [registerKey]: solverId,
+                            [registerKey]: normalizedSolverId,
                         },
                     }),
                 });

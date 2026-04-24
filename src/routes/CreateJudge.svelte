@@ -175,7 +175,7 @@
 
                 tx = await create_profile(
                     get(explorer_uri),
-                    1, // total_supply for a judge profile (usually 1 for a unique profile)
+                    99999999,  // max number of opinions.
                     JUDGE,
                     null, // content
                     burned_amount,

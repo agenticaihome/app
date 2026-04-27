@@ -812,7 +812,7 @@
         const gameDetails = JSON.stringify({
             title: gameTitle,
             description: gameDescription,
-            imageURL: gameImageHash,
+            image: gameImageHash,
             creatorTokenId: creatorTokenId,
             serviceId: gameServiceId,
             paper: gamePaperHash,

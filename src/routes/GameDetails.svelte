@@ -3867,7 +3867,7 @@
                         </div>
 
                         <!-- FILE SOURCES SECTIONS -->
-                        {#if game.content.imageURL && game.content.imageURL.length === 64}
+                        {#if game.content.image && game.content.image.length === 64}
                             <div
                                 class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
                             >
@@ -3902,7 +3902,7 @@
                                             Community-verified download sources
                                             for the game image file (hash: <span
                                                 class="font-mono text-xs"
-                                                >{game.content.imageURL.slice(
+                                                >{game.content.image.slice(
                                                     0,
                                                     16,
                                                 )}...</span
@@ -3915,7 +3915,7 @@
                                                 size="sm"
                                                 on:click={() =>
                                                     openFileSourceModal(
-                                                        game.content.imageURL,
+                                                        game.content.image,
                                                         "image",
                                                     )}
                                                 class="w-full"
@@ -3937,7 +3937,7 @@
                                             <FileCard
                                                 class="bg-background border border-border rounded-lg shadow-xl w-full max-w-2xl mx-4 p-6"
                                                 profile={$reputation_proof}
-                                                fileHash={game.content.imageURL}
+                                                fileHash={game.content.image}
                                                 sources={imageSources}
                                                 explorerUri={$explorer_uri}
                                                 source_explorer_url={$source_explorer_url}

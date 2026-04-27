@@ -202,13 +202,19 @@ export function parseGameContent(
     if (rawJsonDetails) {
         try {
             const parsed = JSON.parse(rawJsonDetails);
+            const imageUrl =
+                typeof parsed.imageURL === "string" &&
+                parsed.imageURL &&
+                !/^[0-9a-fA-F]{64}$/.test(parsed.imageURL)
+                    ? parsed.imageURL
+                    : defaultImageUrl;
             content = {
                 ...content,
                 title: parsed.title || defaultTitle,
                 description: parsed.description || defaultDescription,
                 serviceId: parsed.serviceId || "",
                 image: parsed.image || undefined,
-                imageURL: defaultImageUrl,
+                imageURL: imageUrl,
                 creatorTokenId: parsed.creatorTokenId || undefined,
                 paper: parsed.paper || undefined,
                 soundtrack: parsed.soundtrack || undefined,

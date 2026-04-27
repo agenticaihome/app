@@ -405,7 +405,17 @@ export function resolve_participation_commitment(p: AnyParticipation, secretHex:
 
     // Look for the matching commitment
     for (const score of scoreList) {
+
         const scoreBytes = bigintToLongByteArray(score);
+
+        console.log("------------------------------");
+        console.log("SOLVER ID: ", uint8ArrayToHex(solverIdBytes));
+        console.log("SEED: ", uint8ArrayToHex(seedBytes));
+        console.log("SCORE: ", score, "->", uint8ArrayToHex(scoreBytes));
+        console.log("HASH LOGS: ", uint8ArrayToHex(hashLogsBytes));
+        console.log("ERGO TREE: ", uint8ArrayToHex(ergoTree));
+        console.log("SECRET S: ", uint8ArrayToHex(secretBytes));
+
         const dataToHash = new Uint8Array([
             ...solverIdBytes,
             ...seedBytes,
@@ -415,6 +425,11 @@ export function resolve_participation_commitment(p: AnyParticipation, secretHex:
             ...secretBytes,
         ]);
         const computedCommitment = uint8ArrayToHex(fleetBlake2b256(dataToHash));
+
+        console.log("Computed commitment: ", computedCommitment);
+        console.log("Expected commitment: ", commitmentHex);
+        console.log("Match: ", computedCommitment === commitmentHex);
+        console.log("------------------------------");
 
         if (computedCommitment === commitmentHex) {
             console.log("Matching commitment found");

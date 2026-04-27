@@ -1519,6 +1519,34 @@
 
     let isAutoFilling = false;
 
+    function sortKeysAlphabetically(value: unknown): unknown {
+        if (Array.isArray(value)) {
+            return value.map(sortKeysAlphabetically);
+        }
+
+        if (value && typeof value === "object") {
+            return Object.keys(value as Record<string, unknown>)
+                .sort((a, b) => a.localeCompare(b))
+                .reduce<Record<string, unknown>>((acc, key) => {
+                    acc[key] = sortKeysAlphabetically(
+                        (value as Record<string, unknown>)[key],
+                    );
+                    return acc;
+                }, {});
+        }
+
+        return value;
+    }
+
+    function stringifyForChecksum(data: Record<string, unknown>): string {
+        // To calculate the checksum, the checksum field is removed from the JSON,
+        // the keys of the resulting object are reordered alphabetically,
+        // and its exact representation is obtained using JSON.stringify(...).
+        // A SHA-256 hash is calculated over that string,
+        // and its hexadecimal value is stored in the checksum field.
+        return JSON.stringify(sortKeysAlphabetically(data));
+    }
+
     // Reactivity: Each time 'user_score' changes, we regenerate the rivals
     $: if (!isAutoFilling && user_score !== null && user_score !== undefined) {
         // Generate 6 random numbers between 0 and 100
@@ -2682,7 +2710,9 @@
                     if ("checksum" in jsonData && typeof jsonData.checksum === "string") {
                         const expectedChecksum = jsonData.checksum;
                         const { checksum: _, ...dataWithoutChecksum } = jsonData;
-                        const canonicalJson = JSON.stringify(dataWithoutChecksum);
+                        const canonicalJson = stringifyForChecksum(
+                            dataWithoutChecksum,
+                        );
                         const computedChecksum = await sha256(canonicalJson);
                         if (computedChecksum !== expectedChecksum) {
                             checksumStatus = 'invalid';

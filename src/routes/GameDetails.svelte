@@ -6454,21 +6454,35 @@
                                                 <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                                                 </div>
-                                                <h4 class="font-semibold text-lg">3. Export Solver</h4>
+                                                <h4 class="font-semibold text-lg">3. Publish your solver</h4>
                                             </div>
                                             <p class="text-sm text-muted-foreground mb-3">
-                                                If you have not exported your solver yet, do it now.
+                                                First publish your solver with <span class="font-mono text-foreground">nodo publish solver</span>. Before doing that, make sure you have already configured Nodo with <span class="font-mono text-foreground">nodo config</span>.
                                             </p>
                                             <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
                                                 <button
                                                     type="button"
                                                     class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() => navigator.clipboard.writeText(`nodo export ${solverId_input} /route/`)}
+                                                    on:click={() => navigator.clipboard.writeText(`nodo publish solver`)}
                                                     title="Copy command"
                                                 >
                                                     <Copy class="w-3.5 h-3.5" />
                                                 </button>
-                                                <span class="text-primary">nodo</span> export {solverId_input} ./
+                                                <span class="text-primary">nodo</span> publish solver
+                                            </div>
+                                            <p class="text-sm text-muted-foreground my-3">
+                                                If publishing is available, then export it to a file with:
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo export solver ./Desktop`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> export solver ./Desktop
                                             </div>
                                         </div>
 

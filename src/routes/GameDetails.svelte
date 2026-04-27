@@ -1349,6 +1349,12 @@
     let selectedSolverSources: any[] = [];
 
     let paperContent: string | null = null;
+    let paperContentStatus:
+        | "idle"
+        | "missing-sources"
+        | "loading"
+        | "ready"
+        | "fetch-error" = "idle";
     let isPaperExpanded = false;
     let paperToc: { level: number; text: string; id: string }[] = [];
     let soundtrackSources: any[] = [];
@@ -1360,12 +1366,20 @@
 
     $: audio_element.set(audioElement || null);
     $: botAssistantPaperUrl =
-        paperSources.find(
-            (source) =>
-                typeof source?.sourceUrl === "string" &&
-                source.sourceUrl.length > 0,
-        )?.sourceUrl ?? null;
+        paperSources.map(getPaperSourceUrl).find((url) => !!url) ?? null;
     $: botAssistantPrompt = buildBotAssistantPrompt(game, botAssistantPaperUrl);
+
+    function getPaperSourceUrl(source: any): string | null {
+        const rawUrl =
+            typeof source?.sourceUrl === "string"
+                ? source.sourceUrl
+                : typeof source?.source?.urlLink === "string"
+                  ? source.source.urlLink
+                  : "";
+
+        const normalizedUrl = rawUrl.trim();
+        return normalizedUrl.length > 0 ? normalizedUrl : null;
+    }
 
     function openFileSourceModal(
         hash: string,
@@ -1407,6 +1421,38 @@
         return parts.join("\n\n");
     }
 
+    async function loadPaperContentFromSources(sources: any[]) {
+        paperContent = null;
+        paperContentStatus = "idle";
+
+        const candidateUrls = sources
+            .map(getPaperSourceUrl)
+            .filter((url): url is string => !!url);
+
+        if (candidateUrls.length === 0) {
+            paperContentStatus = "missing-sources";
+            return;
+        }
+
+        paperContentStatus = "loading";
+
+        for (const url of candidateUrls) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) continue;
+
+                paperContent = await response.text();
+                paperContentStatus = "ready";
+                extractToc(paperContent);
+                return;
+            } catch (e) {
+                console.error("Error paper:", e);
+            }
+        }
+
+        paperContentStatus = "fetch-error";
+    }
+
     async function handleFileSourceAdded(txId: string) {
         console.log(`${modalFileType} source added:`, txId);
         closeFileSourceModal();
@@ -1427,6 +1473,7 @@
                     modalFileHash,
                     get(explorer_uri),
                 );
+                await loadPaperContentFromSources(paperSources);
             } else if (modalFileType === "soundtrack") {
                 soundtrackSources = await fetchFileSourcesByHash(
                     modalFileHash,
@@ -1864,17 +1911,10 @@
                     game.content.paper,
                     explorer,
                 );
-                if (paperSources.length > 0) {
-                    try {
-                        const response = await fetch(paperSources[0].sourceUrl);
-                        if (response.ok) {
-                            paperContent = await response.text();
-                            extractToc(paperContent);
-                        }
-                    } catch (e) {
-                        console.error("Error paper:", e);
-                    }
-                }
+                await loadPaperContentFromSources(paperSources);
+            } else {
+                paperContent = null;
+                paperContentStatus = "idle";
             }
 
             if (game.content.soundtrack) {
@@ -3416,6 +3456,34 @@
                                         </div>
                                     {/if}
                                 </div>
+                            {:else if game.content.paper && game.content.paper.length === 64}
+                                <div class="mt-8 border-t border-border pt-8">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <FileText
+                                            class="w-5 h-5 text-amber-500"
+                                        />
+                                        <h3 class="text-lg font-semibold">
+                                            Paper Content
+                                        </h3>
+                                    </div>
+
+                                    <p class="text-sm text-muted-foreground">
+                                        {#if paperContentStatus === "missing-sources"}
+                                            The game includes a paper hash, but
+                                            nobody has published a downloadable
+                                            source for it yet.
+                                        {:else if paperContentStatus === "fetch-error"}
+                                            The paper source exists, but its
+                                            content could not be loaded for
+                                            inline inspection.
+                                        {:else if paperContentStatus === "loading"}
+                                            Loading paper content...
+                                        {:else}
+                                            Paper content is not available for
+                                            inline inspection yet.
+                                        {/if}
+                                    </p>
+                                </div>
                             {/if}
 
                             {#if soundtrackUrl}
@@ -4046,6 +4114,25 @@
                                                 webExplorerUriTkn={$web_explorer_uri_tkn}
                                             />
                                         </div>
+
+                                        {#if paperContentStatus === "missing-sources"}
+                                            <p
+                                                class="text-xs text-muted-foreground italic text-center py-2"
+                                            >
+                                                The paper hash exists, but no
+                                                downloadable source has been
+                                                published yet, so its content
+                                                cannot be inspected here.
+                                            </p>
+                                        {:else if paperContentStatus === "fetch-error"}
+                                            <p
+                                                class="text-xs text-muted-foreground italic text-center py-2"
+                                            >
+                                                A paper source was found, but
+                                                its markdown could not be loaded
+                                                for inline inspection.
+                                            </p>
+                                        {/if}
                                     </div>
                                 </details>
                             </div>

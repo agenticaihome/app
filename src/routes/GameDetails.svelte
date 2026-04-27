@@ -1486,6 +1486,7 @@
     // Form Inputs
     let commitmentC_input = "";
     let solverId_input = "";
+    let participationSolverId = "";
     let solverId_box_found = false;
     let solverId_checked = false;
     let solverId_check_loading = false;
@@ -1700,13 +1701,16 @@
             const box = await fetchSolverIdBox(solverId_input);
             if (box) {
                 solverId_box_found = true;
+                participationSolverId = solverId_input.trim();
             } else {
                 solverId_box_found = false;
+                participationSolverId = "";
                 solverId_check_error =
                     "Solver ID box not found. Please publish it first.";
             }
         } catch (e) {
             console.error("Error checking solver ID box:", e);
+            participationSolverId = "";
             solverId_check_error = "Error checking solver ID box.";
         } finally {
             solverId_check_loading = false;
@@ -2173,12 +2177,14 @@
         errorMessage = null;
         isSubmitting = true;
         try {
+            const solverIdToSubmit =
+                participationSolverId || solverId_input.trim();
             const parsedScores = scores_list.map((s) => BigInt(s));
             transactionId = await platform.submitScoreToGopGame(
                 game,
                 parsedScores,
                 commitmentC_input,
-                solverId_input,
+                solverIdToSubmit,
                 hashLogs_input,
             );
         } catch (e: any) {
@@ -2699,9 +2705,28 @@
                     if (
                         jsonData.solver_id &&
                         typeof jsonData.solver_id === "string"
-                    )
+                    ) {
+                        const uploadedSolverId = jsonData.solver_id.trim();
+                        if (
+                            participationSolverId &&
+                            uploadedSolverId !== participationSolverId.trim()
+                        ) {
+                            alert(
+                                "The uploaded JSON Solver ID does not match the on-chain verified Solver ID.",
+                            );
+                            jsonUploadError =
+                                "Uploaded Solver ID does not match the verified on-chain Solver ID.";
+                            commitmentC_input = "";
+                            hashLogs_input = "";
+                            judgeReferenceSeed_input = "";
+                            judgeReferenceScore_input = "";
+                            user_score = null;
+                            scores_list = [];
+                            target.value = "";
+                            return;
+                        }
                         solverId_input = jsonData.solver_id;
-                    else throw new Error("Missing 'solver_id'");
+                    } else throw new Error("Missing 'solver_id'");
                     if (
                         jsonData.hash_logs_hex &&
                         typeof jsonData.hash_logs_hex === "string"
@@ -6245,6 +6270,12 @@
                                                 <Input
                                                     id="solver_id_step"
                                                     bind:value={solverId_input}
+                                                    on:input={() => {
+                                                        solverId_box_found =
+                                                            false;
+                                                        participationSolverId =
+                                                            "";
+                                                    }}
                                                     placeholder="e.g., a1b2..."
                                                     class="font-mono"
                                                 />
@@ -6362,6 +6393,8 @@
                                         <Button
                                             on:click={() => {
                                                 if (solverId_box_found || get(isDevMode)) {
+                                                    participationSolverId =
+                                                        solverId_input.trim();
                                                     showSolverIdStep = false;
                                                     showExecutionStep = true;
                                                 } else {
@@ -6704,12 +6737,18 @@
                                             <Input
                                                 id="solverId"
                                                 type="text"
-                                                bind:value={solverId_input}
-                                                placeholder="e.g., my_solver.celaut.bee"
+                                                value={participationSolverId}
+                                                readonly
+                                                placeholder="Solver ID verified on-chain"
                                                 class="w-full {$mode === 'dark'
                                                     ? 'bg-slate-800/50 border-slate-700'
                                                     : 'bg-white border-gray-200'}"
                                             />
+                                            <p class="mt-1 text-xs text-muted-foreground">
+                                                This Solver ID comes from the
+                                                on-chain verification step and
+                                                cannot be edited here.
+                                            </p>
                                         </div>
 
                                         <!-- Hash Logs -->
@@ -6795,7 +6834,7 @@
                                                 on:click={handleSubmitScore}
                                                 disabled={isSubmitting ||
                                                     !commitmentC_input.trim() ||
-                                                    !solverId_input.trim() ||
+                                                    !participationSolverId.trim() ||
                                                     !hashLogs_input.trim() ||
                                                     scores_list.length === 0 ||
                                                     openCeremony}

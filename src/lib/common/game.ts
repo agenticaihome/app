@@ -3,6 +3,7 @@ import { SAFE_MIN_BOX_VALUE, type Amount, type Box } from "@fleet-sdk/core";
 import { type GameConstants } from "./constants";
 import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
 import { bigintToLongByteArray, hexToBytes, parseCollByteToHex, parseLongColl, uint8ArrayToHex } from "$lib/ergo/utils";
+import { findMatchingScoreForCommitment } from "$lib/common/commitment";
 import { fetch_token_details } from "$lib/ergo/fetch";
 import { type RPBox } from "reputation-system";
 import { DEV_SCRIPT, DEV_COMMISSION_PERCENTAGE } from "$lib/ergo/envs";
@@ -358,25 +359,17 @@ export function resolve_participation_commitment(p: AnyParticipation, secretHex:
         console.log("Seed: ", seed);
         return null;
     }
+
     const R = p.box.additionalRegisters as any;
 
-    // Parse registers safely
-    const ergoTree = hexToBytes(R.R4?.renderedValue || "");
+    // Extract register values
+    const ergoTreeHex = parseCollByteToHex(R.R4?.renderedValue);
     const commitmentHex = parseCollByteToHex(R.R5?.renderedValue);
     const solverIdHex = parseCollByteToHex(R.R7?.renderedValue);
     const hashLogsHex = parseCollByteToHex(R.R8?.renderedValue);
     const scoreListRaw = R.R9?.renderedValue;
-    const seedBytes = hexToBytes(seed)!;
 
-    console.log(`Participation Box ID: ${p.boxId}`);
-
-    // Check for required fields
-    if (!commitmentHex || !solverIdHex || !hashLogsHex || !ergoTree) {
-        console.log("Missing required register values");
-        return null;
-    }
-
-    // Try parsing the score list (R9)
+    // Parse score list
     let scoreList: bigint[] | null = null;
     if (typeof scoreListRaw === "string") {
         try {
@@ -388,56 +381,22 @@ export function resolve_participation_commitment(p: AnyParticipation, secretHex:
     } else if (Array.isArray(scoreListRaw)) {
         scoreList = parseLongColl(scoreListRaw);
     }
-    if (!scoreList?.length) {
-        console.log("Score list is empty");
-        return null;
+
+    const result = findMatchingScoreForCommitment({
+        declaredCommitmentHex: commitmentHex,
+        solverIdHex,
+        seedHex: seed,
+        scoreList,
+        hashLogsHex,
+        ergoTreeHex,
+        secretHex,
+    });
+
+    if (result.isValid) {
+        return result.matchedScore;
     }
 
-    // Convert hex values to bytes
-    const solverIdBytes = hexToBytes(solverIdHex);
-    const hashLogsBytes = hexToBytes(hashLogsHex);
-    const secretBytes = hexToBytes(secretHex);
-
-    if (!solverIdBytes || !hashLogsBytes || !secretBytes) {
-        console.log("Error converting hex values to bytes");
-        return null;
-    }
-
-    // Look for the matching commitment
-    for (const score of scoreList) {
-
-        const scoreBytes = bigintToLongByteArray(score);
-
-        console.log("------------------------------");
-        console.log("SOLVER ID: ", uint8ArrayToHex(solverIdBytes));
-        console.log("SEED: ", uint8ArrayToHex(seedBytes));
-        console.log("SCORE: ", score, "->", uint8ArrayToHex(scoreBytes));
-        console.log("HASH LOGS: ", uint8ArrayToHex(hashLogsBytes));
-        console.log("ERGO TREE: ", uint8ArrayToHex(ergoTree));
-        console.log("SECRET S: ", uint8ArrayToHex(secretBytes));
-
-        const dataToHash = new Uint8Array([
-            ...solverIdBytes,
-            ...seedBytes,
-            ...scoreBytes,
-            ...hashLogsBytes,
-            ...ergoTree,
-            ...secretBytes,
-        ]);
-        const computedCommitment = uint8ArrayToHex(fleetBlake2b256(dataToHash));
-
-        console.log("Computed commitment: ", computedCommitment);
-        console.log("Expected commitment: ", commitmentHex);
-        console.log("Match: ", computedCommitment === commitmentHex);
-        console.log("------------------------------");
-
-        if (computedCommitment === commitmentHex) {
-            console.log("Matching commitment found");
-            return score;
-        }
-    }
-
-    console.log("No matching commitment found");
+    console.log("No matching commitment found", result.reason);
     return null;
 }
 

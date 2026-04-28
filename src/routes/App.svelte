@@ -27,6 +27,7 @@
     import { type AnyGame as Game } from "$lib/common/game";
     import Kya from "./kya.svelte";
     import Theme from "./Theme.svelte";
+    import Utils from "./utils/+page.svelte";
     import { get } from "svelte/store";
     import { slide, fade } from "svelte/transition";
     import CreateJudge from "./CreateJudge.svelte";
@@ -264,6 +265,8 @@
 
     $: if ($page.url.pathname === "/demo") {
         activeTab = "demo";
+    } else if ($page.url.pathname === "/utils") {
+        activeTab = "utils";
     } else if (activeTab === "demo" && $page.url.pathname !== "/demo") {
         activeTab = "participateGame";
     }
@@ -622,6 +625,11 @@
         {#if activeTab === "demo"}
             <div transition:fade={{ duration: 300 }}>
                 <Demo />
+            </div>
+        {/if}
+        {#if activeTab === "utils"}
+            <div transition:fade={{ duration: 300 }}>
+                <Utils />
             </div>
         {/if}
     {:else if $game_detail !== null}

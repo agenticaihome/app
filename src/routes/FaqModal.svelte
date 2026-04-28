@@ -283,7 +283,7 @@
     FAQ
 </span>
 
-<Dialog.Root bind:open={showModal}>
+<Dialog.Root bind:open={showModal} preventScroll>
     <Dialog.Content class="faq-dialog w-[min(92vw,860px)] max-w-[860px] p-0">
         <div class="faq-shell">
             <Dialog.Header class="faq-header">

@@ -55,6 +55,7 @@
         fetchFileSourcesByHash,
         HASH_ALGORITHM_IDS,
     } from "source-application";
+    import BodyScrollLock from "$lib/components/BodyScrollLock.svelte";
     import { fetchJudges } from "$lib/ergo/reputation/fetch";
 
     import { getGameConstants } from "$lib/common/constants";
@@ -2929,6 +2930,7 @@
                 tabindex="0"
                 aria-label="Close modal"
             >
+                <BodyScrollLock />
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <div
                     class="bg-background border border-border rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden"
@@ -2967,6 +2969,7 @@
                 tabindex="0"
                 aria-label="Close modal"
             >
+                <BodyScrollLock />
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <div
                     class="bg-background border border-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200"

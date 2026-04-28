@@ -64,7 +64,7 @@
   KYA
 </span>
 
-<Dialog.Root bind:open={showModal}>
+<Dialog.Root bind:open={showModal} preventScroll>
   <Dialog.Content class="w-[700px] max-w-[85vw] sm:max-w-[70vw]">
     <Dialog.Header>
       <Dialog.Title>{title}</Dialog.Title>

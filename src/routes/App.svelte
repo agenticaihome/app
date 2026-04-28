@@ -706,7 +706,7 @@
     </div>
 </footer>
 
-<Dialog.Root bind:open={showDevModeInviteModal}>
+<Dialog.Root bind:open={showDevModeInviteModal} preventScroll>
     <Dialog.Content class="w-[560px] max-w-[92vw]">
         <Dialog.Header>
             <Dialog.Title>Want to explore the full system?</Dialog.Title>

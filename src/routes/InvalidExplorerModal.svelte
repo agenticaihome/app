@@ -5,6 +5,7 @@
     import { web_explorer_uri, detectExplorerSuffixes } from "$lib/ergo/envs";
     import { createEventDispatcher } from "svelte";
     import { AlertTriangle, Loader2 } from "lucide-svelte";
+    import BodyScrollLock from "$lib/components/BodyScrollLock.svelte";
 
     const dispatch = createEventDispatcher();
 
@@ -44,6 +45,7 @@
 <div
     class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
 >
+    <BodyScrollLock />
     <div
         class="bg-background border border-destructive/50 rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in duration-200"
     >

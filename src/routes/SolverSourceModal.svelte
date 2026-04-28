@@ -16,7 +16,7 @@
     }
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open preventScroll>
     <Dialog.Content class="sm:max-w-[700px] lg:max-w-[1000px]">
         <Dialog.Header>
             <Dialog.Title>Solver Source</Dialog.Title>

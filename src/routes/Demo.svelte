@@ -35,6 +35,7 @@
     import { format, formatDistanceToNow } from "date-fns";
     import { mode } from "mode-watcher";
     import { onMount } from "svelte";
+    import BodyScrollLock from "$lib/components/BodyScrollLock.svelte";
 
     // Mock Data Generators
     const randomHex = (length: number) =>
@@ -982,6 +983,7 @@
             on:click|self={() => (showAddParticipationModal = false)}
             role="presentation"
         >
+            <BodyScrollLock />
             <div
                 class="modal-content {$mode === 'dark'
                     ? 'bg-slate-800 text-gray-200 border border-slate-700'
@@ -1166,6 +1168,7 @@
             class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
             on:click={() => (showResolveModal = false)}
         >
+            <BodyScrollLock />
             <div
                 class="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden modal-content"
                 on:click|stopPropagation

@@ -20,6 +20,7 @@
     import { X, RotateCcw, Loader2 } from "lucide-svelte";
     import { createEventDispatcher } from "svelte";
     import { user_volume } from "$lib/common/store";
+    import BodyScrollLock from "$lib/components/BodyScrollLock.svelte";
 
     const dispatch = createEventDispatcher();
 
@@ -49,6 +50,7 @@
     role="dialog"
     aria-modal="true"
 >
+    <BodyScrollLock />
     <div
         class="bg-background border border-border rounded-xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200"
     >

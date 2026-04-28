@@ -89,7 +89,7 @@
     }
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open preventScroll>
     <Dialog.Content class="sm:max-w-[500px]">
         <Dialog.Header>
             <Dialog.Title class="flex items-center gap-2">

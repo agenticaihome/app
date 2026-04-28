@@ -49,6 +49,7 @@
     import { remove_opinion } from "reputation-system";
     // UI COMPONENTS
     import { Button, buttonVariants } from "$lib/components/ui/button";
+    import BodyScrollLock from "$lib/components/BodyScrollLock.svelte";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label/index.js";
     import {
@@ -6004,6 +6005,7 @@
                 on:click|self={closeModal}
                 role="presentation"
             >
+                <BodyScrollLock />
                 <div
                     class="modal-content {$mode === 'dark'
                         ? 'bg-slate-800 text-gray-200 border border-slate-700'
@@ -7926,6 +7928,7 @@
                             on:click|self={() => (showBotAssistantModal = false)}
                             role="presentation"
                         >
+                            <BodyScrollLock />
                             <div
                                 class="w-full max-w-3xl rounded-xl border shadow-2xl p-5 md:p-6 max-h-[85vh] overflow-y-auto {$mode === 'dark'
                                     ? 'bg-slate-900/95 text-gray-100 border-slate-700'
@@ -7974,6 +7977,7 @@
                                 (showRobotDevelopmentGuideModal = false)}
                             role="presentation"
                         >
+                            <BodyScrollLock />
                             <div
                                 class="w-full max-w-6xl xl:max-w-7xl rounded-xl border shadow-2xl p-0 max-h-[92vh] overflow-hidden flex flex-col {$mode === 'dark'
                                     ? 'bg-slate-900/95 text-gray-100 border-slate-700'
@@ -8224,6 +8228,7 @@
         on:click|self={closeDidacticModal}
         role="presentation"
     >
+        <BodyScrollLock />
         <div
             class="modal-content {$mode === 'dark'
                 ? 'bg-slate-800 text-gray-200 border border-slate-700'
@@ -8288,6 +8293,7 @@
         role="button"
         tabindex="0"
     >
+        <BodyScrollLock />
         <!-- svelte-ignore a11y-no-static-element-interactions -->
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div on:click|stopPropagation>

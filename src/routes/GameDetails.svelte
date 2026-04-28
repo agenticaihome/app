@@ -1495,6 +1495,7 @@
     let hashLogs_input = "";
     let judgeReferenceSeed_input = "";
     let judgeReferenceScore_input = "";
+    let judgeReferenceErgoTree_input = "";
     let user_score: number | null = null;
     let scores_list: number[] = [];
     let secret_S_input_resolve = "";
@@ -1508,6 +1509,9 @@
             walletErgoTreeHex = typeof ergoAddr.ergoTree === "string" 
                 ? ergoAddr.ergoTree 
                 : uint8ArrayToHex(ergoAddr.ergoTree);
+            if (!judgeReferenceErgoTree_input) {
+                judgeReferenceErgoTree_input = walletErgoTreeHex;
+            }
             sha256(game.seed + walletErgoTreeHex).then(res => {
                 participationChecksum = res;
             });
@@ -2669,7 +2673,9 @@
                 seed_hex: judgeReferenceSeed_input.trim() || game.seed,
                 score: referenceScore,
                 hashLogs_hex: hashLogs_input.trim(),
-                ergoTree_hex: walletErgoTreeHex.trim(),
+                ergoTree_hex:
+                    judgeReferenceErgoTree_input.trim() ||
+                    walletErgoTreeHex.trim(),
             });
         } catch (e: any) {
             setTransactionError(e, {
@@ -2723,6 +2729,7 @@
                             hashLogs_input = "";
                             judgeReferenceSeed_input = "";
                             judgeReferenceScore_input = "";
+                            judgeReferenceErgoTree_input = walletErgoTreeHex;
                             user_score = null;
                             scores_list = [];
                             target.value = "";
@@ -2751,6 +2758,7 @@
                             hashLogs_input = "";
                             judgeReferenceSeed_input = "";
                             judgeReferenceScore_input = "";
+                            judgeReferenceErgoTree_input = walletErgoTreeHex;
                             user_score = null;
                             scores_list = [];
                             target.value = "";
@@ -2782,6 +2790,21 @@
                         judgeReferenceSeed_input = jsonData.seed;
                     }
                     if (
+                        jsonData.pbox_ergotree &&
+                        typeof jsonData.pbox_ergotree === "string"
+                    ) {
+                        judgeReferenceErgoTree_input =
+                            jsonData.pbox_ergotree;
+                    } else if (
+                        jsonData.ergoTree_hex &&
+                        typeof jsonData.ergoTree_hex === "string"
+                    ) {
+                        judgeReferenceErgoTree_input =
+                            jsonData.ergoTree_hex;
+                    } else {
+                        judgeReferenceErgoTree_input = walletErgoTreeHex;
+                    }
+                    if (
                         jsonData.score_list &&
                         Array.isArray(jsonData.score_list) &&
                         jsonData.score_list.every(
@@ -2805,6 +2828,7 @@
                     hashLogs_input = "";
                     judgeReferenceSeed_input = "";
                     judgeReferenceScore_input = "";
+                    judgeReferenceErgoTree_input = walletErgoTreeHex;
                     user_score = null;
                     scores_list = [];
                 }

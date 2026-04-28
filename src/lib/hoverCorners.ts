@@ -220,6 +220,9 @@ export function hoverCorners(
 
 	return {
 		destroy() {
+			// If the hovered node is removed from the DOM while active, we still
+			// need to restore the global custom cursor state.
+			onLeave();
 			node.removeEventListener('mouseenter', onEnter);
 			node.removeEventListener('mouseleave', onLeave);
 			node.removeEventListener('mousemove', onMove);

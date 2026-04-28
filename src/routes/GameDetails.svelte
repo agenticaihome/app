@@ -2795,7 +2795,7 @@
                         );
                         if (scores_list.length > 0) {
                             user_score = scores_list[0];
-                            judgeReferenceScore_input = String(scores_list[0]);
+                            judgeReferenceScore_input = scores_list.length === 1 ? String(scores_list[0]) : "";
                         }
                     } else throw new Error("Missing or invalid 'score_list'");
                 } catch (e: any) {

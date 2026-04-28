@@ -354,7 +354,8 @@
                 {/if}
             </div>
 
-            <div class="status-filter">
+            <!-- Status filter (hidden for now because does not work) -->
+            <div class="status-filter" hidden>
                 <label for="status-select" class="sr-only"
                     >Filter by status</label
                 >

@@ -271,13 +271,9 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             .split(",").filter((e: string) => e.length === 64);
 
         // R8: numericalParameters
-        const r8RenderedValue = box.additionalRegisters.R8?.renderedValue;
-        let parsedR8Array: any[] | null = null;
-        if (typeof r8RenderedValue === 'string') {
-            try { parsedR8Array = JSON.parse(r8RenderedValue); }
-            catch (e) { console.warn(`Could not JSON.parse R8 for ${box.boxId}: ${r8RenderedValue}`); }
-        } else if (Array.isArray(r8RenderedValue)) { parsedR8Array = r8RenderedValue; }
-        const numericalParams = parseLongColl(parsedR8Array);
+        // Use getArrayFromValue for robustness (handles rendered strings like '[1,2,3]' or bare lists)
+        const r8Array = getArrayFromValue(box.additionalRegisters.R8?.renderedValue);
+        const numericalParams = parseLongColl(r8Array);
         // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio]
         if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
         const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio] = numericalParams;

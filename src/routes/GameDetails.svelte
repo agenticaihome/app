@@ -1498,6 +1498,10 @@
     let judgeReferenceErgoTree_input = "";
     let user_score: number | null = null;
     let scores_list: number[] = [];
+    // Inline score picker state (replaces window.prompt)
+    let showScorePicker = false;
+    let scorePickerOptions: number[] = [];
+    let scorePickerSelection: number | null = null;
     let secret_S_input_resolve = "";
     let secret_S_input_cancel = "";
     let walletErgoTreeHex = "";
@@ -2826,46 +2830,25 @@
                         scores_list = jsonData.score_list.map((s: any) => Number(s));
                         if (scores_list.length > 0) {
 
-                            // If we're in the judge nomination flow, ask user to pick the real score
-                            if (currentActionType === "accept_judge_nomination") {
-                                let chosen: number | null = null;
-                                if (scores_list.length === 1) {
-                                    chosen = scores_list[0];
-                                } else if (typeof window !== 'undefined') {
-                                    try {
-                                        const listStr = scores_list
-                                            .map((s, i) => `${i}: ${s}`)
-                                            .join('\n');
-                                        const promptMsg = `Se ha cargado una lista de puntuaciones:\n${listStr}\n\nIntroduce el índice (ej. 0) o el valor del score real. Deja vacío para rellenarlo manualmente.`;
-                                        const resp = window.prompt(promptMsg, "");
-                                        if (resp !== null && resp.trim() !== "") {
-                                            const t = resp.trim();
-                                            const idx = parseInt(t, 10);
-                                            if (!Number.isNaN(idx) && idx >= 0 && idx < scores_list.length) {
-                                                chosen = scores_list[idx];
-                                            } else {
-                                                const num = Number(t);
-                                                if (!Number.isNaN(num)) chosen = num;
-                                            }
-                                        }
-                                    } catch (e) {
-                                        // ignore prompt errors
+                            // If we're in the judge nomination flow, show an inline picker instead of a browser prompt
+                                if (currentActionType === "accept_judge_nomination") {
+                                    if (scores_list.length === 1) {
+                                        judgeReferenceScore_input = String(Math.trunc(scores_list[0]));
+                                    } else {
+                                        // Show the inline score picker UI in the modal (English)
+                                        showScorePicker = true;
+                                        scorePickerOptions = [...scores_list];
+                                        scorePickerSelection = null;
+                                        // leave judgeReferenceScore_input empty so user can confirm a selection
+                                        judgeReferenceScore_input = "";
                                     }
-                                }
-
-                                if (chosen !== null) {
-                                    judgeReferenceScore_input = String(Math.trunc(chosen));
                                 } else {
-                                    // leave empty so user can fill via the number input
-                                    judgeReferenceScore_input = "";
+                                    // Participant flow: store the whole list (as JSON if multiple)
+                                    if (scores_list.length === 1) {
+                                        user_score = Number(scores_list[0]);
+                                    }
+                                    scores_list = scores_list;
                                 }
-                            } else {
-                                // Participant flow: store the whole list (as JSON if multiple)
-                                if (scores_list.length === 1) {
-                                    user_score = Number(scores_list[0]);
-                                }
-                                scores_list = scores_list;
-                            }
                         }
                     } else throw new Error("Missing or invalid 'score_list'");
                 } catch (e: any) {
@@ -2955,6 +2938,27 @@
         showRobotDevelopmentGuideModal = false;
         showActionModal = false;
         currentActionType = null;
+        // Ensure inline score picker is reset when closing modal
+        showScorePicker = false;
+        scorePickerOptions = [];
+        scorePickerSelection = null;
+    }
+
+    function confirmScorePicker() {
+        if (scorePickerSelection !== null) {
+            judgeReferenceScore_input = String(Math.trunc(scorePickerSelection));
+        }
+        showScorePicker = false;
+        scorePickerOptions = [];
+        scorePickerSelection = null;
+    }
+
+    function cancelScorePicker() {
+        showScorePicker = false;
+        scorePickerOptions = [];
+        scorePickerSelection = null;
+        // leave judgeReferenceScore_input empty so user can fill manually
+        judgeReferenceScore_input = "";
     }
 
     async function openRobotDevelopmentGuide() {
@@ -7914,9 +7918,33 @@
                                             type="number"
                                             step="1"
                                             bind:value={judgeReferenceScore_input}
-                                            placeholder="Ej. 98"
+                                            placeholder="e.g. 98"
                                         />
                                     </div>
+
+                                    {#if showScorePicker}
+                                        <div class="p-3 rounded-md border mt-3 {$mode === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-gray-50 border-gray-200'}">
+                                            <p class="font-semibold mb-1">Choose the real score from the uploaded list</p>
+                                            <p class="text-sm text-muted-foreground mb-3">Select one of the scores below or cancel to fill the score manually.</p>
+                                            <div class="space-y-2 max-h-40 overflow-auto">
+                                                {#each scorePickerOptions as s, i}
+                                                    <label class="flex items-center gap-3 text-sm">
+                                                        <input
+                                                            type="radio"
+                                                            name="scorePicker"
+                                                            on:change={() => (scorePickerSelection = s)}
+                                                            checked={scorePickerSelection === s}
+                                                        />
+                                                        <span class="font-mono">{i}: {s}</span>
+                                                    </label>
+                                                {/each}
+                                            </div>
+                                            <div class="flex gap-2 mt-3">
+                                                <Button on:click={confirmScorePicker} disabled={scorePickerSelection === null}>Confirm</Button>
+                                                <Button variant="ghost" on:click={cancelScorePicker}>Cancel</Button>
+                                            </div>
+                                        </div>
+                                    {/if}
                                 </div>
 
                                 <Button

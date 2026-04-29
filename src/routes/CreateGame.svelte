@@ -162,8 +162,14 @@
     }
 
     // Time Factor (timeWeight) - affects how much early participation matters
+    let timeFactorSelected: { value: "zero" | "low" | "balanced" | "high" | "extreme"; label: string } = {
+        value: "zero",
+        label: "Zero (Only score matters)"
+    };
     let timeFactorOption: "zero" | "low" | "balanced" | "high" | "extreme" =
-        "zero";
+        timeFactorSelected.value;
+
+    $: timeFactorOption = timeFactorSelected?.value ?? "zero";
 
     let participationTokenId: string = "";
     let participationTokenDecimals: number = 9;
@@ -1988,7 +1994,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <Select bind:value={timeFactorOption}>
+                                    <Select bind:selected={timeFactorSelected}>
                                         <SelectTrigger
                                             id="timeFactorOption"
                                             class="cyber-select w-full text-sm"

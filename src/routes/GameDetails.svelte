@@ -2767,6 +2767,14 @@
                             return;
                         }
                         solverId_input = jsonData.solver_id;
+                        // After loading solver id, wait a tick so reactive reset runs,
+                        // then auto-check on-chain to detect existing solver box.
+                        try {
+                            await tick();
+                            await checkSolverIdBox();
+                        } catch (e) {
+                            console.warn("Auto checkSolverIdBox failed:", e);
+                        }
                     } else throw new Error("Missing 'solver_id'");
                     if (
                         jsonData.hash_logs_hex &&
@@ -6354,6 +6362,48 @@
                                             You need a unique Solver ID
                                             published on-chain to participate.
                                         </p>
+                                    </div>
+
+                                        <!-- JSON upload: allow uploading exported solver/participation data -->
+                                        <div class="mt-3 space-y-2">
+                                            <Label for="solver_json_upload">Upload exported solver (.json)</Label>
+                                            <input
+                                                id="solver_json_upload"
+                                                type="file"
+                                                accept="application/json"
+                                                on:change={handleJsonFileUpload}
+                                                class="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-muted/50"
+                                            />
+
+                                            {#if jsonUploadError}
+                                                <div class="p-2 rounded text-sm text-red-600">{jsonUploadError}</div>
+                                            {/if}
+
+                                            {#if checksumStatus === 'invalid'}
+                                                <div class="p-2 rounded text-sm text-red-600">Invalid checksum: file does not match.</div>
+                                            {:else if checksumStatus === 'valid'}
+                                                <div class="p-2 rounded text-sm text-green-600">Valid checksum: loaded data.</div>
+                                            {/if}
+                                        </div>
+                                                                        <!-- "Or Fill Manually" Divider -->
+                                    <div class="flex items-center my-2">
+                                        <span
+                                            class="flex-grow border-t {$mode ===
+                                            'dark'
+                                                ? 'border-slate-700'
+                                                : 'border-gray-300'}"
+                                        ></span><span
+                                            class="mx-3 text-xs uppercase {$mode ===
+                                            'dark'
+                                                ? 'text-slate-500'
+                                                : 'text-gray-500'}"
+                                            >Or Fill Manually</span
+                                        ><span
+                                            class="flex-grow border-t {$mode ===
+                                            'dark'
+                                                ? 'border-slate-700'
+                                                : 'border-gray-300'}"
+                                        ></span>
                                     </div>
 
                                     <div class="space-y-4">

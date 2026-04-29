@@ -422,7 +422,7 @@
                     <a
                         href="#"
                         on:click|preventDefault={() => changeTab("throne")}
-                        >Throne</a
+                        >The Throne</a
                     >
                 </li>
                 <li class:active={activeTab === "judges"}>

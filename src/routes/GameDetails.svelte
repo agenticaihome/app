@@ -6347,7 +6347,7 @@
                                             class="gap-2"
                                             on:click={() => {
                                                 showParticipantGuide = false;
-                                                showSolverIdStep = true;
+                                                showExecutionStep = true;
                                             }}
                                         >
                                             I have my Bot implemented
@@ -6360,17 +6360,22 @@
                                 >
                                     <div class="text-center mb-8">
                                         <h3 class="text-2xl font-bold mb-2">
-                                            Publish Solver ID
+                                            Verify Solver ID it's on-chain
                                         </h3>
                                         <p class="text-muted-foreground">
                                             You need a unique Solver ID
-                                            published on-chain to participate.
+                                            published on-chain before the deadline to participate.
                                         </p>
                                     </div>
 
-                                        <!-- JSON upload: allow uploading exported solver/participation data -->
+                                    <!-- If its open don't suggest user to upload their participation data, it's not the time -->
+                                    {#if !openCeremony}
+                                        <!-- JSON upload: allow uploading exported participation data -->
                                         <div class="mt-3 space-y-2">
-                                            <Label for="solver_json_upload">Upload exported solver (.json)</Label>
+                                            <Label for="solver_json_upload">Upload participation data (.json)</Label>
+                                            <p class="text-muted-foreground">
+                                                In case you have already executed the game service.
+                                            </p>
                                             <input
                                                 id="solver_json_upload"
                                                 type="file"
@@ -6389,26 +6394,27 @@
                                                 <div class="p-2 rounded text-sm text-green-600">Valid checksum: loaded data.</div>
                                             {/if}
                                         </div>
-                                                                        <!-- "Or Fill Manually" Divider -->
-                                    <div class="flex items-center my-2">
-                                        <span
-                                            class="flex-grow border-t {$mode ===
-                                            'dark'
-                                                ? 'border-slate-700'
-                                                : 'border-gray-300'}"
-                                        ></span><span
-                                            class="mx-3 text-xs uppercase {$mode ===
-                                            'dark'
-                                                ? 'text-slate-500'
-                                                : 'text-gray-500'}"
-                                            >Or Fill Manually</span
-                                        ><span
-                                            class="flex-grow border-t {$mode ===
-                                            'dark'
-                                                ? 'border-slate-700'
-                                                : 'border-gray-300'}"
-                                        ></span>
-                                    </div>
+                                                                            <!-- "Or Fill Manually" Divider -->
+                                        <div class="flex items-center my-2">
+                                            <span
+                                                class="flex-grow border-t {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-300'}"
+                                            ></span><span
+                                                class="mx-3 text-xs uppercase {$mode ===
+                                                'dark'
+                                                    ? 'text-slate-500'
+                                                    : 'text-gray-500'}"
+                                                >Or Fill Manually</span
+                                            ><span
+                                                class="flex-grow border-t {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-300'}"
+                                            ></span>
+                                        </div>
+                                    {/if}
 
                                     <div class="space-y-4">
                                         <div class="space-y-2">
@@ -6428,25 +6434,6 @@
                                                     placeholder="e.g., a1b2..."
                                                     class="font-mono"
                                                 />
-                                                {#if $isDevMode}
-                                                <Button
-                                                    variant="outline"
-                                                    on:click={() => {
-                                                        const randomBytes =
-                                                            new Uint8Array(32);
-                                                        window.crypto.getRandomValues(
-                                                            randomBytes,
-                                                        );
-                                                        solverId_input =
-                                                            uint8ArrayToHex(
-                                                                randomBytes,
-                                                            );
-                                                    }}
-                                                    title="Generate Random"
-                                                >
-                                                    <Wand2 class="h-4 w-4" />
-                                                </Button>
-                                                {/if}
                                             </div>
                                             <p
                                                 class="text-xs text-muted-foreground"
@@ -6534,7 +6521,7 @@
                                             variant="ghost"
                                             on:click={() => {
                                                 showSolverIdStep = false;
-                                                showParticipantGuide = true;
+                                                showExecutionStep = true;
                                             }}
                                         >
                                             Back
@@ -6545,7 +6532,6 @@
                                                     participationSolverId =
                                                         solverId_input.trim();
                                                     showSolverIdStep = false;
-                                                    showExecutionStep = true;
                                                 } else {
                                                     checkSolverIdBox().then(
                                                         () => {
@@ -6553,7 +6539,6 @@
                                                                 solverId_box_found
                                                             ) {
                                                                 showSolverIdStep = false;
-                                                                showExecutionStep = true;
                                                             }
                                                         },
                                                     );
@@ -6687,7 +6672,7 @@
                                             variant="ghost"
                                             on:click={() => {
                                                 showExecutionStep = false;
-                                                showSolverIdStep = true;
+                                                showParticipantGuide = true;
                                             }}
                                         >
                                             Back
@@ -6695,6 +6680,7 @@
                                         <Button
                                             on:click={() => {
                                                 showExecutionStep = false;
+                                                showSolverIdStep = true;
                                             }}
                                         >
                                             Continue <ArrowRight class="ml-2 h-4 w-4" />
@@ -6703,7 +6689,6 @@
                                 </div>
                             {:else}
                                 <div class="space-y-6 max-w-3xl mx-auto">
-                                    <!-- (Back button moved to footer to match other modals) -->
 
                                     <!-- Ceremony Phase Warning -->
                                     {#if openCeremony}
@@ -7108,21 +7093,17 @@
                                             {/if}
                                         </div>
                                     {/if}
+
+                                    <Button
+                                        variant="ghost"
+                                        on:click={() => {
+                                            showSolverIdStep = true;
+                                        }}
+                                    >
+                                        Back
+                                    </Button>
                                 </div>
                             {/if}
-
-                            <!-- Footer: Back button (placed here to match other modals) -->
-                            <div class="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700 mt-4">
-                                <Button
-                                    variant="ghost"
-                                    on:click={() => {
-                                        showExecutionStep = true;
-                                    }}
-                                >
-                                    Back
-                                </Button>
-                                <div></div>
-                            </div>
 
                         {:else if currentActionType === "resolve_game"}
                             <div class="space-y-4">

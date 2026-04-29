@@ -6354,6 +6354,140 @@
                                         </Button>
                                     </div>
                                 </div>
+                            {:else if showExecutionStep}
+                                <div
+                                    class="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
+                                >
+                                    <div class="text-center mb-8">
+                                        <h3 class="text-2xl font-bold mb-2">
+                                            Game Service Execution
+                                        </h3>
+                                        <p class="text-muted-foreground">
+                                            Follow these instructions to run the game service and generate your participation data.
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="space-y-6">
+                                        <!-- Step 1 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">1. Download Game Service</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                Download the specific game service using Celaut Nodo.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo download ${serviceDownload}`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> download {serviceDownload}
+                                            </div>
+                                        </div>
+
+                                        <!-- Step 2 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-green-500/10 rounded-lg text-green-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">2. Execute Game Service</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                Run your participation. The checksum serves to validate the integrity of both the seed and your ErgoTree.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo execute ${game?.content.serviceId} -e seed ${game?.seed} -e ergotree ${walletErgoTreeHex} -e checksum ${participationChecksum}`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> execute {game?.content.serviceId} -e seed {game?.seed} -e ergotree {walletErgoTreeHex} -e checksum {participationChecksum}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Step 3 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">3. Publish your solver</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                First publish your solver with <span class="font-mono text-foreground">nodo publish solver</span>. Before doing that, make sure you have already configured Nodo with <span class="font-mono text-foreground">nodo config</span>.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo publish solver`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> publish solver
+                                            </div>
+                                            <p class="text-sm text-muted-foreground my-3">
+                                                If publishing is available, then export it to a file with:
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo export solver ./Desktop`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> export solver ./Desktop
+                                            </div>
+                                        </div>
+
+                                        <!-- Step 4 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <div class="p-2 bg-amber-500/10 rounded-lg text-amber-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">4. Upload Results</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground">
+                                                Once execution and export are complete, upload the generated JSON file containing your results in the form below.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+                                        <Button
+                                            variant="ghost"
+                                            on:click={() => {
+                                                showExecutionStep = false;
+                                                showParticipantGuide = true;
+                                            }}
+                                        >
+                                            Back
+                                        </Button>
+                                        <Button
+                                            on:click={() => {
+                                                showExecutionStep = false;
+                                                showSolverIdStep = true;
+                                            }}
+                                        >
+                                            Continue <ArrowRight class="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
                             {:else if showSolverIdStep}
                                 <div
                                     class="space-y-6 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
@@ -6550,140 +6684,6 @@
                                             Continue <ArrowRight
                                                 class="ml-2 h-4 w-4"
                                             />
-                                        </Button>
-                                    </div>
-                                </div>
-                            {:else if showExecutionStep}
-                                <div
-                                    class="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
-                                >
-                                    <div class="text-center mb-8">
-                                        <h3 class="text-2xl font-bold mb-2">
-                                            Game Service Execution
-                                        </h3>
-                                        <p class="text-muted-foreground">
-                                            Follow these instructions to run the game service and generate your participation data.
-                                        </p>
-                                    </div>
-                                    
-                                    <div class="space-y-6">
-                                        <!-- Step 1 -->
-                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
-                                            <div class="flex items-center gap-3 mb-3">
-                                                <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                                </div>
-                                                <h4 class="font-semibold text-lg">1. Download Game Service</h4>
-                                            </div>
-                                            <p class="text-sm text-muted-foreground mb-3">
-                                                Download the specific game service using Celaut Nodo.
-                                            </p>
-                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() => navigator.clipboard.writeText(`nodo download ${serviceDownload}`)}
-                                                    title="Copy command"
-                                                >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary">nodo</span> download {serviceDownload}
-                                            </div>
-                                        </div>
-
-                                        <!-- Step 2 -->
-                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
-                                            <div class="flex items-center gap-3 mb-3">
-                                                <div class="p-2 bg-green-500/10 rounded-lg text-green-500">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                                </div>
-                                                <h4 class="font-semibold text-lg">2. Execute Game Service</h4>
-                                            </div>
-                                            <p class="text-sm text-muted-foreground mb-3">
-                                                Run your participation. The checksum serves to validate the integrity of both the seed and your ErgoTree.
-                                            </p>
-                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() => navigator.clipboard.writeText(`nodo execute ${game?.content.serviceId} -e seed ${game?.seed} -e ergotree ${walletErgoTreeHex} -e checksum ${participationChecksum}`)}
-                                                    title="Copy command"
-                                                >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary">nodo</span> execute {game?.content.serviceId} -e seed {game?.seed} -e ergotree {walletErgoTreeHex} -e checksum {participationChecksum}
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Step 3 -->
-                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
-                                            <div class="flex items-center gap-3 mb-3">
-                                                <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                                                </div>
-                                                <h4 class="font-semibold text-lg">3. Publish your solver</h4>
-                                            </div>
-                                            <p class="text-sm text-muted-foreground mb-3">
-                                                First publish your solver with <span class="font-mono text-foreground">nodo publish solver</span>. Before doing that, make sure you have already configured Nodo with <span class="font-mono text-foreground">nodo config</span>.
-                                            </p>
-                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() => navigator.clipboard.writeText(`nodo publish solver`)}
-                                                    title="Copy command"
-                                                >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary">nodo</span> publish solver
-                                            </div>
-                                            <p class="text-sm text-muted-foreground my-3">
-                                                If publishing is available, then export it to a file with:
-                                            </p>
-                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() => navigator.clipboard.writeText(`nodo export solver ./Desktop`)}
-                                                    title="Copy command"
-                                                >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary">nodo</span> export solver ./Desktop
-                                            </div>
-                                        </div>
-
-                                        <!-- Step 4 -->
-                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
-                                            <div class="flex items-center gap-3 mb-2">
-                                                <div class="p-2 bg-amber-500/10 rounded-lg text-amber-500">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
-                                                </div>
-                                                <h4 class="font-semibold text-lg">4. Upload Results</h4>
-                                            </div>
-                                            <p class="text-sm text-muted-foreground">
-                                                Once execution and export are complete, upload the generated JSON file containing your results in the form below.
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
-                                        <Button
-                                            variant="ghost"
-                                            on:click={() => {
-                                                showExecutionStep = false;
-                                                showParticipantGuide = true;
-                                            }}
-                                        >
-                                            Back
-                                        </Button>
-                                        <Button
-                                            on:click={() => {
-                                                showExecutionStep = false;
-                                                showSolverIdStep = true;
-                                            }}
-                                        >
-                                            Continue <ArrowRight class="ml-2 h-4 w-4" />
                                         </Button>
                                     </div>
                                 </div>

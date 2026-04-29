@@ -6699,32 +6699,7 @@
                                 </div>
                             {:else}
                                 <div class="space-y-6 max-w-3xl mx-auto">
-                                    <!-- Back to Guide Button -->
-                                    <div class="flex justify-start">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            on:click={() =>
-                                                (showExecutionStep = true)}
-                                            class="gap-2"
-                                        >
-                                            <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="16"
-                                                height="16"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                ><path
-                                                    d="m15 18-6-6 6-6"
-                                                /></svg
-                                            >
-                                            Back
-                                        </Button>
-                                    </div>
+                                    <!-- (Back button moved to footer to match other modals) -->
 
                                     <!-- Ceremony Phase Warning -->
                                     {#if openCeremony}
@@ -7131,6 +7106,20 @@
                                     {/if}
                                 </div>
                             {/if}
+
+                            <!-- Footer: Back button (placed here to match other modals) -->
+                            <div class="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700 mt-4">
+                                <Button
+                                    variant="ghost"
+                                    on:click={() => {
+                                        showExecutionStep = true;
+                                    }}
+                                >
+                                    Back
+                                </Button>
+                                <div></div>
+                            </div>
+
                         {:else if currentActionType === "resolve_game"}
                             <div class="space-y-4">
                                 <div>

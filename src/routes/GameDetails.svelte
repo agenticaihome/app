@@ -2740,6 +2740,8 @@
                         checksumStatus = 'missing';
                     }
 
+                    // Capture secret if provided in the JSON (helps matching commitments against score lists)
+
                     if (
                         jsonData.solver_id &&
                         typeof jsonData.solver_id === "string"
@@ -2813,12 +2815,49 @@
                                 typeof item === "string",
                         )
                     ) {
-                        scores_list = jsonData.score_list.map((s: any) =>
-                            Number(s),
-                        );
+                        scores_list = jsonData.score_list.map((s: any) => Number(s));
                         if (scores_list.length > 0) {
-                            user_score = scores_list[0];
-                            judgeReferenceScore_input = scores_list.length === 1 ? String(scores_list[0]) : "";
+
+                            // If we're in the judge nomination flow, ask user to pick the real score
+                            if (currentActionType === "accept_judge_nomination") {
+                                let chosen: number | null = null;
+                                if (scores_list.length === 1) {
+                                    chosen = scores_list[0];
+                                } else if (typeof window !== 'undefined') {
+                                    try {
+                                        const listStr = scores_list
+                                            .map((s, i) => `${i}: ${s}`)
+                                            .join('\n');
+                                        const promptMsg = `Se ha cargado una lista de puntuaciones:\n${listStr}\n\nIntroduce el índice (ej. 0) o el valor del score real. Deja vacío para rellenarlo manualmente.`;
+                                        const resp = window.prompt(promptMsg, "");
+                                        if (resp !== null && resp.trim() !== "") {
+                                            const t = resp.trim();
+                                            const idx = parseInt(t, 10);
+                                            if (!Number.isNaN(idx) && idx >= 0 && idx < scores_list.length) {
+                                                chosen = scores_list[idx];
+                                            } else {
+                                                const num = Number(t);
+                                                if (!Number.isNaN(num)) chosen = num;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        // ignore prompt errors
+                                    }
+                                }
+
+                                if (chosen !== null) {
+                                    judgeReferenceScore_input = String(Math.trunc(chosen));
+                                } else {
+                                    // leave empty so user can fill via the number input
+                                    judgeReferenceScore_input = "";
+                                }
+                            } else {
+                                // Participant flow: store the whole list (as JSON if multiple)
+                                if (scores_list.length === 1) {
+                                    user_score = Number(scores_list[0]);
+                                }
+                                scores_list = scores_list;
+                            }
                         }
                     } else throw new Error("Missing or invalid 'score_list'");
                 } catch (e: any) {
@@ -6831,37 +6870,54 @@
 
                                         <!-- Scores -->
                                         <div>
-                                            <Label
-                                                for="user_score"
-                                                class="block text-sm font-medium mb-1.5 {$mode ===
-                                                'dark'
-                                                    ? 'text-gray-200'
-                                                    : 'text-gray-700'}"
-                                            >
-                                                Your Score
-                                            </Label>
+                                            {#if scores_list.length === 0}
+                                                <Label
+                                                    for="user_score"
+                                                    class="block text-sm font-medium mb-1.5 {$mode ===
+                                                    'dark'
+                                                        ? 'text-gray-200'
+                                                        : 'text-gray-700'}"
+                                                >
+                                                    Your Score
+                                                </Label>
 
-                                            <Input
-                                                id="user_score"
-                                                type="number"
-                                                bind:value={user_score}
-                                                placeholder="e.g., 85"
-                                                class="w-full {$mode === 'dark'
-                                                    ? 'bg-slate-800/50 border-slate-700'
-                                                    : 'bg-white border-gray-200'}"
-                                            />
+                                                <Input
+                                                    id="user_score"
+                                                    type="number"
+                                                    bind:value={user_score}
+                                                    placeholder="e.g., 85"
+                                                    class="w-full {$mode === 'dark'
+                                                        ? 'bg-slate-800/50 border-slate-700'
+                                                        : 'bg-white border-gray-200'}"
+                                                />
 
-                                            <p
-                                                class="text-xs text-muted-foreground mt-1.5"
-                                            >
-                                                Enter your result. Will be mixed
-                                                with random data to preserve
-                                                your score private on-chain.
-                                            </p>
-
-                                            {#if scores_list.length > 0}
                                                 <p
-                                                    class="text-xs text-blue-500 mt-2"
+                                                    class="text-xs text-muted-foreground mt-1.5"
+                                                >
+                                                    Enter your result. Will be mixed
+                                                    with random data to preserve
+                                                    your score private on-chain.
+                                                </p>
+
+                                            {:else}
+                                                <Label
+                                                    for="user_score"
+                                                    class="block text-sm font-medium mb-1.5 {$mode ===
+                                                    'dark'
+                                                        ? 'text-gray-200'
+                                                        : 'text-gray-700'}"
+                                                >
+                                                    Obfuscated Score
+                                                </Label>
+                                                <p
+                                                    class="text-xs mt-1.5 {$mode === 'dark'
+                                                        ? 'text-gray-400'
+                                                        : 'text-gray-500'}"
+                                                    >
+                                                    Your score is anonymized using decoy values
+                                                </p>
+                                                <p
+                                                    class="text text-blue-500 mt-2"
                                                 >
                                                     Public data (Anonymized): {scores_list.join(
                                                         ", ",

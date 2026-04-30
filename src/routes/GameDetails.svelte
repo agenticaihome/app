@@ -559,7 +559,7 @@
         awaiting_resolution:
             "Participation is closed and the creator must reveal the secret before suspension.",
         suspended:
-            "The creator missed the resolution window and players can recover their funds.",
+            "This occurs if and only if the game fails to enter the RESOLUTION phase in time — i.e. if the creator does not reveal the secret before the resolution deadline, the game becomes suspended and players can recover their funds.",
         judging:
             "The secret is revealed and judges can verify or challenge the candidate.",
         ready_to_finalize:

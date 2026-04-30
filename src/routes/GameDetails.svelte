@@ -1273,6 +1273,53 @@
     let isRobotDevelopmentGuideLoading = false;
     let robotDevelopmentGuideContent = "";
     let robotDevelopmentGuideError: string | null = null;
+    let robotDevelopmentGuideFetchPromise: Promise<void> | null = null;
+
+    async function fetchRobotGuideForPaper() {
+        if (robotDevelopmentGuideContent) {
+            if (robotGuideToc.length === 0) {
+                try {
+                    extractGuideToc(robotDevelopmentGuideContent);
+                } catch (e) {
+                    console.error("Error extracting robot guide TOC:", e);
+                }
+            }
+            return;
+        }
+        if (robotDevelopmentGuideFetchPromise) {
+            await robotDevelopmentGuideFetchPromise;
+            return;
+        }
+
+        robotDevelopmentGuideFetchPromise = (async () => {
+            isRobotDevelopmentGuideLoading = true;
+            robotDevelopmentGuideError = null;
+            try {
+                const response = await fetch(ROBOT_DEVELOPMENT_GUIDE);
+                if (!response.ok) {
+                    throw new Error(
+                        `Unable to load guide (${response.status} ${response.statusText})`,
+                    );
+                }
+                robotDevelopmentGuideContent = await response.text();
+                        // Extract TOC for the robot guide
+                        try {
+                            extractGuideToc(robotDevelopmentGuideContent);
+                        } catch (e) {
+                            console.error("Error extracting robot guide TOC:", e);
+                        }
+            } catch (e) {
+                robotDevelopmentGuideError = formatUserFacingError(e, {
+                    fallback: "Unable to load the robot development guide right now.",
+                });
+            } finally {
+                isRobotDevelopmentGuideLoading = false;
+                robotDevelopmentGuideFetchPromise = null;
+            }
+        })();
+
+        await robotDevelopmentGuideFetchPromise;
+    }
     let currentActionType:
         | "submit_score"
         | "resolve_game"
@@ -1358,6 +1405,8 @@
         | "fetch-error" = "idle";
     let isPaperExpanded = false;
     let paperToc: { level: number; text: string; id: string }[] = [];
+    let isRobotGuideExpanded = false;
+    let robotGuideToc: { level: number; text: string; id: string }[] = [];
     let soundtrackSources: any[] = [];
     let soundtrackUrl: string | null = null;
     let serviceDownload: string | null = null;
@@ -1445,6 +1494,13 @@
                 paperContent = await response.text();
                 paperContentStatus = "ready";
                 extractToc(paperContent);
+                // Ensure robot guide is fetched so its separate section can render
+                try {
+                    await fetchRobotGuideForPaper();
+                } catch (e) {
+                    // fetchRobotGuideForPaper handles errors
+                }
+
                 return;
             } catch (e) {
                 console.error("Error paper:", e);
@@ -2969,25 +3025,7 @@
             return;
         }
 
-        isRobotDevelopmentGuideLoading = true;
-
-        try {
-            const response = await fetch(ROBOT_DEVELOPMENT_GUIDE);
-
-            if (!response.ok) {
-                throw new Error(
-                    `Unable to load guide (${response.status} ${response.statusText})`,
-                );
-            }
-
-            robotDevelopmentGuideContent = await response.text();
-        } catch (error) {
-            robotDevelopmentGuideError = formatUserFacingError(error, {
-                fallback: "Unable to load the robot development guide right now.",
-            });
-        } finally {
-            isRobotDevelopmentGuideLoading = false;
-        }
+        await fetchRobotGuideForPaper();
     }
 
     function shareGame() {
@@ -3023,6 +3061,13 @@
     onMount(async () => {
         await fetchJudges();
         if (game) loadGameDetailsAndTimers();
+        // Fetch the robot development guide on page load and ensure it's appended to any paper
+        try {
+            await fetchRobotGuideForPaper();
+        } catch (e) {
+            // errors handled in fetchRobotGuideForPaper
+        }
+
         hasHydrated = true;
     });
 
@@ -3136,6 +3181,27 @@
         paperToc = toc;
     }
 
+    function extractGuideToc(markdown: string) {
+        const lines = markdown.split("\n");
+        const toc: { level: number; text: string; id: string }[] = [];
+        const headerRegex = /^(#{1,6})\s+(.*)$/;
+
+        lines.forEach((line) => {
+            const match = line.match(headerRegex);
+            if (match) {
+                const level = match[1].length;
+                const text = match[2].trim();
+                const id = text
+                    .toLowerCase()
+                    .replace(/[^\w\s-]/g, "")
+                    .replace(/\s+/g, "-");
+                toc.push({ level, text, id });
+            }
+        });
+
+        robotGuideToc = toc;
+    }
+
     function togglePaper() {
         isPaperExpanded = !isPaperExpanded;
         if (!isPaperExpanded) {
@@ -3156,6 +3222,26 @@
             if (startElement) {
                 startElement.scrollIntoView({ behavior: "smooth" });
             }
+        }
+    }
+
+    function toggleRobotGuide() {
+        isRobotGuideExpanded = !isRobotGuideExpanded;
+        if (!isRobotGuideExpanded) {
+            const element = document.getElementById("robot-guide-start");
+            if (element) {
+                element.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    }
+
+    function scrollToRobotToc() {
+        const element = document.getElementById("robot-guide-toc");
+        if (element) {
+            element.scrollIntoView({ behavior: "smooth" });
+        } else {
+            const startElement = document.getElementById("robot-guide-start");
+            if (startElement) startElement.scrollIntoView({ behavior: "smooth" });
         }
     }
 
@@ -3614,6 +3700,90 @@
                                             inline inspection yet.
                                         {/if}
                                     </p>
+                                </div>
+                            {/if}
+
+                            {#if robotDevelopmentGuideContent}
+                                <div
+                                    class="mt-8 border-t border-border pt-8"
+                                    id="robot-guide-start"
+                                >
+                                    <div class="flex items-center gap-2 mb-4">
+                                        <Code class="w-5 h-5 text-amber-500" />
+                                        <h3 class="text-lg font-semibold">
+                                            Robot Development Guide
+                                        </h3>
+                                    </div>
+
+                                    <div class="relative">
+                                        <div
+                                            class="prose prose-sm {$mode === 'dark' ? 'prose-invert' : ''} max-w-none transition-all duration-500 ease-in-out {isRobotGuideExpanded ? '' : 'max-h-96 overflow-hidden'}"
+                                        >
+                                            {#if isRobotGuideExpanded && robotGuideToc.length > 0}
+                                                <div
+                                                    class="mb-6 p-4 bg-muted/50 rounded-lg"
+                                                    id="robot-guide-toc"
+                                                >
+                                                    <h4
+                                                        class="text-sm font-semibold mb-2 uppercase tracking-wider text-muted-foreground"
+                                                    >
+                                                        Table of Contents
+                                                    </h4>
+                                                    <nav class="flex flex-col gap-1">
+                                                        {#each robotGuideToc as item}
+                                                            <button
+                                                                class="text-left text-sm hover:text-primary transition-colors truncate w-full"
+                                                                style="padding-left: {(item.level - 1) * 12}px"
+                                                                on:click={() => scrollToSection(item.id)}
+                                                            >
+                                                                {item.text}
+                                                            </button>
+                                                        {/each}
+                                                    </nav>
+                                                </div>
+                                            {/if}
+
+                                            {@html marked.parse(robotDevelopmentGuideContent, {
+                                                renderer: guideRenderer,
+                                            })}
+                                        </div>
+
+                                        {#if !isRobotGuideExpanded}
+                                            <div
+                                                class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent flex items-end justify-center pb-4"
+                                            >
+                                                <Button
+                                                    variant="secondary"
+                                                    on:click={toggleRobotGuide}
+                                                    class="shadow-lg"
+                                                >
+                                                    Read Full Paper
+                                                    <ChevronDown class="ml-2 w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        {/if}
+                                    </div>
+
+                                    {#if isRobotGuideExpanded}
+                                        <div class="sticky bottom-20 flex justify-center mt-8 pointer-events-none gap-4 z-10">
+                                            <Button
+                                                variant="secondary"
+                                                on:click={scrollToRobotToc}
+                                                class="shadow-lg pointer-events-auto opacity-90 hover:opacity-100"
+                                                title="Back to Table of Contents"
+                                            >
+                                                <ArrowUp class="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                on:click={toggleRobotGuide}
+                                                class="shadow-lg pointer-events-auto opacity-90 hover:opacity-100"
+                                            >
+                                                Collapse Paper
+                                                <ChevronDown class="ml-2 w-4 h-4 rotate-180" />
+                                            </Button>
+                                        </div>
+                                    {/if}
                                 </div>
                             {/if}
 

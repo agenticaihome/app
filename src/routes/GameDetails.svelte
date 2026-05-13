@@ -1304,7 +1304,7 @@
                 robotDevelopmentGuideContent = await response.text();
                 robotDevelopmentGuideContent = robotDevelopmentGuideContent.replaceAll(
                     "GAME_SERVICE_URL",
-                    serviceDownload ?? game.serviceId ?? "N/A"
+                    serviceDownload ?? game.serviceId ?? "GAME_SERVICE_URL"
                 );
                 // Extract TOC for the robot guide
                 try {
@@ -2007,6 +2007,12 @@
                 );
                 if (robotDevelopmentGuideContent === "") {
                     await fetchRobotGuideForPaper();
+                }
+                else if (robotDevelopmentGuideContent.includes("GAME_SERVICE_URL")) {
+                    robotDevelopmentGuideContent = robotDevelopmentGuideContent.replaceAll(
+                        "GAME_SERVICE_URL",
+                        serviceDownload ?? game.serviceId ?? "N/A"
+                    );
                 }
             }
 

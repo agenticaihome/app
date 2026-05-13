@@ -1302,12 +1302,16 @@
                     );
                 }
                 robotDevelopmentGuideContent = await response.text();
-                        // Extract TOC for the robot guide
-                        try {
-                            extractGuideToc(robotDevelopmentGuideContent);
-                        } catch (e) {
-                            console.error("Error extracting robot guide TOC:", e);
-                        }
+                robotDevelopmentGuideContent = robotDevelopmentGuideContent.replaceAll(
+                    "GAME_SERVICE_URL",
+                    serviceDownload ?? game.serviceId ?? "N/A"
+                );
+                // Extract TOC for the robot guide
+                try {
+                    extractGuideToc(robotDevelopmentGuideContent);
+                } catch (e) {
+                    console.error("Error extracting robot guide TOC:", e);
+                }
             } catch (e) {
                 robotDevelopmentGuideError = formatUserFacingError(e, {
                     fallback: "Unable to load the robot development guide right now.",
@@ -2001,6 +2005,9 @@
                 serviceDownload = await fetchServiceDownloadUrl(
                     game?.content.serviceId,
                 );
+                if (robotDevelopmentGuideContent === "") {
+                    await fetchRobotGuideForPaper();
+                }
             }
 
             if (game.content.paper) {

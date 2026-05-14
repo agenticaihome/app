@@ -2638,7 +2638,7 @@
                             : calculateEffectiveScore(
                                   game,
                                   best.score,
-                                  best.solverIdBox?.creationHeight ?? 0,
+                                  best.creationHeight,
                               );
                     const currentEffective =
                         game === null
@@ -2646,7 +2646,7 @@
                             : calculateEffectiveScore(
                                   game,
                                   current.score,
-                                  current.solverIdBox?.creationHeight ?? 0,
+                                  current.creationHeight,
                               );
 
                     if (currentEffective > bestEffective) return current;

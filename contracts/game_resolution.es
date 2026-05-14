@@ -247,13 +247,12 @@
 
                 if (validCurrentCandidate) {
                   // Se determina el nuevo ganador comparando puntajes AJUSTADOS y alturas de bloque
-                  // Formula: score = game_score * (TIME_WEIGHT + DEADLINE - HEIGHT)
-                  val newBotHeight = getBotBoxHeight(omittedWinnerBox)
-                  val currentBotHeight = getBotBoxHeight(currentCandidateBox)
-                  val newScoreAdjusted = newScore * (1L + (timeWeight * (deadline - newBotHeight)))
-                  val currentScoreAdjusted = currentScore * (1L + (timeWeight * (deadline - currentBotHeight)))
+                  val newHeight = omittedWinnerBox.creationInfo._1
+                  val currentHeight = currentCandidateBox.creationInfo._1
+                  val newScoreAdjusted = newScore * (1L + (timeWeight * (deadline - newHeight)))
+                  val currentScoreAdjusted = currentScore * (1L + (timeWeight * (deadline - currentHeight)))
 
-                  if (newScoreAdjusted > currentScoreAdjusted || (newScoreAdjusted == currentScoreAdjusted && newBotHeight < currentBotHeight)) {
+                  if (newScoreAdjusted > currentScoreAdjusted || (newScoreAdjusted == currentScoreAdjusted && newHeight < currentHeight)) {
                     omittedWinnerBox.R5[Coll[Byte]].get // El nuevo es mejor
                   } else {
                     Coll[Byte]() // El actual sigue siendo el mejor

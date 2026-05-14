@@ -15,7 +15,7 @@ export interface ShareConfig {
 
 const DEFAULT_BASE_URL = window.location.origin
 
-const STABILITY_NEXUS_ACCOUNT = '@StabilityNexus';
+const X_ACCOUNT = '' // '@UnstopRobots';
 
 /**
  * Generates a standardized share message with proper formatting
@@ -29,7 +29,7 @@ function generateShareMessage(
         ? description.substring(0, 100).replace(/[^\w\s\-\.]/g, '').trim()
         : '';
 
-    const message = `Check out "${projectName}" - ${projectStatus} on BenefactionPlatform! 🚀${cleanedDescription ? `\n\n${cleanedDescription}` : ''}\n\nHosted by ${STABILITY_NEXUS_ACCOUNT} #BenefactionPlatform`;
+    const message = `Check out "${projectName}" - ${projectStatus} on Game of Prompts! 🚀${cleanedDescription ? `\n\n${cleanedDescription}` : ''}#GameOfPrompts #ErgoBlockchain`;
 
     return message;
 }
@@ -49,7 +49,7 @@ export function getTwitterShareUrl(config: ShareConfig): string {
     const message = generateShareMessage(
         config.projectName,
         config.projectStatus,
-        config.description
+        config.descriptionhttps://twitter.com/intent/tweet
     );
 
     const projectUrl = getProjectUrl(config.projectId, config.baseUrl);
@@ -57,10 +57,10 @@ export function getTwitterShareUrl(config: ShareConfig): string {
 
     const params = new URLSearchParams({
         text: fullMessage,
-        via: STABILITY_NEXUS_ACCOUNT.replace('@', '')
+        via: X_ACCOUNT.replace('@', '')
     });
 
-    return `https://twitter.com/intent/tweet?${params.toString()}`;
+    return `?${params.toString()}`;
 }
 
 /**

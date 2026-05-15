@@ -1,30 +1,29 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { createEventDispatcher } from 'svelte';
+  import { browser } from "$app/environment";
   import * as Dialog from "$lib/components/ui/dialog"; 
   import { Button } from "$lib/components/ui/button";   
 
   export let title: string = 'Know Your Assumptions - Game of Prompts';
   export let closeBtnText: string = 'I understand and I agree';
+  export let autoOpen = false;
   
   let showModal = false;
   let isButtonEnabled = false;
   let contentDiv: HTMLDivElement;
-  
-  const dispatch = createEventDispatcher();
+  const KYA_ACCEPTED_KEY = "acceptedGoPKYA";
 
-  onMount(() => {
-    const alreadyAccepted = localStorage.getItem('acceptedGoPKYA') === 'true';
-    showModal = !alreadyAccepted;
+  function hasAcceptedKya() {
+    if (!browser) return false;
+    return localStorage.getItem(KYA_ACCEPTED_KEY) === "true";
+  }
 
-    if (showModal) {
-      setTimeout(() => {
-        if (contentDiv && contentDiv.scrollHeight <= contentDiv.clientHeight) {
-          isButtonEnabled = true;
-        }
-      }, 0);
-    }
-  });
+  function refreshButtonState() {
+    setTimeout(() => {
+      if (contentDiv && contentDiv.scrollHeight <= contentDiv.clientHeight) {
+        isButtonEnabled = true;
+      }
+    }, 0);
+  }
 
   function checkScroll(e: Event) {
     const element = e.target as HTMLDivElement;
@@ -33,31 +32,28 @@
     }
   }
 
-  function handleOpenModal() {
+  function openModal() {
     showModal = true;
     isButtonEnabled = false; 
-    setTimeout(() => {
-      if (contentDiv && contentDiv.scrollHeight <= contentDiv.clientHeight) {
-        isButtonEnabled = true;
-      }
-    }, 0);
+    refreshButtonState();
   }
 
   function handleCloseModal() {
     showModal = false;
-    localStorage.setItem('acceptedGoPKYA', 'true'); 
-    dispatch('close');
+    if (browser) {
+      localStorage.setItem(KYA_ACCEPTED_KEY, "true");
+    }
   }
 
-  $: if (!showModal && localStorage.getItem('acceptedGoPKYA') === 'true') {
-    dispatch('close');
+  $: if (browser && autoOpen && !showModal && !hasAcceptedKya()) {
+    openModal();
   }
 </script>
 
 <span 
   class="text-gray-500 cursor-pointer hover:underline" 
-  on:click={handleOpenModal}
-  on:keydown={(e) => e.key === 'Enter' && handleOpenModal()}
+  on:click={openModal}
+  on:keydown={(e) => e.key === 'Enter' && openModal()}
   role="button"
   tabindex="0"
 >

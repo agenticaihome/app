@@ -1423,16 +1423,20 @@
         paperSources.map(getPaperSourceUrl).find((url) => !!url) ?? null;
     $: botAssistantPrompt = buildBotAssistantPrompt(game, botAssistantPaperUrl);
 
-    function getPaperSourceUrl(source: any): string | null {
+    function getSourceUrl(source: any): string | null {
         const rawUrl =
-            typeof source?.sourceUrl === "string"
-                ? source.sourceUrl
-                : typeof source?.source?.urlLink === "string"
-                  ? source.source.urlLink
+            typeof source?.source?.urlLink === "string"
+                ? source.source.urlLink
+                : typeof source?.sourceUrl === "string"
+                  ? source.sourceUrl
                   : "";
 
         const normalizedUrl = rawUrl.trim();
         return normalizedUrl.length > 0 ? normalizedUrl : null;
+    }
+
+    function getPaperSourceUrl(source: any): string | null {
+        return getSourceUrl(source);
     }
 
     function openFileSourceModal(
@@ -2032,8 +2036,10 @@
                     game.content.soundtrack,
                     explorer,
                 );
-                if (soundtrackSources.length > 0)
-                    soundtrackUrl = soundtrackSources[0].sourceUrl;
+                soundtrackUrl =
+                    soundtrackSources
+                        .map(getSourceUrl)
+                        .find((url) => !!url) ?? soundtrackUrl;
             }
 
             // 6. Token details
@@ -3117,11 +3123,9 @@
     let resolvedImageSrc = game?.content?.imageURL ?? "";
     $: {
         if (game?.content?.image) {
-            if (imageSources.length > 0) {
-                resolvedImageSrc = imageSources[0].url;
-            } else {
-                resolvedImageSrc = game?.content.imageURL ?? "";
-            }
+            resolvedImageSrc =
+                imageSources.map(getSourceUrl).find((url) => !!url) ??
+                (game?.content.imageURL ?? "");
         } else {
             resolvedImageSrc = game?.content.imageURL ?? "";
         }

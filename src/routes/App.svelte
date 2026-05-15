@@ -13,7 +13,6 @@
         current_height,
     } from "$lib/common/store";
     import CreateGame from "./CreateGame.svelte";
-    import Demo from "./Demo.svelte";
     import TokenAcquisition from "./TokenAcquisition.svelte";
     import MyTrophies from "./MyTrophies.svelte";
     import Throne from "./Throne.svelte";

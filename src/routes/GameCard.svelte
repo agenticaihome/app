@@ -6,7 +6,9 @@
     import { game_detail } from "$lib/common/store";
     import { Button } from "$lib/components/ui/button";
     import { Badge } from "$lib/components/ui/badge";
+    import { explorer_uri } from "$lib/ergo/envs";
     import { onMount, onDestroy } from "svelte";
+    import { get } from "svelte/store";
     import {
         isGameParticipationEnded,
         isGameSuspended,
@@ -18,6 +20,7 @@
         getPrizePool,
     } from "$lib/common/game";
     import { fetch_token_details, fetchParticipations } from "$lib/ergo/fetch";
+    import { fetchFileSourcesByHash } from "source-application";
     import { formatTokenBigInt } from "$lib/utils";
 
     export let game: Game;
@@ -48,6 +51,8 @@
 
     let tokenSymbol = "ERG";
     let tokenDecimals = 9;
+    let resolvedImageSrc = game?.content?.imageURL ?? "";
+    let imageRequestId = 0;
 
     $: currentPrizePool = getPrizePool(game, participations || []);
 
@@ -207,10 +212,47 @@
         timer = null;
     }
 
+    async function resolveImage() {
+        const fallbackImage = game?.content?.imageURL ?? "";
+        resolvedImageSrc = fallbackImage;
+
+        if (!game?.content?.image) {
+            return;
+        }
+
+        const requestId = ++imageRequestId;
+
+        try {
+            const sources = await fetchFileSourcesByHash(
+                game.content.image,
+                get(explorer_uri),
+            );
+            const primarySourceUrl =
+                sources
+                    .map((source) => source.source?.urlLink?.trim() ?? "")
+                    .find((url) => url.length > 0) ?? "";
+
+            if (requestId !== imageRequestId) {
+                return;
+            }
+
+            if (primarySourceUrl) {
+                resolvedImageSrc = primarySourceUrl;
+            }
+        } catch {
+            if (requestId !== imageRequestId) {
+                return;
+            }
+
+            resolvedImageSrc = fallbackImage;
+        }
+    }
+
     async function initialize() {
         if (!game || !game.platform || initializedBoxId === game.boxId) return;
         initializedBoxId = game.boxId;
         cleanup();
+        await resolveImage();
 
         if (game.participationTokenId) {
             try {
@@ -290,9 +332,9 @@
         <div
             class="relative w-full lg:w-2/5 aspect-video lg:aspect-auto overflow-hidden bg-muted/50"
         >
-            {#if game.content?.imageURL}
+            {#if resolvedImageSrc}
                 <img
-                    src={game.content.imageURL}
+                    src={resolvedImageSrc}
                     alt={game.content.title}
                     class="game-card-image w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"

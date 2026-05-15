@@ -49,7 +49,7 @@ export function getTwitterShareUrl(config: ShareConfig): string {
     const message = generateShareMessage(
         config.projectName,
         config.projectStatus,
-        config.descriptionhttps://twitter.com/intent/tweet
+        config.description
     );
 
     const projectUrl = getProjectUrl(config.projectId, config.baseUrl);

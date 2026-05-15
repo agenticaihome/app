@@ -53,6 +53,7 @@
     let tokenDecimals = 9;
     let resolvedImageSrc = game?.content?.imageURL ?? "";
     let imageRequestId = 0;
+    let ceremonyOpen = false;
 
     $: currentPrizePool = getPrizePool(game, participations || []);
 
@@ -127,6 +128,7 @@
 
     async function updateStatus() {
         if (!game) return;
+        ceremonyOpen = await isOpenCeremony(game);
         switch (game.status) {
             case GameState.Active:
                 if (gameSuspended) {
@@ -273,6 +275,7 @@
 
         participationEnded = await isGameParticipationEnded(game);
         gameSuspended = await isGameSuspended(game);
+        ceremonyOpen = await isOpenCeremony(game);
         if (
             game.status === GameState.Active ||
             game.status === GameState.Resolution
@@ -365,9 +368,11 @@
                                 Invited Judge
                             </Badge>
                         {/if}
-                        <Badge variant="secondary" class="text-xs">
-                            {participations?.length ?? "n/a"} Players
-                        </Badge>
+                        {#if !ceremonyOpen}
+                            <Badge variant="secondary" class="text-xs">
+                                {participations?.length ?? "n/a"} Players
+                            </Badge>
+                        {/if}
                     </div>
                     <div
                         class="px-3 py-1 rounded-full text-xs font-semibold {statusClasses}"

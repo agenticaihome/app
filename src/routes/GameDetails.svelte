@@ -153,6 +153,14 @@
     const ROBOT_DEVELOPMENT_GUIDE = "https://raw.githubusercontent.com/game-of-prompts/.github/refs/heads/main/ROBOT_DEVELOPMENT_GUIDE.md";
 
     type HoverHandle = { destroy: () => void };
+    type ErgoWalletApi = {
+        get_change_address?: () => Promise<string>;
+        get_balance?: (tokenId?: string) => Promise<bigint | number | string>;
+    };
+
+    function getErgoWallet(): ErgoWalletApi | null {
+        return (globalThis as typeof globalThis & { ergo?: ErgoWalletApi }).ergo ?? null;
+    }
 
     function hoverCornersWhenClosed(node: HTMLElement, isOpen: boolean) {
         let handle: HoverHandle | null = null;
@@ -1643,6 +1651,11 @@
 
     async function generateDevParticipation() {
         try {
+            const wallet = getErgoWallet();
+            if (!wallet?.get_change_address) {
+                throw new Error("Wallet not connected.");
+            }
+
             // 1. Generate Random Values
             const randomBytes = new Uint8Array(32);
             window.crypto.getRandomValues(randomBytes);
@@ -1656,7 +1669,7 @@
             // 2. Get Constants/Context
             const secretS = game?.content.serviceId; // Dev competitions typically use the serviceId as secretS
 
-            const playerAddressString = await ergo.get_change_address();
+            const playerAddressString = await wallet.get_change_address();
             if (!playerAddressString) {
                 throw new Error(
                     "Could not get the player's address from the wallet.",
@@ -2999,9 +3012,14 @@
         }
 
         if (type === "donate_ceremony" && game?.participationTokenId) {
-            ergo.get_balance(game.participationTokenId).then((bal) => {
-                userParticipationTokenBalance = BigInt(bal);
-            });
+            const wallet = getErgoWallet();
+            if (wallet?.get_balance) {
+                wallet.get_balance(game.participationTokenId).then((bal) => {
+                    userParticipationTokenBalance = BigInt(bal);
+                });
+            } else {
+                userParticipationTokenBalance = 0n;
+            }
             fetch_token_details(game.participationTokenId).then((details) => {
                 if (details) tokenDecimals = details.decimals;
             });

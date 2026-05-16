@@ -892,4 +892,25 @@
             transform: translateX(-100%);
         }
     }
+
+    @media (max-width: 640px) {
+        .page-footer {
+            @apply h-auto px-4 py-2 gap-2;
+            flex-wrap: wrap;
+        }
+
+        .footer-center {
+            order: -1;
+            flex: 0 0 100%;
+        }
+
+        .footer-left,
+        .footer-right {
+            flex: 1 1 0;
+        }
+
+        .footer-right {
+            justify-content: flex-end;
+        }
+    }
 </style>

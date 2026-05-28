@@ -1480,6 +1480,16 @@
             parts.push(`Reference paper URL: ${paperUrl}`);
         }
 
+        // Basic explanation
+        parts.push(
+            "The game mechanics are as follows: A secret value S is locked on-chain. Players must create solver services that can compute a score based on S and submit their results before the deadline. After the deadline, the secret is revealed and the player with the best valid score wins. The exact scoring function and rules are defined in the reference paper.",
+        );
+
+        // Solver developer guide url
+        parts.push(
+            `For more details on how to develop a solver service for this game, please refer to the official guide: ${ROBOT_DEVELOPMENT_GUIDE}`,
+        );
+
         parts.push(
             "Please reason about the game mechanics, propose a solver-service strategy, and provide implementation guidance or code in English.",
         );

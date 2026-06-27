@@ -20,7 +20,7 @@
 <div
   class="group relative overflow-hidden rounded-xl shadow-md
   transition-all duration-200 hover:shadow-lg hover:-translate-y-1 p-4 sm:p-5 flex flex-col
-  justify-between max-w-sm w-full gop-game-card"
+  justify-between w-full gop-game-card"
 >
   <div class="space-y-4">
     <!-- Header: Title + Badge -->

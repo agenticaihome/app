@@ -33,6 +33,8 @@ const ERG_BASE_TOKEN_NAME = "ERG";
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
 const USD_BASE_TOKEN_NAME = "USD";
 
+const CREATOR_SLASH_RATIO = BigInt(COMMISSION_DENOMINATOR);
+
 const baseModes = [
   { name: "USD Token Mode", token: USD_BASE_TOKEN, tokenName: USD_BASE_TOKEN_NAME },
 ];
@@ -228,6 +230,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           0n,                                       // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent),        // resolverCommissionPercentage
           BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+          CREATOR_SLASH_RATIO,
           BigInt(resolutionDeadline)
         ]).toHex(),
 
@@ -249,7 +252,6 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
     const gameBox = gameResolutionContract.utxos.toArray()[0];
     const participationBoxes = participationContract.utxos;
 
-    // --- Act ---
     // --- Act ---
     // 1. Transition to End Game
     const toEndGameTx = new TransactionBuilder(mockChain.height)
@@ -453,6 +455,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           0n,        // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent), // resolverCommissionPercentage
           BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+          CREATOR_SLASH_RATIO,
           BigInt(resolutionDeadline)
         ]).toHex(),
 
@@ -642,6 +645,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           0n,        // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent), // resolverCommissionPercentage
           BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+          CREATOR_SLASH_RATIO,
           BigInt(resolutionDeadline)
         ]).toHex(),
 
@@ -836,6 +840,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           0n,        // perJudgeCommissionPercentage
           BigInt(resolverCommissionPercent),        // resolverCommissionPercentage
           BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+          CREATOR_SLASH_RATIO,
           BigInt(resolutionDeadline)
         ]).toHex(),
 
@@ -1210,6 +1215,7 @@ describe.each(baseModes)("Game Finalization (end_game) - (%s)", (mode) => {
           perJudgeCommissionPercent,     // per-judge commission
           BigInt(resolverCommissionPercent),                            // resolverCommissionPercentage
           BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)), // devCommissionPercentage
+          CREATOR_SLASH_RATIO,           // creator slash ratio
           BigInt(resolutionDeadline),    // resolution deadline
         ]).toHex(),
 

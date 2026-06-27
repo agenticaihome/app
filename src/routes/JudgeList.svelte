@@ -8,7 +8,6 @@
     import { Button } from "$lib/components/ui/button";
     import { Loader2, Search, Coins, Users } from "lucide-svelte";
     import { onMount, onDestroy } from "svelte";
-    import { get } from "svelte/store";
     import { Input } from "$lib/components/ui/input";
     import { fetchJudges } from "$lib/ergo/reputation/fetch";
 
@@ -204,10 +203,11 @@
 
     .judge-list-container {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 2rem;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 380px));
+        justify-content: center;
+        gap: 1.5rem;
         width: 100%;
-        justify-items: start;
+        justify-items: stretch;
     }
 
     @keyframes pulse {

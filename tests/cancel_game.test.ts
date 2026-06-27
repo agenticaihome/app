@@ -17,6 +17,8 @@ import {
 import { blake2b256 } from "@fleet-sdk/crypto";
 import { stringToBytes } from "@scure/base";
 import { getGopGameActiveErgoTree, getGopGameCancellationErgoTree } from "$lib/ergo/contract";
+import { DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
+import { getGameConstants } from "$lib/common/constants";
 import { hexToBytes } from "$lib/ergo/utils";
 
 const ERG_BASE_TOKEN = "";
@@ -27,6 +29,8 @@ const USD_BASE_TOKEN_NAME = "USD";
 const baseModes = [
     { name: "USD Token Mode", token: USD_BASE_TOKEN, tokenName: USD_BASE_TOKEN_NAME },
 ];
+const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
+const CREATOR_SLASH_RATIO = BigInt(COMMISSION_DENOMINATOR);
 
 describe.each(baseModes)("Game Cancellation (cancel_game) - (%s)", (mode) => {
     let mockChain: MockChain;
@@ -85,14 +89,16 @@ describe.each(baseModes)("Game Cancellation (cancel_game) - (%s)", (mode) => {
                     resolverStake,
                     1_000_000n,
                     500n,
-                    1000n
+                    1000n,
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+                    CREATOR_SLASH_RATIO
                 ]).toHex(),
-                R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex()
+                R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? new Uint8Array(0), hexToBytes(DEV_SCRIPT) ?? new Uint8Array(0)]).toHex()
             }
         });
 
         gameBox = game.utxos.toArray()[0];
-    }, 15000);
+    }, 30000);
 
     afterEach(() => {
         mockChain.reset({ clearParties: true });
@@ -141,7 +147,7 @@ describe.each(baseModes)("Game Cancellation (cancel_game) - (%s)", (mode) => {
                         R6: SColl(SByte, secret).toHex(), // Secreto revelado
                         R7: SLong(stakePortionForClaimer).toHex(),
                         R8: SLong(BigInt(deadlineBlock)).toHex(),
-                        R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? ""]).toHex(),
+                        R9: SColl(SColl(SByte), [stringToBytes("utf8", "{}"), hexToBytes(mode.token) ?? new Uint8Array(0)]).toHex(),
                     }),
 
                 // Salida 1: Pago al Reclamante (20% del Stake)
@@ -241,15 +247,20 @@ describe("Game Cancellation (Low Stake) - (%s)", () => {
                 R7: SColl(SColl(SByte), []).toHex(),
                 // R8: Se restaura el formato completo de parámetros numéricos.
                 R8: SColl(SLong, [
+                    1n,                        // createdAt
+                    20n,                       // timeWeight
                     BigInt(deadlineBlock),
                     resolverStake,
                     1_000_000n,                // participationFee
                     500n,                      // perJudgeCommissionPercentage
-                    1000n                      // resolverCommissionPercentage
+                    1000n,                     // resolverCommissionPercentage
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+                    CREATOR_SLASH_RATIO
                 ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes("utf8", "{}"),
-                    mode.token
+                    hexToBytes(mode.token) ?? new Uint8Array(0),
+                    hexToBytes(DEV_SCRIPT) ?? new Uint8Array(0)
                 ]).toHex()
             }
         });

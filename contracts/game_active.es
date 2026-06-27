@@ -34,7 +34,7 @@
   // R5: Coll[Byte]         - seed
   // R6: Coll[Byte]         - secretHash: Hash del secreto 'S' (blake2b256(S)).
   // R7: Coll[Coll[Byte]]   - invitedJudgesReputationProofs
-  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage].
+  // R8: Coll[Long]         - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, creatorSlashRatio].
   // R9: Coll[Coll[Byte]]   - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript]
 
 
@@ -65,6 +65,7 @@
   val perJudgeCommissionPercentage = numericalParams(5)
   val resolverCommissionPercentage = numericalParams(6)
   val devCommissionPercentage = numericalParams(7)
+  val creatorSlashRatio = numericalParams(8)
 
   val ceremonyDeadline = deadline - PARTICIPATION_TIME_WINDOW
 
@@ -87,11 +88,17 @@
 
   val getBotBoxHeight = { (participationBox: Box) =>
     val pBoxSolverId = participationBox.R7[Coll[Byte]].get
-    val candidateBotBoxes = CONTEXT.dataInputs.filter({ (box: Box) =>
-      box.R4[Coll[Byte]].isDefined &&
-      box.R4[Coll[Byte]].get == pBoxSolverId &&
-      blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH
-    })
+    val candidateBotBoxes = CONTEXT.dataInputs.filter { (box: Box) =>
+      if (blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH) {
+        box.R4[Coll[Byte]].isDefined &&
+        box.R4[Coll[Byte]].get == pBoxSolverId
+      } else if (blake2b256(box.propositionBytes) == REPUTATION_PROOF_SCRIPT_HASH) {
+        box.R5[Coll[Byte]].isDefined &&
+        box.R5[Coll[Byte]].get == pBoxSolverId
+      } else {
+        false
+      }
+    }
 
     if (candidateBotBoxes.size > 0) {
       val oldestBox = candidateBotBoxes.fold(candidateBotBoxes(0), { (acc: Box, curr: Box) =>
@@ -205,9 +212,10 @@
               resolutionBox.R8[Coll[Long]].get(3) == resolverStake &&
               resolutionBox.R8[Coll[Long]].get(4) == participationFee &&
               resolutionBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
-              resolutionBox.R8[Coll[Long]].get(6) >= resolverCommissionPercentage &&
+              resolutionBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
               resolutionBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
-              resolutionBox.R8[Coll[Long]].get(8) >= HEIGHT + JUDGE_PERIOD &&
+              resolutionBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
+              resolutionBox.R8[Coll[Long]].get(9) >= HEIGHT + JUDGE_PERIOD &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(0) == gameDetailsJsonHex &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(1) == participationTokenId &&
               resolutionBox.R9[Coll[Coll[Byte]]].get(2) == devScript &&

@@ -13,9 +13,11 @@
         current_height,
     } from "$lib/common/store";
     import CreateGame from "./CreateGame.svelte";
-    import Demo from "./Demo.svelte";
     import TokenAcquisition from "./TokenAcquisition.svelte";
+    import MyTrophies from "./MyTrophies.svelte";
+    import Throne from "./Throne.svelte";
     import GameDetails from "./GameDetails.svelte";
+    import FaqModal from "./FaqModal.svelte";
     import { ErgoPlatform } from "$lib/ergo/platform";
     import { loadGameById } from "$lib/common/load_by_id";
     import { browser } from "$app/environment";
@@ -24,6 +26,7 @@
     import { type AnyGame as Game } from "$lib/common/game";
     import Kya from "./kya.svelte";
     import Theme from "./Theme.svelte";
+    import Utils from "./utils/+page.svelte";
     import { get } from "svelte/store";
     import { slide, fade } from "svelte/transition";
     import CreateJudge from "./CreateJudge.svelte";
@@ -48,6 +51,7 @@
         VolumeX,
         Music,
         Github,
+        Globe,
         Send,
     } from "lucide-svelte";
     import SettingsModal from "./SettingsModal.svelte";
@@ -60,7 +64,6 @@
         forum_explorer_url,
         VALIDATE_WEB_EXPLORER,
     } from "$lib/ergo/envs";
-    import { Button } from "$lib/components/ui/button";
     import { fetchTypeNfts } from "$lib/ergo/reputation/fetch";
     import { JUDGE } from "$lib/ergo/reputation/types";
     import {
@@ -68,6 +71,7 @@
         DropdownMenuContent,
         DropdownMenuTrigger,
     } from "$lib/components/ui/dropdown-menu";
+    import { Button } from "$lib/components/ui/button";
 
     // Sync stores
     $: connected.set($walletConnected);
@@ -82,6 +86,11 @@
     let mobileMenuOpen = false;
     let showSettings = false;
     let showInvalidExplorerModal = false;
+    let autoOpenKya = false;
+    let navHidden = false;
+    let lastScrollY = 0;
+    let scrollTicking = false;
+    const scrollDeltaThreshold = 6;
 
     let platform = new ErgoPlatform();
 
@@ -115,6 +124,31 @@
             "animationiteration",
             handleAnimationIteration,
         );
+
+        lastScrollY = window.scrollY;
+        const onScroll = () => {
+            if (scrollTicking) return;
+            scrollTicking = true;
+            requestAnimationFrame(() => {
+                const currentY = window.scrollY;
+                const delta = currentY - lastScrollY;
+
+                if (currentY <= 0) {
+                    navHidden = false;
+                } else if (Math.abs(delta) >= scrollDeltaThreshold) {
+                    if (delta > 0) {
+                        navHidden = true;
+                        if (mobileMenuOpen) mobileMenuOpen = false;
+                    } else {
+                        navHidden = false;
+                    }
+                }
+
+                lastScrollY = currentY;
+                scrollTicking = false;
+            });
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
 
         // Load settings
         const storedSettings = localStorage.getItem("gop_settings");
@@ -184,6 +218,7 @@
                 "animationiteration",
                 handleAnimationIteration,
             );
+            window.removeEventListener("scroll", onScroll);
             unsubscribeSettings.forEach((unsub) => unsub());
         };
     });
@@ -191,6 +226,12 @@
     connected.subscribe(async (isConnected) => {
         if (isConnected) {
             await updateWalletInfo();
+            if (
+                browser &&
+                localStorage.getItem("acceptedGoPKYA") !== "true"
+            ) {
+                autoOpenKya = true;
+            }
         }
     });
 
@@ -226,6 +267,8 @@
 
     $: if ($page.url.pathname === "/demo") {
         activeTab = "demo";
+    } else if ($page.url.pathname === "/utils") {
+        activeTab = "utils";
     } else if (activeTab === "demo" && $page.url.pathname !== "/demo") {
         activeTab = "participateGame";
     }
@@ -249,6 +292,7 @@
             current_height.set(height);
 
             const types = await fetchTypeNfts();
+            // Only profiles that are self-defined as JUDGE
             const profiles = await fetchAllUserProfiles(
                 get(explorer_uri),
                 true,
@@ -309,9 +353,10 @@
             }, stepDuration);
         });
     }
+
 </script>
 
-<header class="navbar-container">
+<header class="navbar-container" class:navbar-hidden={navHidden}>
     <div class="navbar-content">
         <a
             href="#"
@@ -345,6 +390,20 @@
                         href="#"
                         on:click|preventDefault={() => changeTab("createGame")}
                         >Create Competition</a
+                    >
+                </li>
+                <li class:active={activeTab === "trophies"}>
+                    <a
+                        href="#"
+                        on:click|preventDefault={() => changeTab("trophies")}
+                        >My Trophies</a
+                    >
+                </li>
+                <li class:active={activeTab === "throne"}>
+                    <a
+                        href="#"
+                        on:click|preventDefault={() => changeTab("throne")}
+                        >The Throne</a
                     >
                 </li>
                 <li class:active={activeTab === "judges"}>
@@ -432,6 +491,16 @@
                     >Create Competition</a
                 >
             </li>
+            <li class:active={activeTab === "trophies"}>
+                <a href="#" on:click|preventDefault={() => changeTab("trophies")}
+                    >My Trophies</a
+                >
+            </li>
+            <li class:active={activeTab === "throne"}>
+                <a href="#" on:click|preventDefault={() => changeTab("throne")}
+                    >Throne</a
+                >
+            </li>
             <li class:active={activeTab === "judges"}>
                 <a href="#" on:click|preventDefault={() => changeTab("judges")}
                     >Judges</a
@@ -508,6 +577,16 @@
                 <CreateGame />
             </div>
         {/if}
+        {#if activeTab === "trophies"}
+            <div transition:fade={{ duration: 300 }}>
+                <MyTrophies />
+            </div>
+        {/if}
+        {#if activeTab === "throne"}
+            <div transition:fade={{ duration: 300 }}>
+                <Throne />
+            </div>
+        {/if}
         {#if activeTab === "judges"}
             <div transition:fade={{ duration: 300 }}>
                 <JudgeList />
@@ -527,6 +606,11 @@
         {#if activeTab === "demo"}
             <div transition:fade={{ duration: 300 }}>
                 <Demo />
+            </div>
+        {/if}
+        {#if activeTab === "utils"}
+            <div transition:fade={{ duration: 300 }}>
+                <Utils />
             </div>
         {/if}
     {:else if $game_detail !== null}
@@ -556,7 +640,8 @@
 
 <footer class="page-footer">
     <div class="footer-left">
-        <Kya />
+        <Kya autoOpen={autoOpenKya} />
+        <FaqModal />
         <a
             href="http://github.com/game-of-prompts"
             target="_blank"
@@ -565,6 +650,15 @@
             title="GitHub Repository"
         >
             <Github class="h-4 w-4" />
+        </a>
+        <a
+            href="https://game-of-prompts.github.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-foreground transition-colors ml-2"
+            title="GoP Landing"
+        >
+            <Globe class="h-4 w-4" />
         </a>
         <a
             href="https://t.me/unstopbots"
@@ -604,24 +698,55 @@
 <WalletAddressChangeHandler />
 
 <style lang="postcss">
+    :global(:root) {
+        --gop-nav-top: 0.75rem;
+        --gop-nav-height: 4rem;
+    }
+
     :global(body) {
         background-color: hsl(var(--background));
     }
 
     /* ===== Navbar — Dark Cyberpunk ===== */
     .navbar-container {
-        @apply sticky top-0 z-50 w-full backdrop-blur-lg;
-        background-color: hsl(var(--background) / 0.85);
-        border-bottom: 1px solid rgba(74, 222, 128, 0.08);
+        @apply sticky z-50;
+        top: var(--gop-nav-top);
+        width: fit-content;
+        max-width: calc(100vw - 1rem);
+        margin-inline: auto;
+        border-radius: 30px / 24px;
+        background-color: hsl(var(--background) / 0.82);
+        border: 1px solid rgba(74, 222, 128, 0.14);
+        box-shadow:
+            0 14px 34px rgba(0, 0, 0, 0.28),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(14px) saturate(1.2);
+        -webkit-backdrop-filter: blur(14px) saturate(1.2);
+        overflow: clip;
+        transition:
+            transform 200ms ease,
+            opacity 200ms ease;
+        will-change: transform, opacity;
+    }
+
+    .navbar-hidden {
+        transform: translateY(
+            calc(-1 * (var(--gop-nav-top) + var(--gop-nav-height) + 1rem))
+        );
+        opacity: 0;
+        pointer-events: none;
     }
 
     .navbar-content {
-        @apply container flex h-16 items-center;
+        @apply flex h-16 items-center px-3 md:px-4;
         @apply justify-end md:justify-start;
+        gap: 0.5rem;
+        width: fit-content;
+        max-width: calc(100vw - 1.5rem);
     }
 
     .logo-container {
-        @apply mr-6 flex items-center;
+        @apply mr-3 flex items-center;
     }
 
     .logo-image {
@@ -632,7 +757,7 @@
     }
 
     .desktop-nav {
-        @apply hidden md:flex flex-1;
+        @apply hidden md:flex;
     }
 
     .nav-links {
@@ -660,7 +785,7 @@
     }
 
     .user-section {
-        @apply items-center gap-3;
+        @apply items-center gap-3 md:ml-2;
     }
 
     .mobile-menu-button {
@@ -674,10 +799,12 @@
 
     .mobile-nav {
         @apply md:hidden fixed left-0 right-0 z-40 shadow-lg flex flex-col;
-        top: 4rem;
+        top: calc(var(--gop-nav-top) + var(--gop-nav-height) + 0.35rem);
         background-color: hsl(var(--background));
         border-bottom: 1px solid rgba(74, 222, 128, 0.08);
-        max-height: calc(100vh - 4rem);
+        max-height: calc(
+            100vh - (var(--gop-nav-top) + var(--gop-nav-height) + 0.35rem)
+        );
         overflow-y: auto;
     }
 
@@ -763,6 +890,27 @@
         }
         to {
             transform: translateX(-100%);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .page-footer {
+            @apply h-auto px-4 py-2 gap-2;
+            flex-wrap: wrap;
+        }
+
+        .footer-center {
+            order: -1;
+            flex: 0 0 100%;
+        }
+
+        .footer-left,
+        .footer-right {
+            flex: 1 1 0;
+        }
+
+        .footer-right {
+            justify-content: flex-end;
         }
     }
 </style>

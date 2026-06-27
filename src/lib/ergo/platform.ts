@@ -6,7 +6,6 @@ import {
     type ValidParticipation,
     type AnyGame
 } from '../common/game';
-declare const ergo: any;
 import { create_game } from './actions/create_game';
 import { explorer_uri, USE_CHAINED_TRANSACTIONS } from './envs';
 import { submit_score } from './actions/submit_score';
@@ -34,6 +33,22 @@ import { contribute_to_ceremony } from './actions/ceremony';
 import { batch_participations } from './actions/batch_participations';
 import { publish_solver_id } from './actions/publish_solver_id';
 
+type ErgoWalletApi = {
+    get_current_height?: () => Promise<number>;
+};
+
+function getErgoWallet(): ErgoWalletApi | null {
+    return (globalThis as typeof globalThis & { ergo?: ErgoWalletApi }).ergo ?? null;
+}
+
+function requireWallet(): ErgoWalletApi {
+    const wallet = getErgoWallet();
+    if (!wallet) {
+        throw new Error("Wallet not connected");
+    }
+    return wallet;
+}
+
 interface CreateGoPGamePlatformParams {
     gameServiceId: string;
     hashedSecret: string; // Hex string of blake2b256(S)
@@ -41,6 +56,7 @@ interface CreateGoPGamePlatformParams {
     resolverStakeAmount: bigint | BigInt;
     participationFeeAmount: bigint | BigInt;
     commissionPercentage: number;
+    creatorSlashRatioPercentage: number;
     judges: string[];
     gameDetailsJson: string; // JSON string with title, description, serviceId, etc.
     perJudgeCommissionPercentage: number;
@@ -97,8 +113,9 @@ export class ErgoPlatform implements Platform {
     time_per_block = 2 * 60 * 1000;  // every 2 minutes
 
     async get_current_height(): Promise<number> {
+        const wallet = getErgoWallet();
         const results = await Promise.allSettled([
-            ergo.get_current_height(),
+            ...(wallet?.get_current_height ? [wallet.get_current_height()] : []),
             fetch(get(explorer_uri) + '/api/v1/networkState')
                 .then(res => res.ok ? res.json() : Promise.reject())
                 .then(data => data.height)
@@ -124,7 +141,7 @@ export class ErgoPlatform implements Platform {
     }
 
     public async createGoPGame(params: CreateGoPGamePlatformParams): Promise<string[] | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         try {
             return await create_game(
@@ -134,6 +151,7 @@ export class ErgoPlatform implements Platform {
                 params.resolverStakeAmount as bigint,
                 params.participationFeeAmount as bigint,
                 params.commissionPercentage,
+                params.creatorSlashRatioPercentage,
                 params.judges,
                 params.gameDetailsJson,
                 params.perJudgeCommissionPercentage,
@@ -144,8 +162,8 @@ export class ErgoPlatform implements Platform {
             );
         } catch (error) {
             console.error("Error en el método de plataforma createGoPGame:", error);
-            if (error instanceof Error) throw new Error(`No se pudo crear el juego: ${error.message}`);
-            throw new Error("Ocurrió un error desconocido al crear el juego.");
+            if (error instanceof Error) throw new Error(`Failed to create the game: ${error.message}`);
+            throw new Error("An unknown error occurred while creating the game.");
         }
     }
 
@@ -156,7 +174,7 @@ export class ErgoPlatform implements Platform {
         solverId_string: string,
         hashLogs_hex: string
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         return await submit_score(
             game.gameId,
@@ -175,7 +193,7 @@ export class ErgoPlatform implements Platform {
         secretS_hex: string,
         acceptedJudgeNominations: string[]
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         return await resolve_game(game, participations, secretS_hex, acceptedJudgeNominations);
     }
@@ -185,7 +203,7 @@ export class ErgoPlatform implements Platform {
         secretS_hex: string,
         claimerAddressString: string
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         return await cancel_game(game, secretS_hex, claimerAddressString);
     }
@@ -194,7 +212,7 @@ export class ErgoPlatform implements Platform {
         game: GameCancellation, // Tipo específico: el juego debe estar en estado de cancelación.
         claimerAddressString: string
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         return await drain_cancelled_game_stake(game, claimerAddressString);
     }
@@ -207,7 +225,7 @@ export class ErgoPlatform implements Platform {
         game: GameResolution,
         participations: ValidParticipation[]
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
         return await end_game(game, participations);
     }
 
@@ -220,7 +238,7 @@ export class ErgoPlatform implements Platform {
     async toEndGame(
         game: GameResolution
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
         return await to_end_game(game);
     }
 
@@ -232,7 +250,7 @@ export class ErgoPlatform implements Platform {
         game: GameResolution,
         participations: ValidParticipation[]
     ): Promise<string[] | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
         return await end_game_chained(game, participations);
     }
 
@@ -243,7 +261,7 @@ export class ErgoPlatform implements Platform {
     async judgesInvalidateVote(
         invalidatedParticipation: ValidParticipation
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         // Just create the opinion
         const txId = await createOrUpdateOpinion(
@@ -261,7 +279,7 @@ export class ErgoPlatform implements Platform {
         invalidatedParticipation: ValidParticipation,
         judgeVoteDataInputs: Box<Amount>[]
     ): Promise<string[] | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         const requiredVotes = Math.floor(game.judges.length / 2) + 1;
 
@@ -288,7 +306,7 @@ export class ErgoPlatform implements Platform {
         game: GameResolution,
         invalidatedParticipation: ValidParticipation
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         // Just create the opinion (unlocked)
         const txId = await createOrUpdateOpinion(
@@ -306,7 +324,7 @@ export class ErgoPlatform implements Platform {
         invalidatedParticipation: ValidParticipation,
         judgeVoteDataInputs: Box<Amount>[]
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
 
         const requiredVotes = Math.floor(game.judges.length / 2) + 1;
 
@@ -328,7 +346,7 @@ export class ErgoPlatform implements Platform {
         currentResolved: ValidParticipation | null,
         newResolverPkHex: string
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
         return await include_omitted_participation(game, omittedParticipation, currentResolved, newResolverPkHex);
     }
 
@@ -343,7 +361,7 @@ export class ErgoPlatform implements Platform {
         game: GameCancellation,
         participation: ValidParticipation
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
         if (game.status !== 'Cancelled_Draining') {
             throw new Error("El juego no está en un estado que permita reembolsos.");
         }
@@ -363,7 +381,7 @@ export class ErgoPlatform implements Platform {
         game: GameActive,
         participation: ValidParticipation
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected");
+        requireWallet();
         if (game.status !== 'Active') {
             throw new Error("El juego no está en estado activo.");
         }
@@ -394,7 +412,7 @@ export class ErgoPlatform implements Platform {
             ergoTree_hex: string;
         }
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected.");
+        requireWallet();
         if (game.status !== 'Active') {
             throw new Error("The game is not in an active state.");
         }
@@ -421,7 +439,7 @@ export class ErgoPlatform implements Platform {
      * @returns The transaction ID if successful.
      */
     async contribute_to_ceremony(game: GameActive, donation?: bigint): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected.");
+        requireWallet();
         if (game.status !== 'Active') {
             throw new Error("The game is not in an active state.");
         }
@@ -440,7 +458,7 @@ export class ErgoPlatform implements Platform {
         participations: ValidParticipation[],
         batches: Box<Amount>[]
     ): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected.");
+        requireWallet();
         if (game.status !== 'Resolution') {
             throw new Error("Game must be in Resolution state to batch participations.");
         }
@@ -459,7 +477,7 @@ export class ErgoPlatform implements Platform {
      * @returns A promise that resolves to the transaction ID.
      */
     async submitCreatorOpinion(game: AnyGame): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected.");
+        requireWallet();
         try {
             return await createOrUpdateOpinion(GAME, game.gameId, true, null, true);
         } catch (error) {
@@ -470,7 +488,7 @@ export class ErgoPlatform implements Platform {
     }
 
     async publishSolverId(solverId: string): Promise<string | null> {
-        if (!ergo) throw new Error("Wallet not connected.");
+        requireWallet();
         try {
             return await publish_solver_id(solverId);
         } catch (error) {

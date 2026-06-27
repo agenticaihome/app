@@ -10,7 +10,7 @@ export const web_explorer_uri = writable<string>(default_web_explorer_uri);
 export const web_explorer_suffixes = writable<{ tx: string, addr: string, tkn: string }>({
     tx: "transactions/",
     addr: "addresses/",
-    tkn: "tokens/"
+    tkn: "token/"
 });
 
 export const web_explorer_uri_tx = derived([web_explorer_uri, web_explorer_suffixes], ([$uri, $suffixes]) => $uri + $suffixes.tx);

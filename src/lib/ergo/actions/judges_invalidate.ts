@@ -72,6 +72,8 @@ export async function judges_invalidate(
     const newDeadline = BigInt(currentHeight + game.constants.JUDGE_PERIOD + JUDGE_PERIOD_MARGIN);
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
 
+    const resolverPenalization = Math.floor(game.resolverCommission * game.creatorSlashRatio / game.constants.COMMISSION_DENOMINATOR);
+
     // --- 4. Build the new resolution box ---
     const recreatedGameBox = new OutputBuilder(newGameBoxValue, resolutionErgoTree)
         .addTokens(gameTokens) // Updated tokens list
@@ -91,16 +93,17 @@ export async function judges_invalidate(
             // --- R7: participatingJudges: Coll[Coll[Byte]] ---
             R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
 
-            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline]
+            // R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline]
             R8: SColl(SLong, [
                 BigInt(game.createdAt),
                 BigInt(game.timeWeight),
                 BigInt(game.deadlineBlock),
                 BigInt(game.resolverStakeAmount),
                 BigInt(game.participationFeeAmount),
-                BigInt(game.perJudgeCommission) + BigInt(game.resolverCommission),
-                0n,  // resolver commision goes to judges
+                BigInt(game.perJudgeCommission) + BigInt(resolverPenalization),
+                BigInt(game.resolverCommission) - BigInt(resolverPenalization),
                 BigInt(game.devCommission),
+                BigInt(game.creatorSlashRatio),
                 BigInt(newDeadline)
             ]).toHex(),
 

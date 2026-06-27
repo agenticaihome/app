@@ -17,6 +17,7 @@
   val REPUTATION_PROOF_SCRIPT_HASH = fromBase16("`+REPUTATION_PROOF_SCRIPT_HASH+`")
   val END_GAME_SCRIPT_HASH = fromBase16("`+END_GAME_SCRIPT_HASH+`")
   val FALSE_SCRIPT_HASH = fromBase16("`+FALSE_SCRIPT_HASH+`")
+  val COMMISSION_DENOMINATOR = `+COMMISSION_DENOMINATOR+`L
 
 
   // =================================================================
@@ -27,7 +28,7 @@
   // R5: Coll[Byte]                 - Seed
   // R6: (Coll[Byte], Coll[Byte])   - (revealedSecretS, winnerCandidateCommitment): El secreto y el candidato a ganador.
   // R7: Coll[Coll[Byte]]           - participatingJudges: Lista de IDs de tokens de reputación de los jueces.
-  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, resolutionDeadline]
+  // R8: Coll[Long]                 - numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommissionPercentage, creatorSlashRatio, resolutionDeadline]
   // R9: Coll[Coll[Byte]]           - gameProvenance: [gameDetailsJsonHex, ParticipationTokenID, devScript, resolverErgoTree]
 
   // =================================================================
@@ -51,7 +52,8 @@
   val perJudgeCommissionPercentage = numericalParams(5)
   val resolverCommissionPercentage = numericalParams(6)
   val devCommissionPercentage = numericalParams(7)
-  val resolutionDeadline = numericalParams(8)
+  val creatorSlashRatio = numericalParams(8)
+  val resolutionDeadline = numericalParams(9)
 
   val gameProvenance = SELF.R9[Coll[Coll[Byte]]].get
   // gameProvenance(0) = gameDetailsJsonHex
@@ -86,11 +88,17 @@
 
   val getBotBoxHeight = { (participationBox: Box) =>
     val pBoxSolverId = participationBox.R7[Coll[Byte]].get
-    val candidateBotBoxes = CONTEXT.dataInputs.filter({ (box: Box) =>
-      box.R4[Coll[Byte]].isDefined &&
-      box.R4[Coll[Byte]].get == pBoxSolverId &&
-      blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH
-    })
+    val candidateBotBoxes = CONTEXT.dataInputs.filter { (box: Box) =>
+      if (blake2b256(box.propositionBytes) == FALSE_SCRIPT_HASH) {
+        box.R4[Coll[Byte]].isDefined &&
+        box.R4[Coll[Byte]].get == pBoxSolverId
+      } else if (blake2b256(box.propositionBytes) == REPUTATION_PROOF_SCRIPT_HASH) {
+        box.R5[Coll[Byte]].isDefined &&
+        box.R5[Coll[Byte]].get == pBoxSolverId
+      } else {
+        false
+      }
+    }
 
     if (candidateBotBoxes.size > 0) {
       val oldestBox = candidateBotBoxes.fold(candidateBotBoxes(0), { (acc: Box, curr: Box) =>
@@ -144,8 +152,9 @@
         if (recreatedGameBox.R6[(Coll[Byte], Coll[Byte])].get._2 == Coll[Byte]() && invalidatedCandidateBoxes.size == 1) {
           val invalidatedCandidateBox = invalidatedCandidateBoxes(0)
           
-          val expectedJudgeComm = perJudgeCommissionPercentage + (if (penalizeResolver) resolverCommissionPercentage else 0L)
-          val expectedResolverComm = if (penalizeResolver) 0L else resolverCommissionPercentage
+          val resolverPenalization = if (penalizeResolver) resolverCommissionPercentage * creatorSlashRatio / COMMISSION_DENOMINATOR else 0L
+          val expectedJudgeComm = perJudgeCommissionPercentage + resolverPenalization
+          val expectedResolverComm = resolverCommissionPercentage - resolverPenalization
 
           val gameBoxIsRecreatedCorrectly = {
             recreatedGameBox.tokens(0)._1 == gameNftId &&
@@ -160,11 +169,12 @@
             recreatedGameBox.R8[Coll[Long]].get(5) == expectedJudgeComm &&
             recreatedGameBox.R8[Coll[Long]].get(6) == expectedResolverComm &&
             recreatedGameBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
+            recreatedGameBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
             recreatedGameBox.R9[Coll[Coll[Byte]]].get == gameProvenance
           }
           
           val fundsReturnedToPool = box_value(recreatedGameBox) >= box_value(SELF) + box_value(invalidatedCandidateBox)
-          val deadlineIsExtended = recreatedGameBox.R8[Coll[Long]].get(8) >= HEIGHT + JUDGE_PERIOD
+          val deadlineIsExtended = recreatedGameBox.R8[Coll[Long]].get(9) >= HEIGHT + JUDGE_PERIOD
           
           fundsReturnedToPool && deadlineIsExtended && gameBoxIsRecreatedCorrectly
         } else { false }
@@ -237,13 +247,12 @@
 
                 if (validCurrentCandidate) {
                   // Se determina el nuevo ganador comparando puntajes AJUSTADOS y alturas de bloque
-                  // Formula: score = game_score * (TIME_WEIGHT + DEADLINE - HEIGHT)
-                  val newBotHeight = getBotBoxHeight(omittedWinnerBox)
-                  val currentBotHeight = getBotBoxHeight(currentCandidateBox)
-                  val newScoreAdjusted = newScore * (1L + (timeWeight * (deadline - newBotHeight)))
-                  val currentScoreAdjusted = currentScore * (1L + (timeWeight * (deadline - currentBotHeight)))
+                  val newHeight = omittedWinnerBox.creationInfo._1
+                  val currentHeight = currentCandidateBox.creationInfo._1
+                  val newScoreAdjusted = newScore * (1L + (timeWeight * (deadline - newHeight)))
+                  val currentScoreAdjusted = currentScore * (1L + (timeWeight * (deadline - currentHeight)))
 
-                  if (newScoreAdjusted > currentScoreAdjusted || (newScoreAdjusted == currentScoreAdjusted && newBotHeight < currentBotHeight)) {
+                  if (newScoreAdjusted > currentScoreAdjusted || (newScoreAdjusted == currentScoreAdjusted && newHeight < currentHeight)) {
                     omittedWinnerBox.R5[Coll[Byte]].get // El nuevo es mejor
                   } else {
                     Coll[Byte]() // El actual sigue siendo el mejor
@@ -278,7 +287,8 @@
                 recreatedGameBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
                 recreatedGameBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
                 recreatedGameBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
-                recreatedGameBox.R8[Coll[Long]].get(8) == resolutionDeadline &&
+                recreatedGameBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
+                recreatedGameBox.R8[Coll[Long]].get(9) == resolutionDeadline &&
                 recreatedGameBox.R9[Coll[Coll[Byte]]].get(0) == gameProvenance(0) &&
                 recreatedGameBox.R9[Coll[Coll[Byte]]].get(1) == gameProvenance(1) &&
                 recreatedGameBox.R9[Coll[Coll[Byte]]].get(2) == devScript &&
@@ -327,7 +337,8 @@
           recreatedGameBox.R8[Coll[Long]].get(5) == perJudgeCommissionPercentage &&
           recreatedGameBox.R8[Coll[Long]].get(6) == resolverCommissionPercentage &&
           recreatedGameBox.R8[Coll[Long]].get(7) == devCommissionPercentage &&
-          recreatedGameBox.R8[Coll[Long]].get(8) == resolutionDeadline &&
+          recreatedGameBox.R8[Coll[Long]].get(8) == creatorSlashRatio &&
+          recreatedGameBox.R8[Coll[Long]].get(9) == resolutionDeadline &&
           recreatedGameBox.R9[Coll[Coll[Byte]]].get == gameProvenance
         }
 

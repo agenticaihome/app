@@ -6,7 +6,12 @@ import {
 } from '@fleet-sdk/core';
 import { SColl, SByte, SPair, SLong, SInt } from '@fleet-sdk/serializer';
 import { hexToBytes, parseBox, pkHexToBase58Address } from '$lib/ergo/utils';
-import { type GameResolution, type ValidParticipation } from '$lib/common/game';
+import {
+    calculateEffectiveScore,
+    resolve_participation_commitment,
+    type GameResolution,
+    type ValidParticipation
+} from '$lib/common/game';
 import { getGopGameResolutionErgoTreeHex } from '../contract';
 import { prependHexPrefix } from '$lib/utils';
 import { stringToBytes } from '@scure/base';
@@ -42,6 +47,49 @@ export async function include_omitted_participation(
 
     const resolverErgoTree = (((game.resolutionDeadline - game.constants.JUDGE_PERIOD) + game.constants.RESOLVER_OMISSION_NO_PENALTY_PERIOD) < currentHeight) ? prependHexPrefix(hexToBytes(newResolverPkHex)!) : hexToBytes(game.resolverScript_Hex)!;
 
+    const omittedScore = resolve_participation_commitment(
+        omittedParticipation,
+        game.revealedS_Hex,
+        game.seed
+    );
+    if (omittedScore === null) {
+        throw new Error("The omitted participation does not contain a valid revealed score.");
+    }
+
+    let nextWinnerCommitmentHex = omittedParticipation.commitmentC_Hex;
+    if (currentWinnerParticipation) {
+        const currentWinnerScore = resolve_participation_commitment(
+            currentWinnerParticipation,
+            game.revealedS_Hex,
+            game.seed
+        );
+        if (currentWinnerScore === null) {
+            throw new Error("The current winner participation does not contain a valid revealed score.");
+        }
+
+        const omittedAdjustedScore = calculateEffectiveScore(
+            game,
+            omittedScore,
+            omittedParticipation.creationHeight
+        );
+        const currentAdjustedScore = calculateEffectiveScore(
+            game,
+            currentWinnerScore,
+            currentWinnerParticipation.creationHeight
+        );
+
+        const omittedBeatsCurrent =
+            omittedAdjustedScore > currentAdjustedScore ||
+            (
+                omittedAdjustedScore === currentAdjustedScore &&
+                omittedParticipation.creationHeight < currentWinnerParticipation.creationHeight
+            );
+
+        if (!omittedBeatsCurrent) {
+            throw new Error("The omitted participation does not beat the current winner under the adjusted score rule.");
+        }
+    }
+
     // --- 3. Build Transaction Outputs ---
 
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();;
@@ -59,13 +107,13 @@ export async function include_omitted_participation(
             // --- R6: (revealedSecretS, winnerCandidateCommitment) ---
             R6: SPair(
                 SColl(SByte, hexToBytes(game.revealedS_Hex)!),
-                SColl(SByte, hexToBytes(omittedParticipation.commitmentC_Hex)!)
+                SColl(SByte, hexToBytes(nextWinnerCommitmentHex)!)
             ).toHex(),
 
             // --- R7: participatingJudges: Coll[Coll[Byte]] ---
             R7: SColl(SColl(SByte), game.judges.map((j) => hexToBytes(j)!)).toHex(),
 
-            // --- R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, resolutionDeadline] ---
+            // --- R8: numericalParameters: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline] ---
             R8: SColl(SLong, [
                 BigInt(game.createdAt),
                 BigInt(game.timeWeight),
@@ -75,6 +123,7 @@ export async function include_omitted_participation(
                 BigInt(game.perJudgeCommission),
                 BigInt(game.resolverCommission),
                 BigInt(game.devCommission),
+                BigInt(game.creatorSlashRatio),
                 BigInt(game.resolutionDeadline)
             ]).toHex(),
 

@@ -6,7 +6,9 @@
     import { game_detail } from "$lib/common/store";
     import { Button } from "$lib/components/ui/button";
     import { Badge } from "$lib/components/ui/badge";
+    import { explorer_uri } from "$lib/ergo/envs";
     import { onMount, onDestroy } from "svelte";
+    import { get } from "svelte/store";
     import {
         isGameParticipationEnded,
         isGameSuspended,
@@ -18,6 +20,7 @@
         getPrizePool,
     } from "$lib/common/game";
     import { fetch_token_details, fetchParticipations } from "$lib/ergo/fetch";
+    import { fetchFileSourcesByHash } from "source-application";
     import { formatTokenBigInt } from "$lib/utils";
 
     export let game: Game;
@@ -48,6 +51,9 @@
 
     let tokenSymbol = "ERG";
     let tokenDecimals = 9;
+    let resolvedImageSrc = game?.content?.imageURL ?? "";
+    let imageRequestId = 0;
+    let ceremonyOpen = false;
 
     $: currentPrizePool = getPrizePool(game, participations || []);
 
@@ -122,6 +128,7 @@
 
     async function updateStatus() {
         if (!game) return;
+        ceremonyOpen = await isOpenCeremony(game);
         switch (game.status) {
             case GameState.Active:
                 if (gameSuspended) {
@@ -207,10 +214,47 @@
         timer = null;
     }
 
+    async function resolveImage() {
+        const fallbackImage = game?.content?.imageURL ?? "";
+        resolvedImageSrc = fallbackImage;
+
+        if (!game?.content?.image) {
+            return;
+        }
+
+        const requestId = ++imageRequestId;
+
+        try {
+            const sources = await fetchFileSourcesByHash(
+                game.content.image,
+                get(explorer_uri),
+            );
+            const primarySourceUrl =
+                sources
+                    .map((source) => source.source?.urlLink?.trim() ?? "")
+                    .find((url) => url.length > 0) ?? "";
+
+            if (requestId !== imageRequestId) {
+                return;
+            }
+
+            if (primarySourceUrl) {
+                resolvedImageSrc = primarySourceUrl;
+            }
+        } catch {
+            if (requestId !== imageRequestId) {
+                return;
+            }
+
+            resolvedImageSrc = fallbackImage;
+        }
+    }
+
     async function initialize() {
         if (!game || !game.platform || initializedBoxId === game.boxId) return;
         initializedBoxId = game.boxId;
         cleanup();
+        await resolveImage();
 
         if (game.participationTokenId) {
             try {
@@ -231,6 +275,7 @@
 
         participationEnded = await isGameParticipationEnded(game);
         gameSuspended = await isGameSuspended(game);
+        ceremonyOpen = await isOpenCeremony(game);
         if (
             game.status === GameState.Active ||
             game.status === GameState.Resolution
@@ -290,13 +335,15 @@
         <div
             class="relative w-full lg:w-2/5 aspect-video lg:aspect-auto overflow-hidden bg-muted/50"
         >
-            {#if game.content?.imageURL}
+            {#if resolvedImageSrc}
                 <img
-                    src={game.content.imageURL}
+                    src={resolvedImageSrc}
                     alt={game.content.title}
-                    class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    class="game-card-image w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
                 />
+                <div class="game-card-image-cyber absolute inset-0" />
+                <div class="game-card-image-scanlines absolute inset-0" />
                 <div
                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
                 />
@@ -321,9 +368,11 @@
                                 Invited Judge
                             </Badge>
                         {/if}
-                        <Badge variant="secondary" class="text-xs">
-                            {participations?.length ?? "n/a"} Players
-                        </Badge>
+                        {#if !ceremonyOpen}
+                            <Badge variant="secondary" class="text-xs">
+                                {participations?.length ?? "n/a"} Players
+                            </Badge>
+                        {/if}
                     </div>
                     <div
                         class="px-3 py-1 rounded-full text-xs font-semibold {statusClasses}"
@@ -488,5 +537,47 @@
 
     :global(.gop-btn-primary:hover) {
         box-shadow: 0 0 30px rgba(34, 197, 94, 0.5) !important;
+    }
+
+    .game-card-image-cyber {
+        pointer-events: none;
+        background:
+            radial-gradient(
+                circle at 18% 20%,
+                rgba(34, 197, 94, 0.22),
+                transparent 48%
+            ),
+            linear-gradient(
+                135deg,
+                rgba(16, 185, 129, 0.12),
+                rgba(15, 23, 42, 0.2)
+            );
+        mix-blend-mode: overlay;
+        opacity: 0.32;
+    }
+
+    .game-card-image-scanlines {
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0),
+            rgba(0, 0, 0, 0) 2px,
+            rgba(74, 222, 128, 0.04) 2px,
+            rgba(74, 222, 128, 0.04) 4px
+        );
+        mix-blend-mode: soft-light;
+        opacity: 0.45;
+    }
+
+    :global(.light) .game-card-image {
+        filter: saturate(1.16) contrast(1.08) hue-rotate(-5deg);
+    }
+
+    :global(.light) .game-card-image-cyber {
+        opacity: 0.42;
+    }
+
+    :global(.light) .game-card-image-scanlines {
+        opacity: 0.58;
     }
 </style>

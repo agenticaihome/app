@@ -9,16 +9,20 @@
         GameState,
         iGameDrainingStaking,
         getPrizePool,
-        isGameParticipationEnded,
         isGameEnded,
-        isGameSuspended,
-        isOpenCeremony,
         resolve_participation_commitment,
         calculateEffectiveScore,
-        isOpenSolverSubmit,
         isDevFriendly,
-        isResolutionAllowed,
     } from "$lib/common/game";
+    import { sha256 } from "$lib/common/utils";
+    import {
+        GameContractPhase,
+        GAME_PHASE_DEFINITIONS,
+        type GamePhaseSnapshot,
+        type GameUiSubphaseValue,
+        deriveGamePhaseSnapshot,
+        getSubphaseSequence,
+    } from "$lib/common/game-phase";
     import { marked } from "marked";
     import {
         address,
@@ -29,8 +33,7 @@
         reputation_proof,
         muted,
         audio_element,
-        user_volume,
-        current_height,
+        user_volume
     } from "$lib/common/store";
     import { ErgoPlatform } from "$lib/ergo/platform";
     import { onDestroy, onMount, tick } from "svelte";
@@ -44,9 +47,17 @@
     } from "$lib/ergo/fetch";
     import { remove_opinion } from "reputation-system";
     // UI COMPONENTS
-    import { Button } from "$lib/components/ui/button";
+    import { Button, buttonVariants } from "$lib/components/ui/button";
+    import BodyScrollLock from "$lib/components/BodyScrollLock.svelte";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label/index.js";
+    import {
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+        SelectValue,
+    } from "$lib/components/ui/select";
     import { Textarea } from "$lib/components/ui/textarea";
     // ICONS
     import {
@@ -77,11 +88,11 @@
         Lock as LockIcon,
         Wand2,
         Music,
-        VolumeX,
         Terminal,
         ArrowRight,
         Copy,
         Loader2,
+        Clock3,
     } from "lucide-svelte";
     // UTILITIES
     import { format, formatDistanceToNow } from "date-fns";
@@ -100,13 +111,14 @@
         uint8ArrayToHex,
         pkHexToBase58Address,
         hexToBytes,
+        fetchServiceDownloadUrl,
     } from "$lib/ergo/utils";
     import { mode } from "mode-watcher";
     import { blake2b256 as fleetBlake2b256 } from "@fleet-sdk/crypto";
     import { isDevMode } from "$lib/ergo/envs";
 
     // SOURCE APPLICATION IMPORTS
-    import { FileCard, FileSourceCreation } from "source-application";
+    import { FileCard, FileSourceCreation, HASH_ALGORITHM_IDS } from "source-application";
     import { fetchFileSourcesByHash } from "source-application";
 
     import {
@@ -114,6 +126,7 @@
         getParticipationFee,
         formatTokenBigInt,
         prependHexPrefix,
+        formatReputation,
     } from "$lib/utils";
     import {
         formatUserFacingError,
@@ -128,21 +141,92 @@
     import ShareModal from "./ShareModal.svelte";
     import SolverSourceModal from "./SolverSourceModal.svelte";
     import GameTimeline from "$lib/components/GameTimeline.svelte";
+    import AI_ASSISTANT from "$lib/components/AI_ASSISTANT.svelte";
+    import { hoverCorners } from "$lib/hoverCorners";
 
     const strictMode = true;
 
     const PARTICIPATION_BATCH_THRESHOLD = 2;
+    const NODO_INSTALLATION = "https://github.com/celaut-project/nodo?tab=readme-ov-file#installation";
+    const JUDGE_CHECK_SERVICE = "N/A";
+    const ROBOT_DEVELOPMENT_GUIDE = "https://raw.githubusercontent.com/game-of-prompts/.github/refs/heads/main/ROBOT_DEVELOPMENT_GUIDE.md";
+
+    type HoverHandle = { destroy: () => void };
+    type ErgoWalletApi = {
+        get_change_address?: () => Promise<string>;
+        get_balance?: (tokenId?: string) => Promise<bigint | number | string>;
+    };
+
+    function getErgoWallet(): ErgoWalletApi | null {
+        return (globalThis as typeof globalThis & { ergo?: ErgoWalletApi }).ergo ?? null;
+    }
+
+    function hoverCornersWhenClosed(node: HTMLElement, isOpen: boolean) {
+        let handle: HoverHandle | null = null;
+
+        const applyState = (open: boolean) => {
+            if (open) {
+                if (handle) {
+                    handle.destroy();
+                    handle = null;
+                }
+                return;
+            }
+            if (typeof window !== "undefined") {
+                const isTouch =
+                    "ontouchstart" in window ||
+                    navigator.maxTouchPoints > 0;
+                if (
+                    isTouch ||
+                    window.matchMedia("(max-width:768px)").matches
+                ) {
+                    return;
+                }
+            }
+            if (!handle) {
+                handle = hoverCorners(node, { keepDot: true });
+            }
+        };
+
+        applyState(isOpen);
+
+        return {
+            update(open: boolean) {
+                applyState(open);
+            },
+            destroy() {
+                if (handle) {
+                    handle.destroy();
+                    handle = null;
+                }
+            },
+        };
+    }
 
     // --- COMPONENT STATE ---
     let game: AnyGame | null = null;
     let isLoaded = false;
     let hasHydrated = false;
     let primaryAction: string | null = null;
+    let technicalBundleOpen = false;
+    let technicalDetailsOpen = false;
+    let imageSourcesOpen = false;
+    let serviceSourcesOpen = false;
+    let paperSourcesOpen = false;
+    let soundtrackSourcesOpen = false;
+    let showProgressDetails = false;
 
     $: isBeforeDeadline = targetDate
         ? new Date().getTime() < targetDate
         : false;
     $: showLoadingScreen = !hasHydrated || (game ? !isLoaded : false);
+    $: if (!technicalBundleOpen) {
+        technicalDetailsOpen = false;
+        imageSourcesOpen = false;
+        serviceSourcesOpen = false;
+        paperSourcesOpen = false;
+        soundtrackSourcesOpen = false;
+    }
     $: primaryAction = getPrimaryAction(
         game,
         openCeremony,
@@ -439,6 +523,7 @@
     let errorMessage: string | null = null;
     let warningMessage: string | null = null;
     let jsonUploadError: string | null = null;
+    let checksumStatus: 'valid' | 'invalid' | 'missing' | null = null;
     let isSubmitting: boolean = false;
     let showShareModal = false;
 
@@ -460,24 +545,672 @@
     let claimRefundError: { [boxId: string]: string | null } = {};
     let claimRefundSuccessTxId: { [boxId: string]: string | null } = {};
 
-    const progressCircleBase =
-        "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300";
-    const progressDefaultCircle =
-        "bg-gray-200 border-gray-300 text-gray-400 dark:bg-gray-700 dark:border-gray-600";
-    const progressActiveCircle =
-        "bg-blue-600 border-blue-600 text-white shadow-lg scale-110";
-    const progressJudgeCircle =
-        "bg-blue-600 border-blue-600 text-white shadow-lg scale-110";
-    const progressSuspendedCircle =
-        "bg-red-600 border-red-600 text-white shadow-lg scale-110";
+    interface PhaseActionItem {
+        actor: string;
+        text: string;
+    }
 
-    const ProgressPhase = {
-        ACTIVE: "active",
-        JUDGE: "judge",
-        SUSPENDED: "suspended",
-        CANCELLED: "cancelled",
-        FINALIZED: "finalized",
-    } as const;
+    interface ContractStateCard {
+        id: string;
+        label: string;
+        description: string;
+        badge: string;
+        status: "current" | "completed" | "pending" | "skipped" | "alternate";
+        icon: typeof Sparkles;
+    }
+
+    const MAIN_CONTRACT_FLOW = [
+        GameContractPhase.ACTIVE,
+        GameContractPhase.RESOLUTION,
+        GameContractPhase.FINALIZED,
+    ] as const;
+
+    const SUBPHASE_HINTS: Record<GameUiSubphaseValue, string> = {
+        strategy_upload:
+            "Players can still upload solver services while anyone can keep adding randomness.",
+        seed_lockdown:
+            "Bot uploads are closed, but the ceremony is still open until the seed deadline.",
+        playing:
+            "The seed is fixed and players can execute their bots and submit participations.",
+        awaiting_resolution:
+            "Participation is closed and the creator must reveal the secret before suspension.",
+        suspended:
+            "This occurs if and only if the game fails to enter the RESOLUTION phase in time — i.e. if the creator does not reveal the secret before the resolution deadline, the game becomes suspended and players can recover their funds.",
+        judging:
+            "The secret is revealed and judges can verify or challenge the candidate.",
+        ready_to_finalize:
+            "The judge window ended and payouts can now be distributed.",
+        cancelled_locked:
+            "The game is cancelled, but the next creator-stake drain is still cooling down.",
+        cancelled_draining:
+            "The game is cancelled and the next creator-stake drain is unlocked.",
+        finalized: "The lifecycle is complete and payouts were already distributed.",
+        unknown: "The current phase could not be derived.",
+    };
+
+    const phaseIcons: Record<GameUiSubphaseValue, typeof Sparkles> = {
+        strategy_upload: Sparkles,
+        seed_lockdown: LockIcon,
+        playing: Cpu,
+        awaiting_resolution: Calendar,
+        suspended: AlertTriangle,
+        judging: Gavel,
+        ready_to_finalize: Trophy,
+        cancelled_locked: XCircle,
+        cancelled_draining: XCircle,
+        finalized: Trophy,
+        unknown: Info,
+    };
+
+    function getPhaseTone(subphase: GameUiSubphaseValue) {
+        switch (subphase) {
+            case "strategy_upload":
+                return {
+                    iconBg: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+                    titleText: "text-sky-700 dark:text-sky-300",
+                    contractBadge:
+                        "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+                    currentChip:
+                        "border-sky-300 bg-sky-50 text-sky-800 shadow-sm dark:border-sky-500 dark:bg-sky-500 dark:text-white",
+                    completedChip:
+                        "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300",
+                };
+            case "seed_lockdown":
+                return {
+                    iconBg: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                    titleText: "text-amber-700 dark:text-amber-300",
+                    contractBadge:
+                        "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                    currentChip:
+                        "border-amber-300 bg-amber-50 text-amber-800 shadow-sm dark:border-amber-500 dark:bg-amber-500 dark:text-white",
+                    completedChip:
+                        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300",
+                };
+            case "playing":
+                return {
+                    iconBg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                    titleText: "text-emerald-700 dark:text-emerald-300",
+                    contractBadge:
+                        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                    currentChip:
+                        "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-sm dark:border-emerald-500 dark:bg-emerald-500 dark:text-white",
+                    completedChip:
+                        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+                };
+            case "awaiting_resolution":
+                return {
+                    iconBg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+                    titleText: "text-orange-700 dark:text-orange-300",
+                    contractBadge:
+                        "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+                    currentChip:
+                        "border-orange-300 bg-orange-50 text-orange-800 shadow-sm dark:border-orange-500 dark:bg-orange-500 dark:text-white",
+                    completedChip:
+                        "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900/60 dark:bg-orange-950/40 dark:text-orange-300",
+                };
+            case "suspended":
+            case "cancelled_locked":
+            case "cancelled_draining":
+                return {
+                    iconBg: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                    titleText: "text-red-700 dark:text-red-300",
+                    contractBadge:
+                        "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                    currentChip:
+                        "border-red-300 bg-red-50 text-red-800 shadow-sm dark:border-red-500 dark:bg-red-500 dark:text-white",
+                    completedChip:
+                        "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300",
+                };
+            case "ready_to_finalize":
+                return {
+                    iconBg: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+                    titleText: "text-yellow-700 dark:text-yellow-300",
+                    contractBadge:
+                        "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+                    currentChip:
+                        "border-yellow-300 bg-yellow-50 text-yellow-800 shadow-sm dark:border-yellow-500 dark:bg-yellow-500 dark:text-white",
+                    completedChip:
+                        "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-300",
+                };
+            case "finalized":
+            case "unknown":
+                return {
+                    iconBg: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
+                    titleText: "text-gray-700 dark:text-gray-300",
+                    contractBadge:
+                        "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300",
+                    currentChip:
+                        "border-gray-300 bg-gray-50 text-gray-800 shadow-sm dark:border-gray-500 dark:bg-gray-500 dark:text-white",
+                    completedChip:
+                        "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-300",
+                };
+            case "judging":
+            default:
+                return {
+                    iconBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                    titleText: "text-blue-700 dark:text-blue-300",
+                    contractBadge:
+                        "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                    currentChip:
+                        "border-blue-300 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-500 dark:bg-blue-500 dark:text-white",
+                    completedChip:
+                        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300",
+                };
+        }
+    }
+
+    function getContractStateCards(
+        phase: GamePhaseSnapshot,
+    ): ContractStateCard[] {
+        const cards: ContractStateCard[] = [
+            {
+                id: GameContractPhase.ACTIVE,
+                label: "ACTIVE",
+                description:
+                    "On-chain state 0. This includes Strategy & Upload, Seed Lockdown, Playing, Awaiting Resolution, and Suspended.",
+                badge: "Upcoming",
+                status: "pending",
+                icon: Sparkles,
+            },
+            {
+                id: GameContractPhase.RESOLUTION,
+                label: "RESOLUTION",
+                description:
+                    "On-chain state 1. The secret is revealed and judges can verify or challenge the result.",
+                badge: "Upcoming",
+                status: "pending",
+                icon: Gavel,
+            },
+            {
+                id: GameContractPhase.CANCELLED,
+                label: "CANCELLED_DRAINING",
+                description:
+                    "On-chain state 2. Alternative exit if the secret is revealed before the participation deadline.",
+                badge: "Alternative exit",
+                status: "alternate",
+                icon: XCircle,
+            },
+            {
+                id: GameContractPhase.FINALIZED,
+                label: "FINALIZED",
+                description:
+                    "Derived frontend state after payouts are distributed.",
+                badge: "Pending",
+                status: "pending",
+                icon: Trophy,
+            },
+        ];
+
+        return cards.map((card) => {
+            if (card.id === phase.contractPhase) {
+                return {
+                    ...card,
+                    badge: "Current",
+                    status: "current",
+                };
+            }
+
+            if (
+                phase.contractPhase === GameContractPhase.RESOLUTION &&
+                card.id === GameContractPhase.ACTIVE
+            ) {
+                return { ...card, badge: "Completed", status: "completed" };
+            }
+
+            if (phase.contractPhase === GameContractPhase.FINALIZED) {
+                if (
+                    card.id === GameContractPhase.ACTIVE ||
+                    card.id === GameContractPhase.RESOLUTION
+                ) {
+                    return { ...card, badge: "Completed", status: "completed" };
+                }
+                if (card.id === GameContractPhase.CANCELLED) {
+                    return { ...card, badge: "Skipped", status: "skipped" };
+                }
+            }
+
+            if (phase.contractPhase === GameContractPhase.CANCELLED) {
+                if (card.id === GameContractPhase.ACTIVE) {
+                    return { ...card, badge: "Exited here", status: "completed" };
+                }
+                if (
+                    card.id === GameContractPhase.RESOLUTION ||
+                    card.id === GameContractPhase.FINALIZED
+                ) {
+                    return { ...card, badge: "Skipped", status: "skipped" };
+                }
+            }
+
+            return card;
+        });
+    }
+
+    function getContractCardClasses(
+        card: ContractStateCard,
+        phase: GamePhaseSnapshot,
+    ) {
+        if (card.status === "current") {
+            switch (card.id) {
+                case GameContractPhase.ACTIVE:
+                    return "border-sky-300 bg-sky-50 text-sky-950 shadow-sm dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-50";
+                case GameContractPhase.RESOLUTION:
+                    return "border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-50";
+                case GameContractPhase.FINALIZED:
+                    return "border-slate-300 bg-slate-100 text-slate-950 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-50";
+                default:
+                    return "border-red-300 bg-red-50 text-red-950 shadow-sm dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-50";
+            }
+        }
+
+        if (card.status === "completed") {
+            return "border border-gray-200 bg-gray-50/80 text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100";
+        }
+
+        if (card.status === "skipped") {
+            return "border border-dashed border-gray-200 bg-transparent text-gray-400 dark:border-gray-700 dark:text-gray-500";
+        }
+
+        if (card.status === "alternate") {
+            return "border border-dashed border-red-200 bg-red-50/60 text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300";
+        }
+
+        return "border border-gray-200 bg-background text-gray-500 dark:border-gray-700 dark:text-gray-400";
+    }
+
+    function getContractStateMeta(cardId: ContractStateCard["id"]) {
+        switch (cardId) {
+            case GameContractPhase.ACTIVE:
+                return {
+                    eyebrow: "State 0",
+                    accent:
+                        "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+                };
+            case GameContractPhase.RESOLUTION:
+                return {
+                    eyebrow: "State 1",
+                    accent:
+                        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                };
+            case GameContractPhase.FINALIZED:
+                return {
+                    eyebrow: "Derived",
+                    accent:
+                        "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                };
+            default:
+                return {
+                    eyebrow: "State 2",
+                    accent:
+                        "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                };
+        }
+    }
+
+    function getContractBadgeClasses(card: ContractStateCard) {
+        switch (card.status) {
+            case "current":
+                return "bg-black/10 text-current dark:bg-white/10";
+            case "completed":
+                return "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
+            case "alternate":
+                return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+            case "skipped":
+                return "bg-transparent text-gray-400 ring-1 ring-inset ring-gray-300 dark:text-gray-500 dark:ring-gray-700";
+            default:
+                return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
+        }
+    }
+
+    function getMainContractStateCards(
+        cards: ContractStateCard[],
+    ): ContractStateCard[] {
+        return MAIN_CONTRACT_FLOW.flatMap((id) =>
+            cards.filter((card) => card.id === id),
+        );
+    }
+
+    function getAlternativeContractCard(
+        cards: ContractStateCard[],
+    ): ContractStateCard | null {
+        return cards.find((card) => card.id === GameContractPhase.CANCELLED) ?? null;
+    }
+
+    function getSubphaseStatus(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ): "current" | "completed" | "pending" {
+        const sequence = getSubphaseSequence(phase.contractPhase);
+        const currentIndex = sequence.indexOf(phase.subphase);
+        const subphaseIndex = sequence.indexOf(subphase);
+
+        if (subphase === phase.subphase) {
+            return "current";
+        }
+
+        if (subphaseIndex > -1 && subphaseIndex < currentIndex) {
+            return "completed";
+        }
+
+        return "pending";
+    }
+
+    function getSubphaseCardClasses(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+
+        if (status === "current") {
+            return "border-gray-300 bg-white text-gray-950 shadow-sm dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-50";
+        }
+
+        if (status === "completed") {
+            return "border-gray-200 bg-gray-50 text-gray-700 dark:border-slate-700 dark:bg-slate-900/45 dark:text-slate-200";
+        }
+
+        return "border-gray-200 bg-white text-gray-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-gray-300";
+    }
+
+    function getSubphaseIndexClasses(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+
+        if (status === "current") {
+            return "bg-gray-900 text-white ring-1 ring-inset ring-gray-900/10 dark:bg-gray-100 dark:text-gray-900 dark:ring-white/10";
+        }
+
+        if (status === "completed") {
+            return "bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200";
+        }
+
+        return "bg-gray-100 text-gray-500 dark:bg-slate-900 dark:text-gray-400";
+    }
+
+    function getSubphaseStatusBadgeClasses(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+
+        if (status === "current") {
+            return "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900";
+        }
+
+        if (status === "completed") {
+            return "bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200";
+        }
+
+        return "bg-gray-100 text-gray-600 dark:bg-slate-900 dark:text-gray-300";
+    }
+
+    function getSubphaseStatusLabel(
+        phase: GamePhaseSnapshot,
+        subphase: GameUiSubphaseValue,
+    ) {
+        const status = getSubphaseStatus(phase, subphase);
+        if (status === "current") return "Current";
+        if (status === "completed") return "Done";
+        return "Next";
+    }
+
+    function getAllowedActionsForPhase(
+        phase: GamePhaseSnapshot,
+    ): PhaseActionItem[] {
+        switch (phase.subphase) {
+            case "strategy_upload":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Add randomness to the seed while the ceremony remains open.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Register or upload solver services before the bot-upload deadline.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition if the secret is revealed before the participation deadline.",
+                    },
+                ];
+            case "seed_lockdown":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Add randomness to the seed until the ceremony deadline.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Wait for the fixed seed while preparing execution inputs off-chain.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition if the secret is revealed before the participation deadline.",
+                    },
+                ];
+            case "playing":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Execute their bots with the fixed seed and submit participations.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Inspect the game and monitor for an early secret reveal before the deadline.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition if the secret is revealed before the participation deadline.",
+                    },
+                ];
+            case "awaiting_resolution":
+                return [
+                    {
+                        actor: "Creator",
+                        text: "Reveal the secret and move the game into RESOLUTION before the grace period expires.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Monitor the game so they can challenge the result once RESOLUTION begins.",
+                    },
+                ];
+            case "suspended":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Recover their participation funds immediately.",
+                    },
+                ];
+            case "judging":
+                return [
+                    {
+                        actor: "Judges",
+                        text: "Validate, invalidate, or mark the candidate service as unavailable.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Include omitted participations or propose a better valid candidate.",
+                    },
+                ];
+            case "ready_to_finalize":
+                return [
+                    {
+                        actor: "Winner / Resolver",
+                        text: "Finalize the competition and distribute payouts.",
+                    },
+                ];
+            case "cancelled_locked":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Claim full refunds immediately.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Wait for the cooldown to unlock the next stake drain.",
+                    },
+                ];
+            case "cancelled_draining":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Claim full refunds immediately.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Drain the next portion of the creator stake now.",
+                    },
+                ];
+            case "finalized":
+                return [
+                    {
+                        actor: "Everyone",
+                        text: "Inspect the final result, transactions, and historical record.",
+                    },
+                ];
+            default:
+                return [];
+        }
+    }
+
+    function getRestrictedActionsForPhase(
+        phase: GamePhaseSnapshot,
+    ): PhaseActionItem[] {
+        switch (phase.subphase) {
+            case "strategy_upload":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Submit participation results before the seed is fixed.",
+                    },
+                    {
+                        actor: "Creator",
+                        text: "Reveal the secret and resolve the game before the participation deadline.",
+                    },
+                ];
+            case "seed_lockdown":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Upload new solver services. The bot-upload window is closed.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Submit participation results before the seed is fixed.",
+                    },
+                    {
+                        actor: "Creator",
+                        text: "Reveal the secret and resolve the game before the participation deadline.",
+                    },
+                ];
+            case "playing":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Add more seed randomness. The ceremony has ended.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Upload new solver services. Registration is already closed.",
+                    },
+                    {
+                        actor: "Creator",
+                        text: "Resolve the competition before the participation deadline.",
+                    },
+                ];
+            case "awaiting_resolution":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. The deadline already passed.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Cancel the competition. Cancellation is only valid before the participation deadline.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Add randomness or upload bots. The ACTIVE subphases for setup and play are closed.",
+                    },
+                ];
+            case "suspended":
+                return [
+                    {
+                        actor: "Creator",
+                        text: "Move the game into RESOLUTION. The grace period already expired.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. The competition flow is over.",
+                    },
+                ];
+            case "judging":
+                return [
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. Participation is already closed.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Finalize the competition before the judge window ends.",
+                    },
+                ];
+            case "ready_to_finalize":
+                return [
+                    {
+                        actor: "Judges",
+                        text: "Keep invalidating or replacing the winner. The judging window is closed.",
+                    },
+                    {
+                        actor: "Players",
+                        text: "Submit new participations. Participation is already closed.",
+                    },
+                ];
+            case "cancelled_locked":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Declare a winner or enter RESOLUTION. The cancellation path is permanent.",
+                    },
+                    {
+                        actor: "Anyone",
+                        text: "Drain the next stake portion before the cooldown unlocks.",
+                    },
+                ];
+            case "cancelled_draining":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Declare a winner or enter RESOLUTION. The cancellation path is permanent.",
+                    },
+                ];
+            case "finalized":
+                return [
+                    {
+                        actor: "Anyone",
+                        text: "Modify the outcome or reopen the competition. The lifecycle is closed.",
+                    },
+                ];
+            default:
+                return [];
+        }
+    }
+
+    let gamePhase: GamePhaseSnapshot = deriveGamePhaseSnapshot(
+        game,
+        currentHeight,
+    );
+    let phaseTone = getPhaseTone(gamePhase.subphase);
+    let phaseIcon = phaseIcons[gamePhase.subphase];
+    let contractStateCards: ContractStateCard[] = [];
+    let mainContractStateCards: ContractStateCard[] = [];
+    let alternativeContractCard: ContractStateCard | null = null;
+    let currentSubphaseSequence: GameUiSubphaseValue[] = [];
+    let allowedPhaseActions: PhaseActionItem[] = [];
+    let restrictedPhaseActions: PhaseActionItem[] = [];
+    let currentMilestoneTitle = "No active deadline";
+    let currentMilestoneDescription = "This phase does not have a live countdown.";
 
     function setError(error: unknown, options: FormatOptions = {}) {
         errorMessage = formatUserFacingError(error, options);
@@ -490,62 +1223,42 @@
         });
     }
 
-    type ProgressPhaseValue =
-        (typeof ProgressPhase)[keyof typeof ProgressPhase];
-
-    function getCurrentProgressPhase(): ProgressPhaseValue | null {
-        if (gameSuspended) {
-            return ProgressPhase.SUSPENDED;
-        }
-
-        if (!game) {
-            return null;
-        }
-
-        if (game.status === "Cancelled_Draining") {
-            return ProgressPhase.CANCELLED;
-        }
-
-        if (game.status === "Finalized") {
-            return ProgressPhase.FINALIZED;
-        }
-
-        if (game.status === "Resolution") {
-            return ProgressPhase.JUDGE;
-        }
-
-        if (game.status === "Active" && participationIsEnded) {
-            return ProgressPhase.JUDGE;
-        }
-
-        if (game.status === "Active") {
-            return ProgressPhase.ACTIVE;
-        }
-
-        return null;
-    }
-
-    $: currentProgressPhase = getCurrentProgressPhase();
-    $: isActiveStep =
-        currentProgressPhase === ProgressPhase.ACTIVE && !gameSuspended;
-    $: isJudgeStep = currentProgressPhase === ProgressPhase.JUDGE;
-    $: isSuspendedStep = currentProgressPhase === ProgressPhase.SUSPENDED;
-    $: isCancelledStep = currentProgressPhase === ProgressPhase.CANCELLED;
-    $: isFinalizedStep = currentProgressPhase === ProgressPhase.FINALIZED;
+    $: gamePhase = deriveGamePhaseSnapshot(game, currentHeight);
+    $: phaseTone = getPhaseTone(gamePhase.subphase);
+    $: phaseIcon = phaseIcons[gamePhase.subphase];
+    $: contractStateCards = getContractStateCards(gamePhase);
+    $: mainContractStateCards = getMainContractStateCards(contractStateCards);
+    $: alternativeContractCard = getAlternativeContractCard(contractStateCards);
+    $: currentSubphaseSequence = getSubphaseSequence(gamePhase.contractPhase);
+    $: allowedPhaseActions = getAllowedActionsForPhase(gamePhase);
+    $: restrictedPhaseActions = getRestrictedActionsForPhase(gamePhase);
     $: showCountdown =
         !!targetDate &&
-        (game?.status === "Resolution" ||
-            game?.status === "Cancelled_Draining" ||
-            !participationIsEnded ||
-            (game?.status === "Active" &&
-                participationIsEnded &&
-                resolutionAllowed));
+        ![
+            "suspended",
+            "finalized",
+            "unknown",
+        ].includes(gamePhase.subphase);
     $: countdownIsZero =
         daysValue === 0 &&
         hoursValue === 0 &&
         minutesValue === 0 &&
         secondsValue === 0;
     $: shouldShowCountdown = showCountdown && !countdownIsZero;
+    $: currentMilestoneTitle = shouldShowCountdown
+        ? clockLabel
+        : gamePhase.subphase === "finalized"
+          ? "Game ended"
+          : gamePhase.subphase === "suspended"
+            ? "Refund window"
+            : "No active deadline";
+    $: currentMilestoneDescription = shouldShowCountdown
+        ? deadlineDateDisplay
+        : gamePhase.subphase === "suspended"
+          ? "The resolution grace period already expired."
+          : gamePhase.subphase === "finalized"
+            ? "Payouts were already distributed."
+            : "This phase does not currently expose a live countdown.";
 
     // Reclaim after Grace Period State
     let isReclaimingGraceFor: string | null = null;
@@ -569,7 +1282,64 @@
     let showActionModal = false;
     let showParticipantGuide = true;
     let showSolverIdStep = false;
+    let showExecutionStep = false;
     let showJudgeGuide = true;
+    let showBotAssistantModal = false;
+    let showRobotDevelopmentGuideModal = false;
+    let isRobotDevelopmentGuideLoading = false;
+    let robotDevelopmentGuideContent = "";
+    let robotDevelopmentGuideError: string | null = null;
+    let robotDevelopmentGuideFetchPromise: Promise<void> | null = null;
+
+    async function fetchRobotGuideForPaper() {
+        if (robotDevelopmentGuideContent) {
+            if (robotGuideToc.length === 0) {
+                try {
+                    extractGuideToc(robotDevelopmentGuideContent);
+                } catch (e) {
+                    console.error("Error extracting robot guide TOC:", e);
+                }
+            }
+            return;
+        }
+        if (robotDevelopmentGuideFetchPromise) {
+            await robotDevelopmentGuideFetchPromise;
+            return;
+        }
+
+        robotDevelopmentGuideFetchPromise = (async () => {
+            isRobotDevelopmentGuideLoading = true;
+            robotDevelopmentGuideError = null;
+            try {
+                const response = await fetch(ROBOT_DEVELOPMENT_GUIDE);
+                if (!response.ok) {
+                    throw new Error(
+                        `Unable to load guide (${response.status} ${response.statusText})`,
+                    );
+                }
+                robotDevelopmentGuideContent = await response.text();
+                robotDevelopmentGuideContent = robotDevelopmentGuideContent.replaceAll(
+                    "{GAME_SERVICE_URL}",
+                    serviceDownload ?? game.serviceId ?? "{GAME_SERVICE_URL}"
+                );
+                // Extract TOC for the robot guide
+                try {
+                    extractGuideToc(robotDevelopmentGuideContent);
+                } catch (e) {
+                    console.error("Error extracting robot guide TOC:", e);
+                }
+            } catch (e) {
+                robotDevelopmentGuideError = formatUserFacingError(e, {
+                    fallback: "Unable to load the robot development guide right now.",
+                });
+            } finally {
+                isRobotDevelopmentGuideLoading = false;
+                robotDevelopmentGuideFetchPromise = null;
+            }
+        })();
+
+        await robotDevelopmentGuideFetchPromise;
+    }
     let currentActionType:
         | "submit_score"
         | "resolve_game"
@@ -647,15 +1417,43 @@
     let selectedSolverSources: any[] = [];
 
     let paperContent: string | null = null;
+    let paperContentStatus:
+        | "idle"
+        | "missing-sources"
+        | "loading"
+        | "ready"
+        | "fetch-error" = "idle";
     let isPaperExpanded = false;
     let paperToc: { level: number; text: string; id: string }[] = [];
+    let isRobotGuideExpanded = false;
+    let robotGuideToc: { level: number; text: string; id: string }[] = [];
     let soundtrackSources: any[] = [];
     let soundtrackUrl: string | null = null;
+    let serviceDownload: string | null = null;
     let audioElement: HTMLAudioElement;
     let showAudioControls = false;
     let loadedHandlerAdded = false;
 
     $: audio_element.set(audioElement || null);
+    $: botAssistantPaperUrl =
+        paperSources.map(getPaperSourceUrl).find((url) => !!url) ?? null;
+    $: botAssistantPrompt = buildBotAssistantPrompt(game, botAssistantPaperUrl);
+
+    function getSourceUrl(source: any): string | null {
+        const rawUrl =
+            typeof source?.source?.urlLink === "string"
+                ? source.source.urlLink
+                : typeof source?.sourceUrl === "string"
+                  ? source.sourceUrl
+                  : "";
+
+        const normalizedUrl = rawUrl.trim();
+        return normalizedUrl.length > 0 ? normalizedUrl : null;
+    }
+
+    function getPaperSourceUrl(source: any): string | null {
+        return getSourceUrl(source);
+    }
 
     function openFileSourceModal(
         hash: string,
@@ -669,6 +1467,81 @@
     function closeFileSourceModal() {
         showFileSourceModal = false;
         modalFileHash = "";
+    }
+
+    function buildBotAssistantPrompt(
+        currentGame: AnyGame | null,
+        paperUrl: string | null,
+    ) {
+        const title = currentGame?.content?.title?.trim() || "Untitled challenge";
+        const description =
+            currentGame?.content?.description?.trim() ||
+            "No game description was provided.";
+
+        const parts = [
+            "Please develop a robot that solves the following Game of Prompts challenge.",
+            `Game title: ${title}`,
+            `Game description: ${description}`,
+        ];
+
+        if (paperUrl) {
+            parts.push(`Reference paper URL: ${paperUrl}`);
+        }
+
+        // Basic explanation
+        parts.push(
+            "The game mechanics are as follows: A secret value S is locked on-chain. Players must create solver services that can compute a score based on S and submit their results before the deadline. After the deadline, the secret is revealed and the player with the best valid score wins. The exact scoring function and rules are defined in the reference paper.",
+        );
+
+        // Solver developer guide url
+        parts.push(
+            `For more details on how to develop a solver service for this game, please refer to the official guide: ${ROBOT_DEVELOPMENT_GUIDE}`,
+        );
+
+        parts.push(
+            "Please reason about the game mechanics, propose a solver-service strategy, and provide implementation guidance or code in English.",
+        );
+
+        return parts.join("\n\n");
+    }
+
+    async function loadPaperContentFromSources(sources: any[]) {
+        paperContent = null;
+        paperContentStatus = "idle";
+
+        const candidateUrls = sources
+            .map(getPaperSourceUrl)
+            .filter((url): url is string => !!url);
+
+        if (candidateUrls.length === 0) {
+            paperContentStatus = "missing-sources";
+            return;
+        }
+
+        paperContentStatus = "loading";
+
+        for (const url of candidateUrls) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) continue;
+
+                paperContent = await response.text();
+                paperContentStatus = "ready";
+                extractToc(paperContent);
+                // Ensure robot guide is fetched so its separate section can render
+                try {
+                    await fetchRobotGuideForPaper();
+                } catch (e) {
+                    // fetchRobotGuideForPaper handles errors
+                }
+
+                return;
+            } catch (e) {
+                console.error("Error paper:", e);
+            }
+        }
+
+        paperContentStatus = "fetch-error";
     }
 
     async function handleFileSourceAdded(txId: string) {
@@ -691,6 +1564,7 @@
                     modalFileHash,
                     get(explorer_uri),
                 );
+                await loadPaperContentFromSources(paperSources);
             } else if (modalFileType === "soundtrack") {
                 soundtrackSources = await fetchFileSourcesByHash(
                     modalFileHash,
@@ -703,6 +1577,7 @@
     // Form Inputs
     let commitmentC_input = "";
     let solverId_input = "";
+    let participationSolverId = "";
     let solverId_box_found = false;
     let solverId_checked = false;
     let solverId_check_loading = false;
@@ -710,14 +1585,66 @@
     let hashLogs_input = "";
     let judgeReferenceSeed_input = "";
     let judgeReferenceScore_input = "";
+    let judgeReferenceErgoTree_input = "";
     let user_score: number | null = null;
     let scores_list: number[] = [];
+    // Inline score picker state (replaces window.prompt)
+    let showScorePicker = false;
+    let scorePickerOptions: number[] = [];
+    let scorePickerSelection: number | null = null;
     let secret_S_input_resolve = "";
     let secret_S_input_cancel = "";
+    let walletErgoTreeHex = "";
+    let participationChecksum = "";
+
+    $: if ($address && game && !participationChecksum) {
+        try {
+            const ergoAddr = ErgoAddress.fromBase58($address);
+            walletErgoTreeHex = typeof ergoAddr.ergoTree === "string" 
+                ? ergoAddr.ergoTree 
+                : uint8ArrayToHex(ergoAddr.ergoTree);
+            if (!judgeReferenceErgoTree_input) {
+                judgeReferenceErgoTree_input = walletErgoTreeHex;
+            }
+            sha256(game.seed + walletErgoTreeHex).then(res => {
+                participationChecksum = res;
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
 
     $: if (solverId_input) solverId_checked = false;
 
     let isAutoFilling = false;
+
+    function sortKeysAlphabetically(value: unknown): unknown {
+        if (Array.isArray(value)) {
+            return value.map(sortKeysAlphabetically);
+        }
+
+        if (value && typeof value === "object") {
+            return Object.keys(value as Record<string, unknown>)
+                .sort((a, b) => a.localeCompare(b))
+                .reduce<Record<string, unknown>>((acc, key) => {
+                    acc[key] = sortKeysAlphabetically(
+                        (value as Record<string, unknown>)[key],
+                    );
+                    return acc;
+                }, {});
+        }
+
+        return value;
+    }
+
+    function stringifyForChecksum(data: Record<string, unknown>): string {
+        // To calculate the checksum, the checksum field is removed from the JSON,
+        // the keys of the resulting object are reordered alphabetically,
+        // and its exact representation is obtained using JSON.stringify(...).
+        // A SHA-256 hash is calculated over that string,
+        // and its hexadecimal value is stored in the checksum field.
+        return JSON.stringify(sortKeysAlphabetically(data));
+    }
 
     // Reactivity: Each time 'user_score' changes, we regenerate the rivals
     $: if (!isAutoFilling && user_score !== null && user_score !== undefined) {
@@ -742,6 +1669,11 @@
 
     async function generateDevParticipation() {
         try {
+            const wallet = getErgoWallet();
+            if (!wallet?.get_change_address) {
+                throw new Error("Wallet not connected.");
+            }
+
             // 1. Generate Random Values
             const randomBytes = new Uint8Array(32);
             window.crypto.getRandomValues(randomBytes);
@@ -755,7 +1687,7 @@
             // 2. Get Constants/Context
             const secretS = game?.content.serviceId; // Dev competitions typically use the serviceId as secretS
 
-            const playerAddressString = await ergo.get_change_address();
+            const playerAddressString = await wallet.get_change_address();
             if (!playerAddressString) {
                 throw new Error(
                     "Could not get the player's address from the wallet.",
@@ -901,13 +1833,16 @@
             const box = await fetchSolverIdBox(solverId_input);
             if (box) {
                 solverId_box_found = true;
+                participationSolverId = solverId_input.trim();
             } else {
                 solverId_box_found = false;
+                participationSolverId = "";
                 solverId_check_error =
                     "Solver ID box not found. Please publish it first.";
             }
         } catch (e) {
             console.error("Error checking solver ID box:", e);
+            participationSolverId = "";
             solverId_check_error = "Error checking solver ID box.";
         } finally {
             solverId_check_loading = false;
@@ -973,9 +1908,12 @@
         warningMessage = null;
 
         try {
+            platform = game.platform;
+
             // 2. Commission integration (unified logic)
-            // Only compute breakdown if the status exposes commissions
-            if (game.status === "Active" || game.status === "Resolution") {
+            // Compute breakdown for Active, Resolution, and Finalized games —
+            // all three statuses expose resolverCommission, devCommission, and perJudgeCommission.
+            if (game.status === "Active" || game.status === "Resolution" || game.status === "Finalized") {
                 const denominator = game.constants.COMMISSION_DENOMINATOR / 100;
                 resolverPct =
                     Number(game.resolverCommission ?? 0) / denominator;
@@ -984,6 +1922,8 @@
                         game.judges.length) /
                     denominator;
                 developersPct = Number(game.devCommission ?? 0) / denominator;
+                creatorSlashRatioPct =
+                    Number((game as any).creatorSlashRatio ?? 0) / denominator;
                 totalPct = resolverPct + judgesTotalPct + developersPct;
                 winnerPct = Math.max(0, 100 - totalPct);
                 overAllocated =
@@ -998,24 +1938,25 @@
                 gameHistory = history;
             });
 
-            participationIsEnded = await isGameParticipationEnded(game);
-            resolutionAllowed = await isResolutionAllowed(game);
-            gameSuspended = await isGameSuspended(game);
-            openCeremony = await isOpenCeremony(game);
-            openSolverSubmit = await isOpenSolverSubmit(game);
+            const phaseSnapshot = deriveGamePhaseSnapshot(game, currentHeight);
+            participationIsEnded = phaseSnapshot.participationIsEnded;
+            resolutionAllowed = phaseSnapshot.resolutionAllowed;
+            gameSuspended = phaseSnapshot.gameSuspended;
+            openCeremony = phaseSnapshot.openCeremony;
+            openSolverSubmit = phaseSnapshot.openSolverSubmit;
 
             // 4. Time and deadline logic (consolidated)
             if (game.status === "Active") {
-                if (openSolverSubmit) {
+                if (phaseSnapshot.subphase === "strategy_upload") {
                     targetBlockHeight =
                         game.ceremonyDeadline - game.constants.SEED_MARGIN;
                     targetDate = await block_height_to_timestamp(
                         targetBlockHeight,
                         platform,
                     );
-                    clockLabel = "Solver Submit Deadline";
-                    clockInformation = `Block limit to implement your solution and submit your bot hash. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
-                } else if (openCeremony) {
+                    clockLabel = "Bot Upload Deadline";
+                    clockInformation = `Block limit to register solver services before seed lockdown begins. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                } else if (phaseSnapshot.subphase === "seed_lockdown") {
                     targetBlockHeight = game.ceremonyDeadline;
                     targetDate = await block_height_to_timestamp(
                         targetBlockHeight,
@@ -1023,7 +1964,7 @@
                     );
                     clockLabel = "Ceremony Deadline";
                     clockInformation = `Block limit to add randomness to the game seed. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
-                } else if (currentHeight < game.deadlineBlock) {
+                } else if (phaseSnapshot.subphase === "playing") {
                     targetBlockHeight = game.deadlineBlock;
                     targetDate = await block_height_to_timestamp(
                         targetBlockHeight,
@@ -1039,8 +1980,8 @@
                         targetBlockHeight,
                         platform,
                     );
-                    clockLabel = "Awaiting Resolution";
-                    clockInformation = `Participation period ended. Waiting for the creator to reveal the secret and start the resolution phase. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                    clockLabel = "Resolution Grace Period";
+                    clockInformation = `Participation is closed. The creator must reveal the secret before this grace period ends or the game becomes suspended. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 }
                 deadlineDateDisplay = format(
                     new Date(targetDate),
@@ -1057,8 +1998,12 @@
                     targetBlockHeight,
                     platform,
                 );
-                clockLabel = isGrace ? "Grace Period" : "Resolution Deadline";
-                clockInformation = `Judges must resolve the game before this time. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                clockLabel = isGrace
+                    ? "End-Game Authorization Grace"
+                    : "Resolution Deadline";
+                clockInformation = isGrace
+                    ? `The judge window ended. After this grace period, resolver authorization rules change for finalization. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`
+                    : `Judges can challenge the candidate until this deadline. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 deadlineDateDisplay = `${clockLabel} ends ${formatDistanceToNow(new Date(targetDate), { addSuffix: true })}`;
             } else if (game.status === "Cancelled_Draining") {
                 targetBlockHeight = (game as GameCancellation).unlockHeight;
@@ -1066,8 +2011,8 @@
                     targetBlockHeight,
                     platform,
                 );
-                clockLabel = "STAKE UNLOCK DEADLINE";
-                clockInformation = `Creator stake is locked until this time. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
+                clockLabel = "Next Drain Unlock";
+                clockInformation = `The next creator-stake drain can happen after this cooldown. Time is estimated based on ${platform.time_per_block / 1000 / 60} minutes per block.`;
                 deadlineDateDisplay = format(
                     new Date(targetDate),
                     "MMM d, yyyy 'at' HH:mm",
@@ -1088,28 +2033,34 @@
                     game.content.image,
                     explorer,
                 );
-            if (game.content.serviceId)
+            if (game?.content.serviceId) {
                 serviceSources = await fetchFileSourcesByHash(
                     game.content.serviceId,
                     explorer,
                 );
+                serviceDownload = await fetchServiceDownloadUrl(
+                    game?.content.serviceId,
+                );
+                if (robotDevelopmentGuideContent === "") {
+                    await fetchRobotGuideForPaper();
+                }
+                else if (robotDevelopmentGuideContent.includes("{GAME_SERVICE_URL}")) {
+                    robotDevelopmentGuideContent = robotDevelopmentGuideContent.replaceAll(
+                        "{GAME_SERVICE_URL}",
+                        serviceDownload ?? game.serviceId ?? "N/A"
+                    );
+                }
+            }
 
             if (game.content.paper) {
                 paperSources = await fetchFileSourcesByHash(
                     game.content.paper,
                     explorer,
                 );
-                if (paperSources.length > 0) {
-                    try {
-                        const response = await fetch(paperSources[0].sourceUrl);
-                        if (response.ok) {
-                            paperContent = await response.text();
-                            extractToc(paperContent);
-                        }
-                    } catch (e) {
-                        console.error("Error paper:", e);
-                    }
-                }
+                await loadPaperContentFromSources(paperSources);
+            } else {
+                paperContent = null;
+                paperContentStatus = "idle";
             }
 
             if (game.content.soundtrack) {
@@ -1117,8 +2068,10 @@
                     game.content.soundtrack,
                     explorer,
                 );
-                if (soundtrackSources.length > 0)
-                    soundtrackUrl = soundtrackSources[0].sourceUrl;
+                soundtrackUrl =
+                    soundtrackSources
+                        .map(getSourceUrl)
+                        .find((url) => !!url) ?? soundtrackUrl;
             }
 
             // 6. Token details
@@ -1368,12 +2321,14 @@
         errorMessage = null;
         isSubmitting = true;
         try {
+            const solverIdToSubmit =
+                participationSolverId || solverId_input.trim();
             const parsedScores = scores_list.map((s) => BigInt(s));
             transactionId = await platform.submitScoreToGopGame(
                 game,
                 parsedScores,
                 commitmentC_input,
-                solverId_input,
+                solverIdToSubmit,
                 hashLogs_input,
             );
         } catch (e: any) {
@@ -1721,7 +2676,7 @@
                             : calculateEffectiveScore(
                                   game,
                                   best.score,
-                                  best.solverIdBox?.creationHeight ?? 0,
+                                  best.creationHeight,
                               );
                     const currentEffective =
                         game === null
@@ -1729,7 +2684,7 @@
                             : calculateEffectiveScore(
                                   game,
                                   current.score,
-                                  current.solverIdBox?.creationHeight ?? 0,
+                                  current.creationHeight,
                               );
 
                     if (currentEffective > bestEffective) return current;
@@ -1829,7 +2784,9 @@
                 seed_hex: judgeReferenceSeed_input.trim() || game.seed,
                 score: referenceScore,
                 hashLogs_hex: hashLogs_input.trim(),
-                ergoTree_hex: walletErgoTreeHex.trim(),
+                ergoTree_hex:
+                    judgeReferenceErgoTree_input.trim() ||
+                    walletErgoTreeHex.trim(),
             });
         } catch (e: any) {
             setTransactionError(e, {
@@ -1859,18 +2816,77 @@
         const target = event.target as HTMLInputElement;
         jsonUploadError = null;
         errorMessage = null;
+        checksumStatus = null;
         if (target.files && target.files[0]) {
             const file = target.files[0];
             if (file.type === "application/json") {
                 try {
                     const fileContent = await file.text();
                     const jsonData = JSON.parse(fileContent);
+
+                    // --- Checksum integrity verification ---
+                    if ("checksum" in jsonData && typeof jsonData.checksum === "string") {
+                        const expectedChecksum = jsonData.checksum;
+                        const { checksum: _, ...dataWithoutChecksum } = jsonData;
+                        const canonicalJson = stringifyForChecksum(
+                            dataWithoutChecksum,
+                        );
+                        const computedChecksum = await sha256(canonicalJson);
+                        if (computedChecksum !== expectedChecksum) {
+                            checksumStatus = 'invalid';
+                            jsonUploadError = "Checksum verification failed. The file may have been tampered with. Please provide the data manually.";
+                            commitmentC_input = "";
+                            solverId_input = "";
+                            hashLogs_input = "";
+                            judgeReferenceSeed_input = "";
+                            judgeReferenceScore_input = "";
+                            judgeReferenceErgoTree_input = walletErgoTreeHex;
+                            user_score = null;
+                            scores_list = [];
+                            target.value = "";
+                            return;
+                        }
+                        checksumStatus = 'valid';
+                    } else {
+                        checksumStatus = 'missing';
+                    }
+
+                    // Capture secret if provided in the JSON (helps matching commitments against score lists)
+
                     if (
                         jsonData.solver_id &&
                         typeof jsonData.solver_id === "string"
-                    )
+                    ) {
+                        const uploadedSolverId = jsonData.solver_id.trim();
+                        if (
+                            participationSolverId &&
+                            uploadedSolverId !== participationSolverId.trim()
+                        ) {
+                            alert(
+                                "The uploaded JSON Solver ID does not match the on-chain verified Solver ID.",
+                            );
+                            jsonUploadError =
+                                "Uploaded Solver ID does not match the verified on-chain Solver ID.";
+                            commitmentC_input = "";
+                            hashLogs_input = "";
+                            judgeReferenceSeed_input = "";
+                            judgeReferenceScore_input = "";
+                            judgeReferenceErgoTree_input = walletErgoTreeHex;
+                            user_score = null;
+                            scores_list = [];
+                            target.value = "";
+                            return;
+                        }
                         solverId_input = jsonData.solver_id;
-                    else throw new Error("Missing 'solver_id'");
+                        // After loading solver id, wait a tick so reactive reset runs,
+                        // then auto-check on-chain to detect existing solver box.
+                        try {
+                            await tick();
+                            await checkSolverIdBox();
+                        } catch (e) {
+                            console.warn("Auto checkSolverIdBox failed:", e);
+                        }
+                    } else throw new Error("Missing 'solver_id'");
                     if (
                         jsonData.hash_logs_hex &&
                         typeof jsonData.hash_logs_hex === "string"
@@ -1895,6 +2911,21 @@
                         judgeReferenceSeed_input = jsonData.seed;
                     }
                     if (
+                        jsonData.pbox_ergotree &&
+                        typeof jsonData.pbox_ergotree === "string"
+                    ) {
+                        judgeReferenceErgoTree_input =
+                            jsonData.pbox_ergotree;
+                    } else if (
+                        jsonData.ergoTree_hex &&
+                        typeof jsonData.ergoTree_hex === "string"
+                    ) {
+                        judgeReferenceErgoTree_input =
+                            jsonData.ergoTree_hex;
+                    } else {
+                        judgeReferenceErgoTree_input = walletErgoTreeHex;
+                    }
+                    if (
                         jsonData.score_list &&
                         Array.isArray(jsonData.score_list) &&
                         jsonData.score_list.every(
@@ -1903,12 +2934,28 @@
                                 typeof item === "string",
                         )
                     ) {
-                        scores_list = jsonData.score_list.map((s: any) =>
-                            Number(s),
-                        );
+                        scores_list = jsonData.score_list.map((s: any) => Number(s));
                         if (scores_list.length > 0) {
-                            user_score = scores_list[0];
-                            judgeReferenceScore_input = String(scores_list[0]);
+
+                            // If we're in the judge nomination flow, show an inline picker instead of a browser prompt
+                                if (currentActionType === "accept_judge_nomination") {
+                                    if (scores_list.length === 1) {
+                                        judgeReferenceScore_input = String(Math.trunc(scores_list[0]));
+                                    } else {
+                                        // Show the inline score picker UI in the modal (English)
+                                        showScorePicker = true;
+                                        scorePickerOptions = [...scores_list];
+                                        scorePickerSelection = null;
+                                        // leave judgeReferenceScore_input empty so user can confirm a selection
+                                        judgeReferenceScore_input = "";
+                                    }
+                                } else {
+                                    // Participant flow: store the whole list (as JSON if multiple)
+                                    if (scores_list.length === 1) {
+                                        user_score = Number(scores_list[0]);
+                                    }
+                                    scores_list = scores_list;
+                                }
                         }
                     } else throw new Error("Missing or invalid 'score_list'");
                 } catch (e: any) {
@@ -1918,6 +2965,7 @@
                     hashLogs_input = "";
                     judgeReferenceSeed_input = "";
                     judgeReferenceScore_input = "";
+                    judgeReferenceErgoTree_input = walletErgoTreeHex;
                     user_score = null;
                     scores_list = [];
                 }
@@ -1944,7 +2992,7 @@
         console.log("setupActionModal called with type:", type);
         currentActionType = type;
         const titles = {
-            submit_score: `Submit Score`,
+            submit_score: `Participate`,
             resolve_game: `Resolve Competition`,
             cancel_game: `Cancel Competition`,
             drain_stake: `Drain Resolver Stake`,
@@ -1966,6 +3014,8 @@
         warningMessage = null;
         isSubmitting = false;
         transactionId = null;
+        showBotAssistantModal = false;
+        showRobotDevelopmentGuideModal = false;
 
         // Reset guide states
         if (type === "invalidate_winner" || type === "judge_unavailable") {
@@ -1981,9 +3031,14 @@
         }
 
         if (type === "donate_ceremony" && game?.participationTokenId) {
-            ergo.get_balance(game.participationTokenId).then((bal) => {
-                userParticipationTokenBalance = BigInt(bal);
-            });
+            const wallet = getErgoWallet();
+            if (wallet?.get_balance) {
+                wallet.get_balance(game.participationTokenId).then((bal) => {
+                    userParticipationTokenBalance = BigInt(bal);
+                });
+            } else {
+                userParticipationTokenBalance = 0n;
+            }
             fetch_token_details(game.participationTokenId).then((details) => {
                 if (details) tokenDecimals = details.decimals;
             });
@@ -1991,8 +3046,42 @@
     }
 
     function closeModal() {
+        showBotAssistantModal = false;
+        showRobotDevelopmentGuideModal = false;
         showActionModal = false;
         currentActionType = null;
+        // Ensure inline score picker is reset when closing modal
+        showScorePicker = false;
+        scorePickerOptions = [];
+        scorePickerSelection = null;
+    }
+
+    function confirmScorePicker() {
+        if (scorePickerSelection !== null) {
+            judgeReferenceScore_input = String(Math.trunc(scorePickerSelection));
+        }
+        showScorePicker = false;
+        scorePickerOptions = [];
+        scorePickerSelection = null;
+    }
+
+    function cancelScorePicker() {
+        showScorePicker = false;
+        scorePickerOptions = [];
+        scorePickerSelection = null;
+        // leave judgeReferenceScore_input empty so user can fill manually
+        judgeReferenceScore_input = "";
+    }
+
+    async function openRobotDevelopmentGuide() {
+        showRobotDevelopmentGuideModal = true;
+        robotDevelopmentGuideError = null;
+
+        if (robotDevelopmentGuideContent || isRobotDevelopmentGuideLoading) {
+            return;
+        }
+
+        await fetchRobotGuideForPaper();
     }
 
     function shareGame() {
@@ -2028,6 +3117,13 @@
     onMount(async () => {
         await fetchJudges();
         if (game) loadGameDetailsAndTimers();
+        // Fetch the robot development guide on page load and ensure it's appended to any paper
+        try {
+            await fetchRobotGuideForPaper();
+        } catch (e) {
+            // errors handled in fetchRobotGuideForPaper
+        }
+
         hasHydrated = true;
     });
 
@@ -2049,16 +3145,24 @@
     let resolverPct = 0;
     let judgesTotalPct = 0;
     let developersPct = 0;
+    let creatorSlashRatioPct = 0;
+    let showTrophyIncentive = false;
+    let showTimeFactorIncentive = false;
+    $: showTrophyIncentive =
+        !!game && game.status !== GameState.Cancelled_Draining;
+    $: showTimeFactorIncentive =
+        !!game &&
+        (game.status === GameState.Active ||
+            game.status === GameState.Resolution) &&
+        game.timeWeight > 0n;
 
     // --- Image Resolution Logic ---
     let resolvedImageSrc = game?.content?.imageURL ?? "";
     $: {
         if (game?.content?.image) {
-            if (imageSources.length > 0) {
-                resolvedImageSrc = imageSources[0].url;
-            } else {
-                resolvedImageSrc = game?.content.imageURL ?? "";
-            }
+            resolvedImageSrc =
+                imageSources.map(getSourceUrl).find((url) => !!url) ??
+                (game?.content.imageURL ?? "");
         } else {
             resolvedImageSrc = game?.content.imageURL ?? "";
         }
@@ -2094,6 +3198,20 @@
         // Add scroll-mt-24 to ensure header is not hidden behind fixed elements when scrolling
         return `<h${depth} id="${id}" class="scroll-mt-24">${text}</h${depth}>`;
     };
+    const guideRenderer = new marked.Renderer();
+    guideRenderer.heading = function ({
+        text,
+        depth,
+    }: {
+        text: string;
+        depth: number;
+    }) {
+        const id = text
+            .toLowerCase()
+            .replace(/[^\w\s-]/g, "")
+            .replace(/\s+/g, "-");
+        return `<h${depth} id="${id}" class="scroll-mt-24">${text}</h${depth}>`;
+    };
 
     function extractToc(markdown: string) {
         const lines = markdown.split("\n");
@@ -2117,6 +3235,27 @@
         paperToc = toc;
     }
 
+    function extractGuideToc(markdown: string) {
+        const lines = markdown.split("\n");
+        const toc: { level: number; text: string; id: string }[] = [];
+        const headerRegex = /^(#{1,6})\s+(.*)$/;
+
+        lines.forEach((line) => {
+            const match = line.match(headerRegex);
+            if (match) {
+                const level = match[1].length;
+                const text = match[2].trim();
+                const id = text
+                    .toLowerCase()
+                    .replace(/[^\w\s-]/g, "")
+                    .replace(/\s+/g, "-");
+                toc.push({ level, text, id });
+            }
+        });
+
+        robotGuideToc = toc;
+    }
+
     function togglePaper() {
         isPaperExpanded = !isPaperExpanded;
         if (!isPaperExpanded) {
@@ -2137,6 +3276,26 @@
             if (startElement) {
                 startElement.scrollIntoView({ behavior: "smooth" });
             }
+        }
+    }
+
+    function toggleRobotGuide() {
+        isRobotGuideExpanded = !isRobotGuideExpanded;
+        if (!isRobotGuideExpanded) {
+            const element = document.getElementById("robot-guide-start");
+            if (element) {
+                element.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    }
+
+    function scrollToRobotToc() {
+        const element = document.getElementById("robot-guide-toc");
+        if (element) {
+            element.scrollIntoView({ behavior: "smooth" });
+        } else {
+            const startElement = document.getElementById("robot-guide-start");
+            if (startElement) startElement.scrollIntoView({ behavior: "smooth" });
         }
     }
 
@@ -2181,14 +3340,14 @@
 
 {#if showLoadingScreen}
     <div
-        class="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-gray-200"
+        class="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"
     >
         <Loader2 class="w-12 h-12 animate-spin mb-4 text-green-500" />
         <p class="text-xl font-semibold opacity-80">Loading game...</p>
     </div>
 {:else if game}
     <div
-        class="game-detail-page min-h-screen bg-slate-900 text-gray-200"
+        class="game-detail-page min-h-screen bg-background text-foreground"
     >
         <div
             class="game-container w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8 py-0 md:py-8"
@@ -2196,12 +3355,12 @@
             <section
                 class="hero-section relative md:rounded-xl md:shadow-2xl overflow-hidden mb-6 md:mb-12"
             >
-                <div class="hero-bg-image">
+                <div class="hero-bg-image absolute inset-0">
                     {#if resolvedImageSrc}
                         <img
                             src={resolvedImageSrc}
                             alt=""
-                            class="absolute inset-0 w-full h-full object-cover blur-md scale-110"
+                            class="hero-bg-layer absolute inset-0 w-full h-full object-cover blur-md scale-110"
                         />
                     {/if}
                     <div
@@ -2217,7 +3376,7 @@
                             <img
                                 src={resolvedImageSrc}
                                 alt="{game.content.title} banner"
-                                class="w-full h-auto max-h-64 md:max-h-96 object-contain rounded-lg shadow-2xl border border-white/10"
+                                class="hero-main-image w-full h-auto max-h-64 md:max-h-96 object-contain rounded-lg shadow-2xl border border-white/10"
                             />
                         </div>
                     {/if}
@@ -2226,7 +3385,7 @@
                         class="flex-1 text-center md:text-left w-full mt-6 md:mt-0"
                     >
                         <h1
-                            class="text-3xl sm:text-4xl lg:text-5xl font-bold font-['Russo_One'] mb-8 text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)] tracking-tight"
+                            class="text-3xl sm:text-4xl lg:text-5xl font-bold font-['Russo_One'] mb-8 tracking-tight text-white drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)]"
                         >
                             {game.content.title}
                         </h1>
@@ -2234,7 +3393,7 @@
                         <div
                             class="stat-blocks-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full"
                         >
-                            {#each [{ label: "Reputation", value: game.reputation.toFixed(4), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commissions", value: `${totalPct}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool that goes to commissions" }] as stat}
+                            {#each [{ label: "Reputation", value: formatReputation(game.reputation), icon: Users, color: "text-blue-300", info: "The game's reputation score is the sum of ERG sacrificed per reputation proof from judges and the creator." }, { label: "Entry Fee", value: `${formatTokenBigInt(getParticipationFee(game), tokenDecimals)} ${tokenSymbol}`, icon: Edit, color: "text-emerald-300", info: "The cost each player must pay..." }, { label: "Participants", value: participations.length, icon: Users, color: "text-purple-300" }, { label: "Prize Pool", value: `${formatTokenBigInt(prizePoolValue, tokenDecimals)} ${tokenSymbol}`, icon: Trophy, color: "text-yellow-300", info: "The accumulated funds available for the winner (fees + donations), after subtracting judge, resolver, and contract developer commissions and the resolver stake." }, { label: "Creator Stake", value: `${formatTokenBigInt(getDisplayStake(game), tokenDecimals)} ${tokenSymbol}`, icon: ShieldCheck, color: "text-cyan-300", info: "Guarantee deposited by the creator..." }, { label: "Commissions", value: `${totalPct}%`, icon: CheckSquare, color: "text-pink-300", info: "Percentage of the Prize Pool that goes to commissions" }] as stat}
                                 <div
                                     class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                                 >
@@ -2277,7 +3436,7 @@
 
                             {#if createdDateDisplay}
                                 <div
-                                    class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
+                                    class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                                 >
                                     <div class="flex items-center gap-2 mb-3">
                                         <Calendar
@@ -2297,23 +3456,23 @@
                             {/if}
 
                             <div
-                                class="flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md"
+                                class="group relative flex flex-col justify-between p-5 rounded-xl border border-slate-600/50 bg-slate-800/80 backdrop-blur-md transition-all duration-300 hover:bg-slate-700/80"
                             >
                                 <div
                                     class="flex items-center justify-between mb-3"
                                 >
                                     <div class="flex items-center gap-2">
                                         <Calendar
-                                            class="w-5 h-5 md:w-4 md:h-4 text-indigo-300"
+                                            class="w-5 h-5 md:w-4 md:h-4 text-purple-300"
                                         />
                                         <span
-                                            class="text-[11px] md:text-[10px] uppercase tracking-[0.2em] font-black text-indigo-100/90"
+                                            class="text-[11px] md:text-[10px] uppercase tracking-[0.2em] font-black text-white/90"
                                             >{clockLabel}</span
                                         >
                                     </div>
                                     <button
                                         type="button"
-                                        class="text-indigo-300/40 hover:text-indigo-100 p-2 -mr-2 -mt-2"
+                                        class="text-white/40 hover:text-white p-2 -mr-2 -mt-2"
                                         on:click|stopPropagation={() =>
                                             openDidacticModal(
                                                 clockLabel,
@@ -2330,7 +3489,7 @@
                                         {deadlineDateDisplay.split(" at ")[0]}
                                     </span>
                                     <span
-                                        class="text-[10px] md:text-[9px] font-mono text-indigo-200/60 mt-1 uppercase tracking-tighter"
+                                        class="text-[10px] md:text-[9px] font-mono text-white/40 mt-1 uppercase tracking-tighter"
                                     >
                                         Block: {game.status == "Active"
                                             ? game.deadlineBlock
@@ -2361,8 +3520,8 @@
 
                             <Button
                                 on:click={shareGame}
-                                class="w-full sm:w-auto text-sm dark:text-white dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 text-gray-800 bg-gray-100 hover:bg-gray-200 border border-gray-300 backdrop-blur-md py-2 px-4 transition-all"
-                            >
+                                class="w-full sm:w-auto text-sm text-white bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md py-2 px-4 transition-all"
+                                style="background-color: rgba(255, 255, 255, 0.05) !important; border-color: rgba(255, 255, 255, 0.1) !important; color: white !important;">
                                 <Share2 class="mr-2 h-4 w-4" />
                                 Share Game
                             </Button>
@@ -2371,6 +3530,59 @@
                 </div>
             </section>
         </div>
+
+        {#if showTrophyIncentive}
+            <div class="w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8">
+                <section
+                    class="mb-6 md:mb-8 overflow-hidden rounded-none md:rounded-xl border-y md:border border-border/60 bg-card shadow-[0_10px_28px_rgba(0,0,0,0.12)]"
+                >
+                    <div
+                        class="flex flex-col lg:flex-row lg:items-center gap-4 px-4 py-4 md:px-6 md:py-5 bg-[radial-gradient(circle_at_top_left,rgba(74,222,128,0.10),transparent_40%)]"
+                    >
+                        <div
+                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-green-400/20 bg-green-400/10 text-green-400"
+                        >
+                            <Trophy class="h-5 w-5" />
+                        </div>
+
+                        <div class="flex-1 space-y-2">
+                            <div
+                                class="inline-flex items-center gap-2 rounded-full border border-green-400/25 bg-green-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-green-500"
+                            >
+                                <Sparkles class="h-3.5 w-3.5" />
+                                Winner Incentive
+                            </div>
+
+                            <p class="text-sm md:text-[15px] text-foreground/90">
+                                {#if game.status === GameState.Finalized}
+                                    This competition NFT was awarded to the
+                                    winner as a trophy, in addition to the
+                                    economic prize.
+                                {:else}
+                                    The winner also receives the competition
+                                    NFT as a trophy, on top of the economic
+                                    prize.
+                                {/if}
+                            </p>
+
+                            {#if showTimeFactorIncentive}
+                                <div
+                                    class="inline-flex max-w-full items-start gap-2 rounded-xl border border-border/70 bg-background/65 px-3 py-2 text-sm text-muted-foreground"
+                                >
+                                    <Clock3 class="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                                    <span>
+                                        Uploading the robot earlier increases
+                                        the effective score via the time
+                                        factor, so earlier submissions can earn
+                                        more points.
+                                    </span>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </section>
+            </div>
+        {/if}
 
         <div
             class="game-container w-full md:max-w-[95%] mx-auto px-0 md:px-4 lg:px-8 py-0 md:py-8"
@@ -2428,7 +3640,7 @@
 
                                     <div class="relative">
                                         <div
-                                            class="prose prose-sm {$mode ===
+                                            class="paper-prose prose prose-sm {$mode ===
                                             'dark'
                                                 ? 'prose-invert'
                                                 : ''} max-w-none transition-all duration-500 ease-in-out {isPaperExpanded
@@ -2515,6 +3727,118 @@
                                         </div>
                                     {/if}
                                 </div>
+                            {:else if game.content.paper && game.content.paper.length === 64}
+                                <div class="mt-8 border-t border-border pt-8">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <FileText
+                                            class="w-5 h-5 text-amber-500"
+                                        />
+                                        <h3 class="text-lg font-semibold">
+                                            Paper Content
+                                        </h3>
+                                    </div>
+
+                                    <p class="text-sm text-muted-foreground">
+                                        {#if paperContentStatus === "missing-sources"}
+                                            The game includes a paper hash, but
+                                            nobody has published a downloadable
+                                            source for it yet.
+                                        {:else if paperContentStatus === "fetch-error"}
+                                            The paper source exists, but its
+                                            content could not be loaded for
+                                            inline inspection.
+                                        {:else if paperContentStatus === "loading"}
+                                            Loading paper content...
+                                        {:else}
+                                            Paper content is not available for
+                                            inline inspection yet.
+                                        {/if}
+                                    </p>
+                                </div>
+                            {/if}
+
+                            {#if robotDevelopmentGuideContent}
+                                <div
+                                    class="mt-8 border-t border-border pt-8"
+                                    id="robot-guide-start"
+                                >
+                                    <div class="flex items-center gap-2 mb-4">
+                                        <Code class="w-5 h-5 text-amber-500" />
+                                        <h3 class="text-lg font-semibold">
+                                            Robot Development Guide
+                                        </h3>
+                                    </div>
+
+                                    <div class="relative">
+                                        <div
+                                            class="guide-prose prose prose-sm {$mode === 'dark' ? 'prose-invert' : ''} max-w-none transition-all duration-500 ease-in-out {isRobotGuideExpanded ? '' : 'max-h-96 overflow-hidden'}"
+                                        >
+                                            {#if isRobotGuideExpanded && robotGuideToc.length > 0}
+                                                <div
+                                                    class="mb-6 p-4 bg-muted/50 rounded-lg"
+                                                    id="robot-guide-toc"
+                                                >
+                                                    <h4
+                                                        class="text-sm font-semibold mb-2 uppercase tracking-wider text-muted-foreground"
+                                                    >
+                                                        Table of Contents
+                                                    </h4>
+                                                    <nav class="flex flex-col gap-1">
+                                                        {#each robotGuideToc as item}
+                                                            <button
+                                                                class="text-left text-sm hover:text-primary transition-colors truncate w-full"
+                                                                style="padding-left: {(item.level - 1) * 12}px"
+                                                                on:click={() => scrollToSection(item.id)}
+                                                            >
+                                                                {item.text}
+                                                            </button>
+                                                        {/each}
+                                                    </nav>
+                                                </div>
+                                            {/if}
+
+                                            {@html marked.parse(robotDevelopmentGuideContent, {
+                                                renderer: guideRenderer,
+                                            })}
+                                        </div>
+
+                                        {#if !isRobotGuideExpanded}
+                                            <div
+                                                class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent flex items-end justify-center pb-4"
+                                            >
+                                                <Button
+                                                    variant="secondary"
+                                                    on:click={toggleRobotGuide}
+                                                    class="shadow-lg"
+                                                >
+                                                    Read Full Paper
+                                                    <ChevronDown class="ml-2 w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        {/if}
+                                    </div>
+
+                                    {#if isRobotGuideExpanded}
+                                        <div class="sticky bottom-20 flex justify-center mt-8 pointer-events-none gap-4 z-10">
+                                            <Button
+                                                variant="secondary"
+                                                on:click={scrollToRobotToc}
+                                                class="shadow-lg pointer-events-auto opacity-90 hover:opacity-100"
+                                                title="Back to Table of Contents"
+                                            >
+                                                <ArrowUp class="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                on:click={toggleRobotGuide}
+                                                class="shadow-lg pointer-events-auto opacity-90 hover:opacity-100"
+                                            >
+                                                Collapse Paper
+                                                <ChevronDown class="ml-2 w-4 h-4 rotate-180" />
+                                            </Button>
+                                        </div>
+                                    {/if}
+                                </div>
                             {/if}
 
                             {#if soundtrackUrl}
@@ -2522,7 +3846,7 @@
                                     class="mt-8 border-t border-border pt-8 hidden"
                                 >
                                     <div class="flex items-center gap-2 mb-2">
-                                        <Music class="w-5 h-5 text-green-500" />
+                                        <Music class="w-5 h-5 text-red-500" />
                                         <h3 class="text-lg font-semibold">
                                             Soundtrack
                                         </h3>
@@ -2646,12 +3970,13 @@
                                     The winner's prize will be 0.
                                 </p>
                             {/if}
+
                         </div>
 
-                        <div
-                            class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
-                        >
+                        <div class="col-span-1 md:col-span-2 lg:col-span-3 mt-4">
                             <details
+                                bind:open={technicalBundleOpen}
+                                use:hoverCornersWhenClosed={technicalBundleOpen}
                                 class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
                                 'dark'
                                     ? 'border-slate-700'
@@ -2661,880 +3986,1000 @@
                                     class="flex justify-between items-center font-medium cursor-pointer list-none"
                                 >
                                     <div class="flex items-center gap-2">
-                                        <Settings
-                                            class="w-5 h-5 text-gray-500"
-                                        />
-                                        <span>Technical Details</span>
+                                        <Settings class="w-5 h-5 text-gray-500" />
+                                        <span>Technical Data & Sources</span>
                                     </div>
-                                    <span
-                                        class="transition group-open:rotate-180"
-                                    >
+                                    <span class="transition group-open:rotate-180">
                                         <ChevronDown class="w-5 h-5" />
                                     </span>
                                 </summary>
-                                <div
-                                    class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 text-sm"
-                                >
-                                    <div
-                                        class="info-block col-span-1 md:col-span-2"
+
+                                <div class="mt-4 space-y-4">
+                                    <p class="text-sm text-muted-foreground">
+                                        Open this section to inspect the raw game data and the community-verified sources behind each file.
+                                    </p>
+
+                                    <details
+                                        bind:open={technicalDetailsOpen}
+                                        use:hoverCornersWhenClosed={technicalDetailsOpen}
+                                        class="group p-4 rounded-lg border bg-background/60 shadow-sm {$mode ===
+                                        'dark'
+                                            ? 'border-slate-700'
+                                            : 'border-gray-200'}"
                                     >
-                                        <span class="info-label"
-                                            >Creator Reputation Token ID {isOwner
-                                                ? "(You)"
-                                                : ""}</span
+                                        <summary
+                                            class="flex justify-between items-center font-medium cursor-pointer list-none"
                                         >
-                                        {#if game.content.creatorTokenId}
-                                            <a
-                                                href={$web_explorer_uri_tkn +
-                                                    game.content.creatorTokenId}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="info-value font-mono text-xs break-all hover:underline"
-                                                title={game.content
-                                                    .creatorTokenId}
+                                            <div class="flex items-center gap-2">
+                                                <Settings class="w-5 h-5 text-gray-500" />
+                                                <span>Technical Details</span>
+                                            </div>
+                                            <span class="transition group-open:rotate-180">
+                                                <ChevronDown class="w-5 h-5" />
+                                            </span>
+                                        </summary>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 text-sm">
+                                            <div class="info-block col-span-1 md:col-span-2">
+                                                <span class="info-label"
+                                                    >Creator Reputation Token ID {isOwner
+                                                        ? "(You)"
+                                                        : ""}</span
+                                                >
+                                                {#if game.content.creatorTokenId}
+                                                    <a
+                                                        href={$web_explorer_uri_tkn +
+                                                            game.content.creatorTokenId}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        class="info-value font-mono text-xs break-all hover:underline"
+                                                        title={game.content
+                                                            .creatorTokenId}
+                                                    >
+                                                        {game.content.creatorTokenId}
+                                                    </a>
+                                                {:else}
+                                                    <span class="info-value">N/A</span>
+                                                {/if}
+                                            </div>
+
+                                            <div class="info-block">
+                                                <span class="info-label"
+                                                    >Competition ID (NFT)<button
+                                                        type="button"
+                                                        class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                        on:click|stopPropagation={() =>
+                                                            openDidacticModal(
+                                                                "Competition ID (NFT)",
+                                                                "Unique token identifying this game on the blockchain. Tracks the game's history and is awarded to the winner as a trophy.",
+                                                            )}
+                                                    >
+                                                        <Info class="w-3.5 h-3.5" />
+                                                    </button></span
+                                                >
+                                                <a
+                                                    href={$web_explorer_uri_tkn +
+                                                        game.gameId}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="info-value font-mono text-xs break-all hover:underline"
+                                                    title={game.gameId}
+                                                >
+                                                    {game.gameId}
+                                                </a>
+                                            </div>
+
+                                            <div class="info-block">
+                                                <span class="info-label"
+                                                    >Service ID<button
+                                                        type="button"
+                                                        class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                        on:click|stopPropagation={() =>
+                                                            openDidacticModal(
+                                                                "Service ID",
+                                                                "Hash of the Celaut service running the game. Players must execute it on their own computer to play and can verify they use the same game.",
+                                                            )}
+                                                    >
+                                                        <Info class="w-3.5 h-3.5" />
+                                                    </button></span
+                                                >
+                                                <span
+                                                    class="info-value font-mono text-xs break-all"
+                                                    title={game.content.serviceId}
+                                                >
+                                                    {game.content.serviceId}
+                                                </span>
+                                            </div>
+
+                                            <div class="info-block">
+                                                <span class="info-label"
+                                                    >Creator Splash Ratio</span
+                                                >
+                                                <span class="info-value font-mono">
+                                                    {clampPct(creatorSlashRatioPct).toFixed(
+                                                        0,
+                                                    )}%
+                                                </span>
+                                            </div>
+
+                                            <div class="info-block">
+                                                <span class="info-label"
+                                                    >Verification Runs<button
+                                                        type="button"
+                                                        class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                        on:click|stopPropagation={() =>
+                                                            openDidacticModal(
+                                                                "Verification Runs",
+                                                                "Number of times judges will test your participation to verify if it reproduces your game logs. If judges cannot reproduce the logs, the participation is invalidated.",
+                                                            )}
+                                                    >
+                                                        <Info class="w-3.5 h-3.5" />
+                                                    </button></span
+                                                >
+                                                <span
+                                                    class="info-value font-mono text-xs break-all"
+                                                >
+                                                    {game.content.indetermismIndex}
+                                                </span>
+                                            </div>
+
+                                            <div class="info-block">
+                                                <span class="info-label"
+                                                    >Time Factor<button
+                                                        type="button"
+                                                        class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                        on:click|stopPropagation={() =>
+                                                            openDidacticModal(
+                                                                "Time Factor",
+                                                                "Weight used to reward earlier submissions when computing effective score. A higher value increases the advantage of uploading sooner.",
+                                                            )}
+                                                    >
+                                                        <Info class="w-3.5 h-3.5" />
+                                                    </button></span
+                                                >
+                                                <span
+                                                    class="info-value font-mono text-xs break-all"
+                                                >
+                                                    {game.timeWeight?.toString() ?? "0"}
+                                                </span>
+                                            </div>
+
+                                            <div class="info-block">
+                                                <span class="info-label"
+                                                    >Seed<button
+                                                        type="button"
+                                                        class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                        on:click|stopPropagation={() =>
+                                                            openDidacticModal(
+                                                                "Seed",
+                                                                "Random seed determining the game scenario. Generated during the initial ceremony where anyone can participate.",
+                                                            )}
+                                                    >
+                                                        <Info class="w-3.5 h-3.5" />
+                                                    </button></span
+                                                >
+                                                <span
+                                                    class="info-value font-mono text-xs break-all"
+                                                >
+                                                    {game.seed ?? "N/A"}
+                                                </span>
+                                            </div>
+
+                                            {#if game.winnerCandidateCommitment}
+                                                <div class="info-block md:col-span-2">
+                                                    <span class="info-label"
+                                                        >Winner Candidate<button
+                                                            type="button"
+                                                            class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                            on:click|stopPropagation={() =>
+                                                                openDidacticModal(
+                                                                    "Winner Candidate",
+                                                                    "The commitment of the participation currently considered the winner candidate.",
+                                                                )}
+                                                        >
+                                                            <Info class="w-3.5 h-3.5" />
+                                                        </button></span
+                                                    >
+                                                    <span
+                                                        class="info-value font-mono text-xs break-all"
+                                                    >
+                                                        {game.winnerCandidateCommitment}
+                                                    </span>
+                                                </div>
+                                            {/if}
+
+                                            {#if game.status === "Resolution" && game.revealedS_Hex}
+                                                <div class="info-block md:col-span-2">
+                                                    <span class="info-label"
+                                                        >Revealed Secret (S)<button
+                                                            type="button"
+                                                            class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                            on:click|stopPropagation={() =>
+                                                                openDidacticModal(
+                                                                    "Revealed Secret (S)",
+                                                                    "The creator's secret, revealed when resolving the game. Allows validation of all participation scores.",
+                                                                )}
+                                                        >
+                                                            <Info class="w-3.5 h-3.5" />
+                                                        </button></span
+                                                    >
+                                                    <span
+                                                        class="info-value font-mono text-xs break-all"
+                                                    >
+                                                        {game.revealedS_Hex}
+                                                    </span>
+                                                </div>
+                                            {/if}
+
+                                            {#if game.status === "Resolution"}
+                                                <div class="info-block md:col-span-2">
+                                                    <span class="info-label"
+                                                        >Resolver Script<button
+                                                            type="button"
+                                                            class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
+                                                            on:click|stopPropagation={() =>
+                                                                openDidacticModal(
+                                                                    "Resolver Script",
+                                                                    "The script that enforces the game rules during the resolution phase.",
+                                                                )}
+                                                        >
+                                                            <Info class="w-3.5 h-3.5" />
+                                                        </button></span
+                                                    >
+                                                    <span
+                                                        class="info-value font-mono text-xs break-all"
+                                                    >
+                                                        {game.resolverScript_Hex}
+                                                    </span>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    </details>
+
+                                    <div class="space-y-4">
+                                        {#if game.content.image && game.content.image.length === 64}
+                                            <details
+                                                bind:open={imageSourcesOpen}
+                                                use:hoverCornersWhenClosed={imageSourcesOpen}
+                                                class="group p-4 rounded-lg border bg-background/60 shadow-sm {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-200'}"
                                             >
-                                                {game.content.creatorTokenId}
-                                            </a>
-                                        {:else}
-                                            <span class="info-value">N/A</span>
+                                                <summary
+                                                    class="flex justify-between items-center font-medium cursor-pointer list-none"
+                                                >
+                                                    <div class="flex items-center gap-2">
+                                                        <Sparkles class="w-5 h-5 text-blue-500" />
+                                                        <span>Game Image Sources</span>
+                                                    </div>
+                                                    <span class="transition group-open:rotate-180">
+                                                        <ChevronDown class="w-5 h-5" />
+                                                    </span>
+                                                </summary>
+
+                                                <div class="mt-4 space-y-4">
+                                                    <p class="text-sm text-muted-foreground">
+                                                        Community-verified download sources for the game image file (hash: <span
+                                                            class="font-mono text-xs">{game.content.image.slice(
+                                                                0,
+                                                                16,
+                                                            )}...</span
+                                                        >)
+                                                    </p>
+
+                                                    {#if $reputation_proof}
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            on:click={() =>
+                                                                openFileSourceModal(
+                                                                    game.content.image,
+                                                                    "image",
+                                                                )}
+                                                            class="w-full"
+                                                        >
+                                                            Add Download Source
+                                                        </Button>
+                                                    {:else}
+                                                        <p class="text-xs text-muted-foreground italic">
+                                                            Create a reputation profile to add or manage download sources
+                                                        </p>
+                                                    {/if}
+
+                                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                                        <FileCard
+                                                            class="bg-background border border-border rounded-lg shadow-xl w-full max-w-2xl mx-4 p-6"
+                                                            profile={$reputation_proof}
+                                                            fileHash={game.content.image}
+                                                            sources={imageSources}
+                                                            explorerUri={$explorer_uri}
+                                                            source_explorer_url={$source_explorer_url}
+                                                            webExplorerUriTkn={$web_explorer_uri_tkn}
+                                                        />
+                                                    </div>
+
+                                                    {#if imageSources.length === 0}
+                                                        <p class="text-xs text-muted-foreground italic text-center py-4">
+                                                            No sources found for this file.
+                                                        </p>
+                                                    {/if}
+                                                </div>
+                                            </details>
+                                        {/if}
+
+                                        {#if game.content.serviceId && game.content.serviceId.length === 64}
+                                            <details
+                                                bind:open={serviceSourcesOpen}
+                                                use:hoverCornersWhenClosed={serviceSourcesOpen}
+                                                class="group p-4 rounded-lg border bg-background/60 shadow-sm {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-200'}"
+                                            >
+                                                <summary
+                                                    class="flex justify-between items-center font-medium cursor-pointer list-none"
+                                                >
+                                                    <div class="flex items-center gap-2">
+                                                        <Cpu class="w-5 h-5 text-green-500" />
+                                                        <span>Game Service Sources</span>
+                                                    </div>
+                                                    <span class="transition group-open:rotate-180">
+                                                        <ChevronDown class="w-5 h-5" />
+                                                    </span>
+                                                </summary>
+
+                                                <div class="mt-4 space-y-4">
+                                                    <p class="text-sm text-muted-foreground">
+                                                        Community-verified download sources for the game service executable (hash: <span
+                                                            class="font-mono text-xs">{game.content.serviceId.slice(
+                                                                0,
+                                                                16,
+                                                            )}...</span
+                                                        >)
+                                                    </p>
+
+                                                    {#if $reputation_proof}
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            on:click={() =>
+                                                                openFileSourceModal(
+                                                                    game.content.serviceId,
+                                                                    "service",
+                                                                )}
+                                                            class="w-full"
+                                                        >
+                                                            Add Download Source
+                                                        </Button>
+                                                    {:else}
+                                                        <p class="text-xs text-muted-foreground italic">
+                                                            Create a reputation profile to add or manage download sources
+                                                        </p>
+                                                    {/if}
+
+                                                    <!-- service-purple: override source-application's hardcoded green with purple -->
+                                                    <div class="service-file-card-wrapper">
+                                                        <FileCard
+                                                            profile={$reputation_proof}
+                                                            fileHash={game.content.serviceId}
+                                                            sources={serviceSources}
+                                                            explorerUri={$explorer_uri}
+                                                            source_explorer_url={$source_explorer_url}
+                                                            webExplorerUriTkn={$web_explorer_uri_tkn}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </details>
+                                        {/if}
+
+                                        {#if game.content.paper && game.content.paper.length === 64}
+                                            <details
+                                                bind:open={paperSourcesOpen}
+                                                use:hoverCornersWhenClosed={paperSourcesOpen}
+                                                class="group p-4 rounded-lg border bg-background/60 shadow-sm {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-200'}"
+                                            >
+                                                <summary
+                                                    class="flex justify-between items-center font-medium cursor-pointer list-none"
+                                                >
+                                                    <div class="flex items-center gap-2">
+                                                        <FileText class="w-5 h-5 text-amber-500" />
+                                                        <span>Game Paper Sources</span>
+                                                    </div>
+                                                    <span class="transition group-open:rotate-180">
+                                                        <ChevronDown class="w-5 h-5" />
+                                                    </span>
+                                                </summary>
+
+                                                <div class="mt-4 space-y-4">
+                                                    <p class="text-sm text-muted-foreground">
+                                                        Community-verified download sources for the detailed game documentation markdown file (hash: <span
+                                                            class="font-mono text-xs">{game.content.paper.slice(
+                                                                0,
+                                                                16,
+                                                            )}...</span
+                                                        >)
+                                                    </p>
+
+                                                    {#if $reputation_proof}
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            on:click={() =>
+                                                                openFileSourceModal(
+                                                                    game?.content.paper ??
+                                                                        "",
+                                                                    "paper",
+                                                                )}
+                                                            class="w-full"
+                                                        >
+                                                            Add Download Source
+                                                        </Button>
+                                                    {:else}
+                                                        <p class="text-xs text-muted-foreground italic">
+                                                            Create a reputation profile to add or manage download sources
+                                                        </p>
+                                                    {/if}
+
+                                                    <div class="service-file-card-wrapper">
+                                                        <FileCard
+                                                            profile={$reputation_proof}
+                                                            fileHash={game.content.paper}
+                                                            sources={paperSources}
+                                                            explorerUri={$explorer_uri}
+                                                            source_explorer_url={$source_explorer_url}
+                                                            webExplorerUriTkn={$web_explorer_uri_tkn}
+                                                        />
+                                                    </div>
+
+                                                    {#if paperContentStatus === "missing-sources"}
+                                                        <p class="text-xs text-muted-foreground italic text-center py-2">
+                                                            The paper hash exists, but no downloadable source has been published yet, so its content cannot be inspected here.
+                                                        </p>
+                                                    {:else if paperContentStatus === "fetch-error"}
+                                                        <p class="text-xs text-muted-foreground italic text-center py-2">
+                                                            A paper source was found, but its markdown could not be loaded for inline inspection.
+                                                        </p>
+                                                    {/if}
+                                                </div>
+                                            </details>
+                                        {/if}
+
+                                        {#if game.content.soundtrack && game.content.soundtrack.length === 64}
+                                            <details
+                                                bind:open={soundtrackSourcesOpen}
+                                                use:hoverCornersWhenClosed={soundtrackSourcesOpen}
+                                                class="group p-4 rounded-lg border bg-background/60 shadow-sm {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-200'}"
+                                            >
+                                                <summary
+                                                    class="flex justify-between items-center font-medium cursor-pointer list-none"
+                                                >
+                                                    <div class="flex items-center gap-2">
+                                                        <Music class="w-5 h-5 text-red-500" />
+                                                        <span>Game Soundtrack Sources</span>
+                                                    </div>
+                                                    <span class="transition group-open:rotate-180">
+                                                        <ChevronDown class="w-5 h-5" />
+                                                    </span>
+                                                </summary>
+
+                                                <div class="mt-4 space-y-4">
+                                                    <p class="text-sm text-muted-foreground">
+                                                        Community-verified download sources for the game soundtrack audio file (hash: <span
+                                                            class="font-mono text-xs">{game.content.soundtrack.slice(
+                                                                0,
+                                                                16,
+                                                            )}...</span
+                                                        >)
+                                                    </p>
+
+                                                    {#if $reputation_proof}
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            on:click={() =>
+                                                                openFileSourceModal(
+                                                                    game?.content
+                                                                        .soundtrack ?? "",
+                                                                    "soundtrack",
+                                                                )}
+                                                            class="w-full"
+                                                        >
+                                                            Add Download Source
+                                                        </Button>
+                                                    {:else}
+                                                        <p class="text-xs text-muted-foreground italic">
+                                                            Create a reputation profile to add or manage download sources
+                                                        </p>
+                                                    {/if}
+
+                                                    <div class="service-file-card-wrapper">
+                                                        <FileCard
+                                                            profile={$reputation_proof}
+                                                            fileHash={game.content.soundtrack}
+                                                            sources={soundtrackSources}
+                                                            explorerUri={$explorer_uri}
+                                                            source_explorer_url={$source_explorer_url}
+                                                            webExplorerUriTkn={$web_explorer_uri_tkn}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </details>
                                         {/if}
                                     </div>
-
-                                    <div class="info-block">
-                                        <span class="info-label"
-                                            >Competition ID (NFT)<button
-                                                type="button"
-                                                class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
-                                                on:click|stopPropagation={() =>
-                                                    openDidacticModal(
-                                                        "Competition ID (NFT)",
-                                                        "Unique token identifying this game on the blockchain. Tracks the game's history and is awarded to the winner as a trophy.",
-                                                    )}
-                                            >
-                                                <Info class="w-3.5 h-3.5" />
-                                            </button></span
-                                        >
-                                        <a
-                                            href={$web_explorer_uri_tkn +
-                                                game.gameId}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="info-value font-mono text-xs break-all hover:underline"
-                                            title={game.gameId}
-                                        >
-                                            {game.gameId}
-                                        </a>
-                                    </div>
-
-                                    <div class="info-block">
-                                        <span class="info-label"
-                                            >Service ID<button
-                                                type="button"
-                                                class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
-                                                on:click|stopPropagation={() =>
-                                                    openDidacticModal(
-                                                        "Service ID",
-                                                        "Hash of the Celaut service running the game. Players must execute it on their own computer to play and can verify they use the same game.",
-                                                    )}
-                                            >
-                                                <Info class="w-3.5 h-3.5" />
-                                            </button></span
-                                        >
-                                        <span
-                                            class="info-value font-mono text-xs break-all"
-                                            title={game.content.serviceId}
-                                        >
-                                            {game.content.serviceId}
-                                        </span>
-                                    </div>
-
-                                    <div class="info-block">
-                                        <span class="info-label"
-                                            >Indeterminism Index<button
-                                                type="button"
-                                                class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
-                                                on:click|stopPropagation={() =>
-                                                    openDidacticModal(
-                                                        "Indeterminism Index",
-                                                        "Number of times judges will test your participation to verify if it reproduces your game logs. If judges cannot reproduce the logs, the participation is invalidated.",
-                                                    )}
-                                            >
-                                                <Info class="w-3.5 h-3.5" />
-                                            </button></span
-                                        >
-                                        <span
-                                            class="info-value font-mono text-xs break-all"
-                                        >
-                                            {game.content.indetermismIndex}
-                                        </span>
-                                    </div>
-
-                                    <div class="info-block">
-                                        <span class="info-label"
-                                            >Seed<button
-                                                type="button"
-                                                class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
-                                                on:click|stopPropagation={() =>
-                                                    openDidacticModal(
-                                                        "Seed",
-                                                        "Random seed determining the game scenario. Generated during the initial ceremony where anyone can participate.",
-                                                    )}
-                                            >
-                                                <Info class="w-3.5 h-3.5" />
-                                            </button></span
-                                        >
-                                        <span
-                                            class="info-value font-mono text-xs break-all"
-                                        >
-                                            {game.seed ?? "N/A"}
-                                        </span>
-                                    </div>
-
-                                    {#if game.winnerCandidateCommitment}
-                                        <div class="info-block md:col-span-2">
-                                            <span class="info-label"
-                                                >Winner Candidate<button
-                                                    type="button"
-                                                    class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
-                                                    on:click|stopPropagation={() =>
-                                                        openDidacticModal(
-                                                            "Winner Candidate",
-                                                            "The commitment of the participation currently considered the winner candidate.",
-                                                        )}
-                                                >
-                                                    <Info class="w-3.5 h-3.5" />
-                                                </button></span
-                                            >
-                                            <span
-                                                class="info-value font-mono text-xs break-all"
-                                            >
-                                                {game.winnerCandidateCommitment}
-                                            </span>
-                                        </div>
-                                    {/if}
-
-                                    {#if game.status === "Resolution" && game.revealedS_Hex}
-                                        <div class="info-block md:col-span-2">
-                                            <span class="info-label"
-                                                >Revealed Secret (S)<button
-                                                    type="button"
-                                                    class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
-                                                    on:click|stopPropagation={() =>
-                                                        openDidacticModal(
-                                                            "Revealed Secret (S)",
-                                                            "The creator's secret, revealed when resolving the game. Allows validation of all participation scores.",
-                                                        )}
-                                                >
-                                                    <Info class="w-3.5 h-3.5" />
-                                                </button></span
-                                            >
-                                            <span
-                                                class="info-value font-mono text-xs break-all"
-                                            >
-                                                {game.revealedS_Hex}
-                                            </span>
-                                        </div>
-                                    {/if}
-
-                                    {#if game.status === "Resolution"}
-                                        <div class="info-block md:col-span-2">
-                                            <span class="info-label"
-                                                >Resolver Script<button
-                                                    type="button"
-                                                    class="inline-flex items-center justify-center ml-1 p-0.5 text-gray-400 hover:text-white transition-colors"
-                                                    on:click|stopPropagation={() =>
-                                                        openDidacticModal(
-                                                            "Resolver Script",
-                                                            "The script that enforces the game rules during the resolution phase.",
-                                                        )}
-                                                >
-                                                    <Info class="w-3.5 h-3.5" />
-                                                </button></span
-                                            >
-                                            <span
-                                                class="info-value font-mono text-xs break-all"
-                                            >
-                                                {game.resolverScript_Hex}
-                                            </span>
-                                        </div>
-                                    {/if}
                                 </div>
                             </details>
                         </div>
-
-                        <!-- FILE SOURCES SECTIONS -->
-                        {#if game.content.imageURL && game.content.imageURL.length === 64}
-                            <div
-                                class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
-                            >
-                                <details
-                                    class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
-                                    'dark'
-                                        ? 'border-slate-700'
-                                        : 'border-gray-200'}"
-                                >
-                                    <summary
-                                        class="flex justify-between items-center font-medium cursor-pointer list-none"
-                                    >
-                                        <div class="flex items-center gap-2">
-                                            <Sparkles
-                                                class="w-5 h-5 text-blue-500"
-                                            />
-                                            <span>Game Image Sources</span>
-                                        </div>
-                                        <span
-                                            class="transition group-open:rotate-180"
-                                        >
-                                            <ChevronDown class="w-5 h-5" />
-                                        </span>
-                                    </summary>
-
-                                    <div class="mt-4 space-y-4">
-                                        <p
-                                            class="text-sm text-muted-foreground"
-                                        >
-                                            Community-verified download sources
-                                            for the game image file (hash: <span
-                                                class="font-mono text-xs"
-                                                >{game.content.imageURL.slice(
-                                                    0,
-                                                    16,
-                                                )}...</span
-                                            >)
-                                        </p>
-
-                                        {#if $reputation_proof}
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                on:click={() =>
-                                                    openFileSourceModal(
-                                                        game.content.imageURL,
-                                                        "image",
-                                                    )}
-                                                class="w-full"
-                                            >
-                                                Add Download Source
-                                            </Button>
-                                        {:else}
-                                            <p
-                                                class="text-xs text-muted-foreground italic"
-                                            >
-                                                Create a reputation profile to
-                                                add or manage download sources
-                                            </p>
-                                        {/if}
-
-                                        <div
-                                            class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"
-                                        >
-                                            <FileCard
-                                                class="bg-background border border-border rounded-lg shadow-xl w-full max-w-2xl mx-4 p-6"
-                                                profile={$reputation_proof}
-                                                fileHash={game.content.imageURL}
-                                                sources={imageSources}
-                                                explorerUri={$explorer_uri}
-                                                source_explorer_url={$source_explorer_url}
-                                                webExplorerUriTkn={$web_explorer_uri_tkn}
-                                            />
-                                        </div>
-
-                                        {#if imageSources.length === 0}
-                                            <p
-                                                class="text-xs text-muted-foreground italic text-center py-4"
-                                            >
-                                                No sources found for this file.
-                                            </p>
-                                        {/if}
-                                    </div>
-                                </details>
-                            </div>
-                        {/if}
-
-                        {#if game.content.serviceId && game.content.serviceId.length === 64}
-                            <div
-                                class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
-                            >
-                                <details
-                                    class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
-                                    'dark'
-                                        ? 'border-slate-700'
-                                        : 'border-gray-200'}"
-                                >
-                                    <summary
-                                        class="flex justify-between items-center font-medium cursor-pointer list-none"
-                                    >
-                                        <div class="flex items-center gap-2">
-                                            <Cpu
-                                                class="w-5 h-5 text-purple-500"
-                                            />
-                                            <span>Game Service Sources</span>
-                                        </div>
-                                        <span
-                                            class="transition group-open:rotate-180"
-                                        >
-                                            <ChevronDown class="w-5 h-5" />
-                                        </span>
-                                    </summary>
-
-                                    <div class="mt-4 space-y-4">
-                                        <p
-                                            class="text-sm text-muted-foreground"
-                                        >
-                                            Community-verified download sources
-                                            for the game service executable
-                                            (hash: <span
-                                                class="font-mono text-xs"
-                                                >{game.content.serviceId.slice(
-                                                    0,
-                                                    16,
-                                                )}...</span
-                                            >)
-                                        </p>
-
-                                        {#if $reputation_proof}
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                on:click={() =>
-                                                    openFileSourceModal(
-                                                        game.content.serviceId,
-                                                        "service",
-                                                    )}
-                                                class="w-full"
-                                            >
-                                                Add Download Source
-                                            </Button>
-                                        {:else}
-                                            <p
-                                                class="text-xs text-muted-foreground italic"
-                                            >
-                                                Create a reputation profile to
-                                                add or manage download sources
-                                            </p>
-                                        {/if}
-
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.serviceId}
-                                            sources={serviceSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
-                                    </div>
-                                </details>
-                            </div>
-                        {/if}
-
-                        {#if game.content.paper && game.content.paper.length === 64}
-                            <div
-                                class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
-                            >
-                                <details
-                                    class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
-                                    'dark'
-                                        ? 'border-slate-700'
-                                        : 'border-gray-200'}"
-                                >
-                                    <summary
-                                        class="flex justify-between items-center font-medium cursor-pointer list-none"
-                                    >
-                                        <div class="flex items-center gap-2">
-                                            <FileText
-                                                class="w-5 h-5 text-amber-500"
-                                            />
-                                            <span>Game Paper Sources</span>
-                                        </div>
-                                        <span
-                                            class="transition group-open:rotate-180"
-                                        >
-                                            <ChevronDown class="w-5 h-5" />
-                                        </span>
-                                    </summary>
-
-                                    <div class="mt-4 space-y-4">
-                                        <p
-                                            class="text-sm text-muted-foreground"
-                                        >
-                                            Community-verified download sources
-                                            for the detailed game documentation
-                                            markdown file (hash: <span
-                                                class="font-mono text-xs"
-                                                >{game.content.paper.slice(
-                                                    0,
-                                                    16,
-                                                )}...</span
-                                            >)
-                                        </p>
-
-                                        {#if $reputation_proof}
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                on:click={() =>
-                                                    openFileSourceModal(
-                                                        game.content.paper,
-                                                        "paper",
-                                                    )}
-                                                class="w-full"
-                                            >
-                                                Add Download Source
-                                            </Button>
-                                        {:else}
-                                            <p
-                                                class="text-xs text-muted-foreground italic"
-                                            >
-                                                Create a reputation profile to
-                                                add or manage download sources
-                                            </p>
-                                        {/if}
-
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.paper}
-                                            sources={paperSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
-                                    </div>
-                                </details>
-                            </div>
-                        {/if}
-
-                        {#if game.content.soundtrack && game.content.soundtrack.length === 64}
-                            <div
-                                class="col-span-1 md:col-span-2 lg:col-span-3 mt-4"
-                            >
-                                <details
-                                    class="group p-4 rounded-lg border bg-card shadow-sm {$mode ===
-                                    'dark'
-                                        ? 'border-slate-700'
-                                        : 'border-gray-200'}"
-                                >
-                                    <summary
-                                        class="flex justify-between items-center font-medium cursor-pointer list-none"
-                                    >
-                                        <div class="flex items-center gap-2">
-                                            <Music
-                                                class="w-5 h-5 text-green-500"
-                                            />
-                                            <span>Game Soundtrack Sources</span>
-                                        </div>
-                                        <span
-                                            class="transition group-open:rotate-180"
-                                        >
-                                            <ChevronDown class="w-5 h-5" />
-                                        </span>
-                                    </summary>
-
-                                    <div class="mt-4 space-y-4">
-                                        <p
-                                            class="text-sm text-muted-foreground"
-                                        >
-                                            Community-verified download sources
-                                            for the game soundtrack audio file
-                                            (hash: <span
-                                                class="font-mono text-xs"
-                                                >{game.content.soundtrack.slice(
-                                                    0,
-                                                    16,
-                                                )}...</span
-                                            >)
-                                        </p>
-
-                                        {#if $reputation_proof}
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                on:click={() =>
-                                                    openFileSourceModal(
-                                                        game.content.soundtrack,
-                                                        "soundtrack",
-                                                    )}
-                                                class="w-full"
-                                            >
-                                                Add Download Source
-                                            </Button>
-                                        {:else}
-                                            <p
-                                                class="text-xs text-muted-foreground italic"
-                                            >
-                                                Create a reputation profile to
-                                                add or manage download sources
-                                            </p>
-                                        {/if}
-
-                                        <FileCard
-                                            profile={$reputation_proof}
-                                            fileHash={game.content.soundtrack}
-                                            sources={soundtrackSources}
-                                            explorerUri={$explorer_uri}
-                                            source_explorer_url={$source_explorer_url}
-                                            webExplorerUriTkn={$web_explorer_uri_tkn}
-                                        />
-                                    </div>
-                                </details>
-                            </div>
-                        {/if}
                     </div>
                 {/if}
             </section>
 
             <section
-                class="game-status status-actions-panel grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 p-6 md:p-8 shadow-lg rounded-xl bg-card border border-border/50"
+                class="game-status status-actions-panel mb-12 p-6 md:p-8 shadow-lg rounded-xl bg-card border border-border/50"
             >
-                <div class="status-side">
-                    <div class="flex items-center justify-between mb-6">
+                <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
                         <h2 class="text-2xl font-semibold">Game Progress</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            Start with the essentials, then open details when you want the deeper technical view.
+                        </p>
                     </div>
-
-                    <!-- Game Phase Stepper -->
-                    <div
-                        class="relative flex items-center justify-between mb-8 w-full px-4"
+                    <Button
+                        variant={showProgressDetails ? "secondary" : "outline"}
+                        size="sm"
+                        on:click={() => (showProgressDetails = !showProgressDetails)}
+                        class="self-start"
                     >
-                        <!-- Progress Lines Background -->
+                        {showProgressDetails ? "Hide Details" : "Details"}
+                        <ChevronDown
+                            class={`ml-2 h-4 w-4 transition-transform ${showProgressDetails ? "rotate-180" : ""}`}
+                        />
+                    </Button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div class="status-side space-y-5">
                         <div
-                            class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 dark:bg-gray-700 -z-10 mx-4"
-                        ></div>
-
-                        {#if game.status === "Cancelled_Draining"}
-                            <!-- CANCELLED FLOW: Active -> Cancelled -> Draining -->
-
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
                             <div
-                                class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 bg-gray-200 dark:bg-gray-700"
-                                style="width: 50%;"
-                            ></div>
-
-                            <div
-                                class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 bg-gray-200 dark:bg-gray-700"
-                                style="width: 50%;"
-                            ></div>
-
-                            <!-- Step 1: Active (Completed) -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
+                                class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]"
                             >
-                                <div
-                                    class={`${progressCircleBase} ${progressDefaultCircle}`}
-                                >
-                                    <Check class="w-6 h-6" />
-                                </div>
-                                <span
-                                    class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                                    >Active</span
-                                >
-                            </div>
-
-                            <!-- Step 2: Cancelled (Completed Event) -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${progressDefaultCircle}`}
-                                >
-                                    <XCircle class="w-6 h-6" />
-                                </div>
-                                <span
-                                    class="mt-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                                    >Cancelled</span
-                                >
-                            </div>
-
-                            <!-- Step 3: Draining (Active State) -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${progressSuspendedCircle} animate-pulse`}
-                                >
-                                    <ShieldCheck class="w-5 h-5" />
-                                </div>
-                                <span
-                                    class="mt-2 text-xs font-bold uppercase tracking-wider text-red-600"
-                                    >Draining</span
-                                >
-                            </div>
-                        {:else}
-                            <!-- STANDARD FLOW: Ceremony -> Active -> Resolution -> Finalized -->
-
-                            <!-- Line 1: Active -> Resolution -->
-                            <div
-                                class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 -z-10 mx-4 transition-all duration-500 bg-gray-200 dark:bg-gray-700"
-                                style="width: {game.status !== 'Active'
-                                    ? '50%'
-                                    : '0%'};"
-                            ></div>
-
-                            <!-- Line 2: Resolution -> Finalized -->
-                            <div
-                                class="absolute left-1/2 top-1/2 transform -translate-y-1/2 h-1 -z-10 transition-all duration-500 bg-gray-200 dark:bg-gray-700"
-                                style="width: {game.status === 'Finalized'
-                                    ? '50%'
-                                    : '0%'};"
-                            ></div>
-
-                            <!-- Step 1: Active -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${
-                                        isActiveStep
-                                            ? progressActiveCircle
-                                            : progressDefaultCircle
-                                    }`}
-                                >
-                                    {#if game.status !== "Active" || participationIsEnded}
-                                        <Check class="w-6 h-6" />
-                                    {:else}
-                                        <span class="text-base font-bold"
-                                            >1</span
+                                <div class="min-w-0">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            class={`p-3 rounded-2xl shrink-0 ${phaseTone.iconBg}`}
                                         >
+                                            <svelte:component
+                                                this={phaseIcon}
+                                                class="w-6 h-6"
+                                            />
+                                        </div>
+                                        <div class="min-w-0">
+                                            <p
+                                                class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                Current Snapshot
+                                            </p>
+                                            <div
+                                                class="mt-2 flex flex-wrap items-center gap-2"
+                                            >
+                                                <span
+                                                    class={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] ${phaseTone.contractBadge}`}
+                                                >
+                                                    {gamePhase.contractLabel}
+                                                </span>
+                                                <h3
+                                                    class={`text-xl font-bold leading-tight ${phaseTone.titleText}`}
+                                                >
+                                                    {gamePhase.title}
+                                                </h3>
+                                            </div>
+                                            <p
+                                                class="mt-3 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400"
+                                            >
+                                                {gamePhase.description}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {#if shouldShowCountdown}
+                                        <div
+                                            data-hover-corners
+                                            class="countdown-container mt-5 rounded-2xl border {$mode ===
+                                            'dark'
+                                                ? 'border-slate-700 bg-slate-950/30'
+                                                : 'border-gray-200 bg-gray-50/80'} p-4 md:p-5"
+                                        >
+                                            <div class="timeleft">
+                                                <div class="timeleft-header">
+                                                    <span
+                                                        class="timeleft-label-icon"
+                                                    >
+                                                        <Clock3 class="w-4 h-4" />
+                                                    </span>
+                                                    <span class="timeleft-label">
+                                                        {clockLabel}
+                                                    </span>
+                                                </div>
+                                                {#if remainingBlocks > 0}
+                                                    <span class="text-xs opacity-70 mt-1 block">
+                                                        Estimated time ({remainingBlocks}
+                                                        blocks remaining, ~{platform
+                                                            .time_per_block /
+                                                            1000 /
+                                                            60} min/block)
+                                                    </span>
+                                                {/if}
+                                                <div class="countdown-items">
+                                                    <div class="item">
+                                                        <div>{daysValue}</div>
+                                                        <div><h3>Days</h3></div>
+                                                    </div>
+                                                    <div class="item">
+                                                        <div>{hoursValue}</div>
+                                                        <div><h3>Hours</h3></div>
+                                                    </div>
+                                                    <div class="item">
+                                                        <div>{minutesValue}</div>
+                                                        <div><h3>Minutes</h3></div>
+                                                    </div>
+                                                    <div class="item">
+                                                        <div>{secondsValue}</div>
+                                                        <div><h3>Seconds</h3></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     {/if}
                                 </div>
-                                <span
-                                    class={`mt-2 text-xs font-bold uppercase tracking-wider ${
-                                        isActiveStep
-                                            ? "text-blue-600 dark:text-blue-400"
-                                            : "text-gray-500 dark:text-gray-400"
-                                    }`}>Active</span
-                                >
-                            </div>
 
-                            <!-- Step 2: Resolution -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
                                 <div
-                                    class={`${progressCircleBase} ${
-                                        isSuspendedStep
-                                            ? progressSuspendedCircle
-                                            : isJudgeStep
-                                              ? progressJudgeCircle
-                                              : progressDefaultCircle
-                                    }`}
+                                    data-hover-corners
+                                    class="rounded-2xl border {$mode === 'dark'
+                                        ? 'border-slate-700 bg-slate-950/20'
+                                        : 'border-gray-200 bg-gray-50/70'} p-4 md:p-5"
                                 >
-                                    {#if game.status === "Finalized"}
-                                        <Check class="w-6 h-6" />
-                                    {:else if game.status === "Resolution" || (game.status === "Active" && participationIsEnded && !gameSuspended)}
-                                        <Gavel class="w-5 h-5" />
-                                    {:else if gameSuspended}
-                                        <AlertTriangle class="w-5 h-5" />
-                                    {:else}
-                                        <span class="text-base font-bold"
-                                            >2</span
-                                        >
-                                    {/if}
-                                </div>
-                                <span
-                                    class={`mt-2 text-xs font-bold uppercase tracking-wider ${
-                                        isSuspendedStep
-                                            ? "text-red-500"
-                                            : isJudgeStep
-                                              ? "text-blue-600 dark:text-blue-400"
-                                              : "text-gray-500 dark:text-gray-400"
-                                    }`}
-                                    >{gameSuspended
-                                        ? "Suspended"
-                                        : "Resolution"}</span
-                                >
-                            </div>
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                    >
+                                        At a Glance
+                                    </p>
 
-                            <!-- Step 3: Finalized -->
-                            <div
-                                class="flex flex-col items-center bg-transparent z-10 px-2"
-                            >
-                                <div
-                                    class={`${progressCircleBase} ${
-                                        isFinalizedStep
-                                            ? progressActiveCircle
-                                            : progressDefaultCircle
-                                    }`}
-                                >
-                                    {#if game.status === "Finalized"}
-                                        <Check class="w-6 h-6" />
-                                    {:else}
-                                        <span class="text-base font-bold"
-                                            >3</span
-                                        >
-                                    {/if}
-                                </div>
-                                <span
-                                    class={`mt-2 text-xs font-bold uppercase tracking-wider ${
-                                        isFinalizedStep
-                                            ? "text-blue-600"
-                                            : "text-gray-500 dark:text-gray-400"
-                                    }`}>Finalized</span
-                                >
-                            </div>
-                        {/if}
-                    </div>
+                                    <div class="mt-4 space-y-4">
+                                        <div class="flex flex-col gap-2">
+                                            <p
+                                                class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                On-chain state
+                                            </p>
+                                            <p class="text-base font-semibold">
+                                                {gamePhase.contractLabel}
+                                            </p>
+                                        </div>
 
-                    {#if shouldShowCountdown}
-                        <div class="countdown-container mb-8">
-                            <div class="timeleft">
-                                <span class="timeleft-label">
-                                    {clockLabel}
-                                </span>
-                                {#if remainingBlocks > 0}
-                                    <span class="text-xs opacity-70 mt-1 block">
-                                        Estimated time ({remainingBlocks} blocks
-                                        remaining, ~{platform.time_per_block /
-                                            1000 /
-                                            60} min/block)
-                                    </span>
-                                {/if}
-                                <div class="countdown-items">
-                                    <div class="item">
-                                        <div>{daysValue}</div>
-                                        <div><h3>Days</h3></div>
-                                    </div>
-                                    <div class="item">
-                                        <div>{hoursValue}</div>
-                                        <div><h3>Hours</h3></div>
-                                    </div>
-                                    <div class="item">
-                                        <div>{minutesValue}</div>
-                                        <div><h3>Minutes</h3></div>
-                                    </div>
-                                    <div class="item">
-                                        <div>{secondsValue}</div>
-                                        <div><h3>Seconds</h3></div>
+                                        <div class="flex flex-col gap-2">
+                                            <p
+                                                class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                UI subphase
+                                            </p>
+                                            <p class="text-base font-semibold">
+                                                {gamePhase.label}
+                                            </p>
+                                        </div>
+
+                                        <div class="flex flex-col gap-2">
+                                            <p
+                                                class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400"
+                                            >
+                                                Next milestone
+                                            </p>
+                                            <p
+                                                class="text-base font-semibold leading-snug"
+                                            >
+                                                {currentMilestoneTitle}
+                                            </p>
+                                            <p
+                                                class="text-xs leading-5 text-gray-500 dark:text-gray-400"
+                                            >
+                                                {currentMilestoneDescription}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    {/if}
+
+                        {#if showProgressDetails}
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <div
+                                class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
+                            >
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                    >
+                                        Subphase Progression
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400"
+                                    >
+                                        These frontend subphases explain where
+                                        the game sits inside the current
+                                        contract state.
+                                    </p>
+                                </div>
+                                <div
+                                    class="flex flex-wrap items-center gap-2"
+                                >
+                                    <span
+                                        class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] text-gray-700 dark:bg-slate-800 dark:text-slate-200"
+                                    >
+                                        {gamePhase.contractLabel}
+                                    </span>
+                                    <span class="text-sm font-semibold">
+                                        {gamePhase.label}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="mt-5 space-y-3">
+                                {#each currentSubphaseSequence as subphase, index (subphase)}
+                                    <div
+                                        data-hover-corners
+                                        class={`rounded-xl border p-4 md:p-5 ${getSubphaseCardClasses(
+                                            gamePhase,
+                                            subphase,
+                                        )}`}
+                                    >
+                                        <div
+                                            class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
+                                        >
+                                            <div
+                                                class="flex items-start gap-4 min-w-0"
+                                            >
+                                                <div
+                                                    class={`inline-flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold shrink-0 ${getSubphaseIndexClasses(
+                                                        gamePhase,
+                                                        subphase,
+                                                    )}`}
+                                                >
+                                                    {index + 1}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div
+                                                        class="flex flex-wrap items-center gap-2"
+                                                    >
+                                                        <p
+                                                            class="text-base font-semibold leading-tight"
+                                                        >
+                                                            {
+                                                                GAME_PHASE_DEFINITIONS[
+                                                                    subphase
+                                                                ].label
+                                                            }
+                                                        </p>
+                                                        <span
+                                                            class={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getSubphaseStatusBadgeClasses(
+                                                                gamePhase,
+                                                                subphase,
+                                                            )}`}
+                                                        >
+                                                            {getSubphaseStatusLabel(
+                                                                gamePhase,
+                                                                subphase,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <p
+                                                        class="mt-2 text-sm leading-6 opacity-80"
+                                                    >
+                                                        {SUBPHASE_HINTS[subphase]}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                        {/if}
+                    </div>
 
                     <div
-                        class="status-description mb-8 rounded-xl border bg-card overflow-hidden {$mode ===
+                        class="actions-side space-y-5"
+                    >
+                        {#if showProgressDetails}
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <div
+                                class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
+                            >
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400"
+                                    >
+                                        Contract Lifecycle
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400"
+                                    >
+                                        The contract only moves through three
+                                        main states. FINALIZED is the frontend
+                                        end state after the successful path pays
+                                        out.
+                                    </p>
+                                </div>
+                                <span
+                                    class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500"
+                                >
+                                    Canonical contract path
+                                </span>
+                            </div>
+
+                            <div
+                                class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-stretch"
+                            >
+                                {#each mainContractStateCards as card, index (card.id)}
+                                    <div
+                                        data-hover-corners
+                                        class={`rounded-xl p-4 ${getContractCardClasses(
+                                            card,
+                                            gamePhase,
+                                        )}`}
+                                    >
+                                        <div class="flex items-start gap-4">
+                                            <div
+                                                class="flex items-start gap-3 min-w-0 flex-1"
+                                            >
+                                                <div
+                                                    class={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold shrink-0 ${getContractStateMeta(
+                                                        card.id,
+                                                    ).accent}`}
+                                                >
+                                                    {index + 1}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div
+                                                        class="flex flex-wrap items-center gap-2"
+                                                    >
+                                                        <p
+                                                            class="text-[10px] uppercase tracking-[0.18em] opacity-70"
+                                                        >
+                                                            {getContractStateMeta(
+                                                                card.id,
+                                                            ).eyebrow}
+                                                        </p>
+                                                        <span
+                                                            class={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${getContractBadgeClasses(
+                                                                card,
+                                                            )}`}
+                                                        >
+                                                            {card.badge}
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        class="mt-2 flex items-center gap-2"
+                                                    >
+                                                        <svelte:component
+                                                            this={card.icon}
+                                                            class="w-4 h-4 shrink-0"
+                                                        />
+                                                        <span
+                                                            class="text-sm font-semibold leading-tight"
+                                                            >{card.label}</span
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p
+                                            class="mt-4 text-sm leading-6 opacity-80"
+                                        >
+                                            {card.description}
+                                        </p>
+                                    </div>
+
+                                    {#if index < mainContractStateCards.length - 1}
+                                        <div
+                                            class="hidden md:flex items-center justify-center text-gray-300 dark:text-slate-600"
+                                            aria-hidden="true"
+                                        >
+                                            <ArrowRight class="w-5 h-5" />
+                                        </div>
+                                    {/if}
+                                {/each}
+                            </div>
+
+                            {#if alternativeContractCard}
+                                <div
+                                    data-hover-corners
+                                    class="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50/80 dark:border-slate-700 dark:bg-slate-900/45 p-4"
+                                >
+                                    <div
+                                        class="flex flex-col gap-3 sm:flex-row sm:items-start"
+                                    >
+                                        <div
+                                            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200 shrink-0"
+                                        >
+                                            <XCircle class="w-5 h-5" />
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div
+                                                class="flex flex-wrap items-center gap-2"
+                                            >
+                                                <span
+                                                    class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-200"
+                                                >
+                                                    Alternative branch
+                                                </span>
+                                                <span
+                                                    class="text-sm font-semibold text-gray-900 dark:text-slate-100"
+                                                >
+                                                    {alternativeContractCard.label}
+                                                </span>
+                                                <span
+                                                    class="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400"
+                                                >
+                                                    Exits from ACTIVE
+                                                </span>
+                                            </div>
+                                            <p
+                                                class="mt-2 text-sm leading-6 text-gray-600 dark:text-slate-300"
+                                            >
+                                                {alternativeContractCard.description}
+                                                This path is only taken if the
+                                                secret is revealed too early.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
+                        </div>
+                        {/if}
+
+                        {#if showProgressDetails}
+                        <div
+                            class="status-description rounded-xl border bg-card overflow-hidden {$mode ===
                         'dark'
                             ? 'border-slate-700'
                             : 'border-gray-200'} shadow-sm"
-                    >
-                        <!-- Header with State Title -->
-                        <div
-                            class="p-4 border-b {$mode === 'dark'
-                                ? 'border-slate-700'
-                                : 'border-gray-100'} flex items-center gap-3"
                         >
-                            <div
-                                class="p-2 rounded-lg {game.status ===
-                                    'Active' && gameSuspended
-                                    ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                                    : game.status === 'Active'
-                                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                                      : game.status === 'Resolution'
-                                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                                        : game.status === 'Finalized'
-                                          ? 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400'
-                                          : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}"
+                        <div class="p-4">
+                            <p
+                                class="text-sm leading-6 text-gray-500 dark:text-gray-400"
                             >
-                                {#if game.status === "Active"}
-                                    <Sparkles class="w-5 h-5" />
-                                {:else if game.status === "Resolution"}
-                                    <Gavel class="w-5 h-5" />
-                                {:else if game.status === "Finalized"}
-                                    <Trophy class="w-5 h-5" />
-                                {:else}
-                                    <XCircle class="w-5 h-5" />
-                                {/if}
-                            </div>
-                            <div>
-                                <h3
-                                    class="text-lg font-bold flex items-center gap-2 {game.status ===
-                                        'Active' && gameSuspended
-                                        ? 'text-red-600 dark:text-red-400'
-                                        : game.status === 'Active'
-                                          ? 'text-blue-600 dark:text-blue-400'
-                                          : game.status === 'Resolution'
-                                            ? 'text-blue-600 dark:text-blue-400'
-                                            : game.status === 'Finalized'
-                                              ? 'text-gray-600 dark:text-gray-400'
-                                              : 'text-red-600 dark:text-red-400'}"
-                                >
-                                    {#if game.status === "Active" && openCeremony}
-                                        PLAYING
-                                    {:else if game.status === "Active" && !participationIsEnded}
-                                        PARTICIPATIONS MUST BE SUBMITED
-                                    {:else if game.status === "Active" && participationIsEnded}
-                                        {#if resolutionAllowed}
-                                            AWAITING RESOLUTION
-                                        {:else}
-                                            SUSPENDED
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            JUDGE PERIOD
-                                        {:else}
-                                            READY TO FINALIZE
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
-                                        FINALIZED STATE
-                                    {:else}
-                                        CANCELLED (DRAINING)
-                                    {/if}
-                                </h3>
-                                <p
-                                    class="text-sm text-gray-500 dark:text-gray-400"
-                                >
-                                    {#if game.status === "Active" && openCeremony}
-                                        Seed ceremony is open. Collaborate to
-                                        ensure a random seed.
-                                        <br />
-                                        The competition is live. Implement and submit
-                                        your solution.
-                                    {:else if game.status === "Active" && !participationIsEnded}
-                                        A seed has been agreed upon. Execute and
-                                        publish your results.
-                                    {:else if game.status === "Active" && participationIsEnded}
-                                        {#if resolutionAllowed}
-                                            Time is up. The creator must now
-                                            resolve the competition.
-                                        {:else}
-                                            The creator failed to resolve the
-                                            competition in time.
-                                            <br />
-                                            <strong
-                                                >Players can recover their fees.
-                                                Resolver stake is lost.</strong
-                                            >
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            Judges are validating the winner.
-                                            New candidates can be proposed.
-                                        {:else}
-                                            Judge period ended. The competition
-                                            can be finalized.
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
-                                        The competition has ended and prizes
-                                        have been distributed.
-                                    {:else}
-                                        The competition was cancelled after the
-                                        creator’s secret was compromised.
-                                    {/if}
-                                </p>
-                            </div>
+                                The platform is currently in
+                                <span class="font-medium text-gray-900 dark:text-gray-100">
+                                    {gamePhase.title}</span
+                                >. These are the actions that are allowed and
+                                disallowed right now.
+                            </p>
                         </div>
 
                         <!-- Content Grid: Allowed vs Restricted -->
 
-                        <div
-                            class="grid grid-cols-1 md:grid-cols-1 divide-y md:divide-y-0 md:divide-x {$mode ===
-                            'dark'
-                                ? 'divide-slate-700'
-                                : 'divide-gray-100'}"
-                        >
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 p-4">
                             <!-- Allowed Actions -->
-                            <div class="p-4">
+                            <div
+                                data-hover-corners
+                                class="rounded-xl border border-green-100 bg-green-50/70 dark:border-green-900/40 dark:bg-green-950/20 p-4"
+                            >
                                 <h4
                                     class="text-sm font-semibold uppercase tracking-wider text-green-600 dark:text-green-400 mb-3 flex items-center"
                                 >
@@ -3542,220 +4987,24 @@
                                     What can happen?
                                 </h4>
                                 <ul class="space-y-2">
-                                    {#if game.status === "Active" && openCeremony}
+                                    {#each allowedPhaseActions as action}
                                         <li
                                             class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
                                         >
                                             <span
                                                 class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Anyone:</span
-                                            > Contribute to the random number generation
-                                            process (free) to ensure the competition's
-                                            seed is random.
+                                                >{action.actor}:</span
+                                            > {action.text}
                                         </li>
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Anyone:</span
-                                            >
-                                            Cancel the competition by revealing the
-                                            secret and receive a portion of the creator’s
-                                            stake.
-                                        </li>
-                                    {:else if game.status === "Active"}
-                                        {#if openCeremony}
-                                            <!-- CEREMONY PHASE -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Contribute to the random number generation
-                                                process (free).
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Players:</span
-                                                >
-                                                Join the competition and submit bot
-                                                hash.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Cancel the competition (if secret
-                                                leaked).
-                                            </li>
-                                        {:else if !participationIsEnded}
-                                            <!-- PLAYING PHASE -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Players:</span
-                                                >
-                                                Submit scores.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Cancel the competition (if secret
-                                                leaked).
-                                            </li>
-                                        {:else}
-                                            <!-- AWAITING RESOLUTION PHASE -->
-                                            {#if resolutionAllowed}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Creator:</span
-                                                    >
-                                                    Resolve the game by revealing
-                                                    the secret.
-                                                </li>
-                                            {/if}
-                                            {#if !gameSuspended}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Anyone:</span
-                                                    >
-                                                    Cancel the competition (if secret
-                                                    leaked).
-                                                </li>
-                                            {/if}
-                                            {#if gameSuspended}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                                >
-                                                    <span
-                                                        class="font-medium text-gray-900 dark:text-gray-100"
-                                                        >Players:</span
-                                                    >
-                                                    Claim full refund immediately
-                                                    (Creator resolution deadline
-                                                    passed).
-                                                </li>
-                                            {/if}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Rescue funds (if stuck after grace
-                                                period).
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            <!-- JUDGE PERIOD -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Judges:</span
-                                                >
-                                                Validate, invalidate, or mark the
-                                                candidate's service as unavailable.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Propose a new winner (if higher score).
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Anyone:</span
-                                                >
-                                                Include omitted participations.
-                                            </li>
-                                        {:else}
-                                            <!-- POST-JUDGE PERIOD -->
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Winner/Resolver:</span
-                                                >
-                                                Finalize the competition and distribute
-                                                prizes.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                            >
-                                                <span
-                                                    class="font-medium text-gray-900 dark:text-gray-100"
-                                                    >Participants:</span
-                                                >
-                                                Claim refunds (if grace period passes).
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Everyone:</span
-                                            > View results and history.
-                                        </li>
-                                    {:else}
-                                        <!-- Cancelled -->
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Players:</span
-                                            > Claim full refund immediately.
-                                        </li>
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-600 dark:text-gray-300"
-                                        >
-                                            <span
-                                                class="font-medium text-gray-900 dark:text-gray-100"
-                                                >Creator:</span
-                                            > Drain stake (slowly, over time).
-                                        </li>
-                                    {/if}
+                                    {/each}
                                 </ul>
                             </div>
 
                             <!-- Restricted Actions -->
-                            <div class="p-4">
+                            <div
+                                data-hover-corners
+                                class="rounded-xl border border-red-100 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20 p-4"
+                            >
                                 <h4
                                     class="text-sm font-semibold uppercase tracking-wider text-red-500 dark:text-red-400 mb-3 flex items-center"
                                 >
@@ -3763,162 +5012,36 @@
                                     What cannot happen?
                                 </h4>
                                 <ul class="space-y-2">
-                                    {#if game.status === "Active"}
-                                        {#if openCeremony}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Submit Score:</span
-                                                >
-                                                Wait for ceremony to end.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Resolve Competition:</span
-                                                >
-                                                Cannot resolve during ceremony.
-                                            </li>
-                                        {:else if !participationIsEnded}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Resolve Competition:</span
-                                                >
-                                                Wait for deadline to expire.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Ceremony:</span
-                                                >
-                                                Ceremony is closed.
-                                            </li>
-                                        {:else}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Submit Score:</span
-                                                >
-                                                Deadline has passed.
-                                            </li>
-                                            {#if gameSuspended}
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                                >
-                                                    <span class="font-medium"
-                                                        >Resolve Competition:</span
-                                                    >
-                                                    Resolution deadline has passed.
-                                                    Creator did not resolve in time.
-                                                </li>
-                                                <li
-                                                    class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                                >
-                                                    <span class="font-medium"
-                                                        >Cancel Game:</span
-                                                    >
-                                                    Cannot cancel after resolution
-                                                    deadline has passed.
-                                                </li>
-                                            {/if}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Ceremony:</span
-                                                >
-                                                Ceremony is closed.
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Resolution"}
-                                        {@const isBeforeDeadline =
-                                            new Date().getTime() < targetDate}
-                                        {#if isBeforeDeadline}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Submit participation:</span
-                                                >
-                                                Participation period has ended.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Finalize Competition:</span
-                                                >
-                                                Wait for judge period to end.
-                                            </li>
-                                        {:else}
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Invalidate Winner:</span
-                                                >
-                                                Judge period has ended.
-                                            </li>
-                                            <li
-                                                class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                            >
-                                                <span class="font-medium"
-                                                    >Propose Winner:</span
-                                                >
-                                                Judge period has ended.
-                                            </li>
-                                        {/if}
-                                    {:else if game.status === "Finalized"}
+                                    {#each restrictedPhaseActions as action}
                                         <li
                                             class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
                                         >
                                             <span class="font-medium"
-                                                >Modifying state:</span
-                                            > The competition is closed.
+                                                >{action.actor}:</span
+                                            > {action.text}
                                         </li>
-                                    {:else}
-                                        <!-- Cancelled -->
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                        >
-                                            <span class="font-medium"
-                                                >Winning:</span
-                                            > No winner can be declared.
-                                        </li>
-                                        <li
-                                            class="text-sm flex items-start gap-2 text-gray-500 dark:text-gray-400"
-                                        >
-                                            <span class="font-medium"
-                                                >Resuming:</span
-                                            > The competition is permanently invalid.
-                                        </li>
-                                    {/if}
+                                    {/each}
                                 </ul>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div
-                    class="actions-side md:border-l {$mode === 'dark'
-                        ? 'border-slate-700'
-                        : 'border-gray-200'} md:pl-8"
-                >
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
-                        <ShieldCheck class="w-5 h-5 mr-2 text-blue-500" />
-                        Trust & Security
-                    </h2>
+                        </div>
+                        {/if}
 
-                    <div class="grid grid-cols-1 gap-y-6">
+                        <div
+                            class="rounded-2xl border {$mode === 'dark'
+                                ? 'border-slate-700 bg-slate-900/40'
+                                : 'border-gray-200 bg-white'} p-5 md:p-6"
+                        >
+                            <h2 class="text-xl font-semibold mb-5">
+                                {showProgressDetails ? "Trust & Security" : "Trust Snapshot"}
+                            </h2>
+
+                            <div class="grid grid-cols-1 gap-y-6">
                         {#if riskLevel === "Low"}
                             <div class="info-block">
                                 <div
+                                    data-hover-corners
                                     class="mb-4 p-3 rounded bg-green-500/10 border border-green-500/20"
                                 >
                                     <span
@@ -3939,6 +5062,7 @@
                         {:else if riskLevel === "Medium"}
                             <div class="info-block">
                                 <div
+                                    data-hover-corners
                                     class="mb-4 p-3 rounded bg-yellow-500/10 border border-yellow-500/20"
                                 >
                                     <span
@@ -3958,6 +5082,7 @@
                         {:else}
                             <div class="info-block">
                                 <div
+                                    data-hover-corners
                                     class="mb-4 p-3 rounded bg-red-500/10 border border-red-500/20"
                                 >
                                     <span class="text-sm font-bold text-red-500"
@@ -4132,6 +5257,7 @@
                                 </div>
                             {/if}
                         {/if}
+                        </div>
                     </div>
                 </div>
 
@@ -4447,7 +5573,7 @@
                                     {#if isCurrentParticipationWinner}
                                         <div class="winner-badge">
                                             <Trophy class="w-4 h-4 mr-2" />
-                                            <span>WINNER CANDIDATE</span>
+                                            <span>{game.status === GameState.Finalized ? 'WINNER' : 'WINNER CANDIDATE'}</span>
                                         </div>
                                     {/if}
 
@@ -5128,6 +6254,7 @@
                             maxWidth="100%"
                             profile={$reputation_proof}
                             connected={$connected}
+                            connect_executed={$connected}
                         />
                     </div>
                 {/if}
@@ -5140,10 +6267,11 @@
                 on:click|self={closeModal}
                 role="presentation"
             >
+                <BodyScrollLock />
                 <div
                     class="modal-content {$mode === 'dark'
                         ? 'bg-slate-800 text-gray-200 border border-slate-700'
-                        : 'bg-white text-gray-800 border border-gray-200'} p-6 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-4xl transform transition-all flex flex-col max-h-[90vh]"
+                        : 'bg-white text-gray-800 border border-gray-200'} relative p-6 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-5xl xl:max-w-6xl transform transition-all flex flex-col max-h-[90vh]"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="modal-title"
@@ -5187,7 +6315,7 @@
                         {#if currentActionType === "submit_score"}
                             {#if showParticipantGuide}
                                 <div
-                                    class="space-y-6 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
+                                    class="space-y-6 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
                                 >
                                     <div class="text-center mb-8">
                                         <h3 class="text-2xl font-bold mb-2">
@@ -5219,37 +6347,86 @@
                                                 <h4
                                                     class="font-semibold text-lg"
                                                 >
-                                                    1. Check Judges
+                                                    1. {uniqueJudges.length > 0
+                                                        ? "Check Judges"
+                                                        : "No Judges"}
                                                 </h4>
                                             </div>
-                                            <p
-                                                class="text-sm text-muted-foreground mb-4"
-                                            >
-                                                Verify the reputation of the
-                                                judges to ensure fair play.
-                                            </p>
-                                            <div
-                                                class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
-                                            >
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() =>
-                                                        navigator.clipboard.writeText(
-                                                            `nodo gop_judges_check ${game?.boxId}`,
-                                                        )}
-                                                    title="Copy command"
+                                            {#if uniqueJudges.length > 0}
+                                                <p
+                                                    class="text-sm text-muted-foreground mb-4"
                                                 >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary"
-                                                    >nodo</span
+                                                    Install and run the
+                                                    judge-check service to
+                                                    verify the reputation of
+                                                    the judges before
+                                                    participating.
+                                                </p>
+                                                <div class="space-y-2">
+                                                    <div
+                                                        class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                            on:click={() =>
+                                                                navigator.clipboard.writeText(
+                                                                    `nodo download ${JUDGE_CHECK_SERVICE}`,
+                                                                )}
+                                                            title="Copy command"
+                                                        >
+                                                            <Copy class="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <span
+                                                            class="text-primary"
+                                                            >nodo</span
+                                                        >
+                                                        download
+                                                        {JUDGE_CHECK_SERVICE}
+                                                    </div>
+                                                    <div
+                                                        class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                            on:click={() =>
+                                                                navigator.clipboard.writeText(
+                                                                    "nodo execute gop_judges_check",
+                                                                )}
+                                                            title="Copy command"
+                                                        >
+                                                            <Copy class="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <span
+                                                            class="text-primary"
+                                                            >nodo</span
+                                                        >
+                                                        execute
+                                                        gop_judges_check
+                                                    </div>
+                                                    <p
+                                                        class="text-xs text-muted-foreground"
+                                                    >
+                                                        Requires Celaut Nodo.
+                                                        Follow
+                                                        {NODO_INSTALLATION},
+                                                        then open the service
+                                                        web UI, enter the game
+                                                        id or the judges you
+                                                        want to verify, and
+                                                        wait for the verdict.
+                                                    </p>
+                                                </div>
+                                            {:else}
+                                                <p
+                                                    class="text-sm text-muted-foreground"
                                                 >
-                                                gop_judges_check {game?.boxId.slice(
-                                                    0,
-                                                    10,
-                                                )}...
-                                            </div>
+                                                    This game has no judges, so
+                                                    there is nothing to verify
+                                                    in this step.
+                                                </p>
+                                            {/if}
                                         </div>
 
                                         <!-- Step 2: Create Bot -->
@@ -5273,31 +6450,39 @@
                                             <p
                                                 class="text-sm text-muted-foreground mb-4"
                                             >
-                                                Use the CLI to generate your bot
-                                                template and integrate with
-                                                LLMs.
+                                                Build your robot by following
+                                                the development guide and its
+                                                recommendations.
                                             </p>
                                             <div
-                                                class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group"
+                                                class="bg-muted/50 p-3 rounded-lg text-sm"
                                             >
-                                                <button
-                                                    type="button"
-                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
-                                                    on:click={() =>
-                                                        navigator.clipboard.writeText(
-                                                            `nodo gop_create_bot ${game?.boxId}`,
-                                                        )}
-                                                    title="Copy command"
+                                                <p
+                                                    class="text-muted-foreground"
                                                 >
-                                                    <Copy class="w-3.5 h-3.5" />
-                                                </button>
-                                                <span class="text-primary"
-                                                    >nodo</span
+                                                    Open the full robot
+                                                    development guide here and
+                                                    read it without leaving the
+                                                    participation flow.
+                                                </p>
+                                                <Button
+                                                    variant="outline"
+                                                    class="mt-3 w-full justify-center gap-2"
+                                                    on:click={openRobotDevelopmentGuide}
                                                 >
-                                                gop_create_bot {game?.boxId.slice(
-                                                    0,
-                                                    10,
-                                                )}...
+                                                    <FileText class="w-4 h-4" />
+                                                    Read development guide
+                                                </Button>
+                                            </div>
+                                            <div class="mt-4">
+                                                <Button
+                                                    variant="outline"
+                                                    class="w-full justify-center gap-2"
+                                                    on:click={() => (showBotAssistantModal = true)}
+                                                >
+                                                    <Sparkles class="w-4 h-4" />
+                                                    Need help drafting your bot?
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -5317,7 +6502,7 @@
                                                 >
                                                 the deadline. Publishing the hash
                                                 is <b>free</b> - no participation
-                                                fee required yet.
+                                                fee required yet (only network fees).
                                             </li>
                                             <li>
                                                 After the ceremony reveals the
@@ -5333,10 +6518,10 @@
                                                 to automatically generate and
                                                 submit the participation, or
                                                 monitor the <a
-                                                    href="https://t.me/gameofprompts"
+                                                    href="https://t.me/unstopbots"
                                                     target="_blank"
                                                     class="underline font-semibold hover:text-yellow-500"
-                                                    >Game of Prompts Telegram
+                                                    >UnstopBots Telegram
                                                     channel</a
                                                 > where a bot notifies these events.
                                             </li>
@@ -5349,10 +6534,157 @@
                                             class="gap-2"
                                             on:click={() => {
                                                 showParticipantGuide = false;
-                                                showSolverIdStep = true;
+                                                showExecutionStep = true;
                                             }}
                                         >
                                             I have my Bot implemented
+                                        </Button>
+                                    </div>
+                                </div>
+                            {:else if showExecutionStep}
+                                <div
+                                    class="space-y-6 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
+                                >
+                                    <div class="text-center mb-8">
+                                        <h3 class="text-2xl font-bold mb-2">
+                                            Game Service Execution
+                                        </h3>
+                                        <p class="text-muted-foreground">
+                                            Follow these instructions to run the game service and generate your participation data.
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="space-y-6">
+                                        <!-- Step 1 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">1. Download Game Service</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                Download the specific game service using Celaut Nodo.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo download ${serviceDownload}`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> download {serviceDownload}
+                                            </div>
+                                        </div>
+
+                                        <!-- Step 2 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-green-500/10 rounded-lg text-green-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">2. Execute Game Service</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                Run your participation. The checksum serves to validate the integrity of both the seed and your ErgoTree.
+                                            </p>
+                                            {#if !$connected}
+                                                <div class="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20 flex items-start gap-3 mb-3">
+                                                    <AlertTriangle class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                                    <div class="text-sm text-amber-600">
+                                                        <p class="font-semibold mb-1">Connect Your Wallet</p>
+                                                        <p>You need to connect your wallet to execute this command.</p>
+                                                    </div>
+                                                </div>
+                                                <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all opacity-50">
+                                                    <span class="text-primary">nodo</span> execute {game?.content.serviceId} -e seed {game?.seed} -e ergotree "your_ergotree" -e checksum "checksum"
+                                                </div>
+                                            {:else}
+                                                <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                    <button
+                                                        type="button"
+                                                        class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                        on:click={() => navigator.clipboard.writeText(`nodo execute ${game?.content.serviceId} -e seed ${game?.seed} -e ergotree ${walletErgoTreeHex} -e checksum ${participationChecksum}`)}
+                                                        title="Copy command"
+                                                    >
+                                                        <Copy class="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span class="text-primary">nodo</span> execute {game?.content.serviceId} -e seed {game?.seed} -e ergotree {walletErgoTreeHex} -e checksum {participationChecksum}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                        
+                                        <!-- Step 3 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">3. Publish your solver</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground mb-3">
+                                                First publish your solver with <span class="font-mono text-foreground">nodo publish solver</span>. Before doing that, make sure you have already configured Nodo with <span class="font-mono text-foreground">nodo config</span>.
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo publish solver`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> publish solver
+                                            </div>
+                                            <p class="text-sm text-muted-foreground my-3">
+                                                If publishing is available, then export it to a file with:
+                                            </p>
+                                            <div class="bg-muted/50 p-3 rounded-lg font-mono text-xs break-all relative group">
+                                                <button
+                                                    type="button"
+                                                    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-muted"
+                                                    on:click={() => navigator.clipboard.writeText(`nodo export solver ./Desktop`)}
+                                                    title="Copy command"
+                                                >
+                                                    <Copy class="w-3.5 h-3.5" />
+                                                </button>
+                                                <span class="text-primary">nodo</span> export solver ./Desktop
+                                            </div>
+                                        </div>
+
+                                        <!-- Step 4 -->
+                                        <div class="p-4 rounded-xl border bg-card text-card-foreground shadow-sm">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <div class="p-2 bg-amber-500/10 rounded-lg text-amber-500">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                                                </div>
+                                                <h4 class="font-semibold text-lg">4. Upload Results</h4>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground">
+                                                Once execution and export are complete, upload the generated JSON file containing your results in the form below.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+                                        <Button
+                                            variant="ghost"
+                                            on:click={() => {
+                                                showExecutionStep = false;
+                                                showParticipantGuide = true;
+                                            }}
+                                        >
+                                            Back
+                                        </Button>
+                                        <Button
+                                            on:click={() => {
+                                                showExecutionStep = false;
+                                                showSolverIdStep = true;
+                                            }}
+                                        >
+                                            Continue <ArrowRight class="ml-2 h-4 w-4" />
                                         </Button>
                                     </div>
                                 </div>
@@ -5362,13 +6694,61 @@
                                 >
                                     <div class="text-center mb-8">
                                         <h3 class="text-2xl font-bold mb-2">
-                                            Publish Solver ID
+                                            Verify Solver ID it's on-chain
                                         </h3>
                                         <p class="text-muted-foreground">
                                             You need a unique Solver ID
-                                            published on-chain to participate.
+                                            published on-chain before the deadline to participate.
                                         </p>
                                     </div>
+
+                                    <!-- If its open don't suggest user to upload their participation data, it's not the time -->
+                                    {#if !openCeremony}
+                                        <!-- JSON upload: allow uploading exported participation data -->
+                                        <div class="mt-3 space-y-2">
+                                            <Label for="solver_json_upload">Upload participation data (.json)</Label>
+                                            <p class="text-muted-foreground">
+                                                In case you have already executed the game service.
+                                            </p>
+                                            <input
+                                                id="solver_json_upload"
+                                                type="file"
+                                                accept="application/json"
+                                                on:change={handleJsonFileUpload}
+                                                class="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-muted/50"
+                                            />
+
+                                            {#if jsonUploadError}
+                                                <div class="p-2 rounded text-sm text-red-600">{jsonUploadError}</div>
+                                            {/if}
+
+                                            {#if checksumStatus === 'invalid'}
+                                                <div class="p-2 rounded text-sm text-red-600">Invalid checksum: file does not match.</div>
+                                            {:else if checksumStatus === 'valid'}
+                                                <div class="p-2 rounded text-sm text-green-600">Valid checksum: loaded data.</div>
+                                            {/if}
+                                        </div>
+                                                                            <!-- "Or Fill Manually" Divider -->
+                                        <div class="flex items-center my-2">
+                                            <span
+                                                class="flex-grow border-t {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-300'}"
+                                            ></span><span
+                                                class="mx-3 text-xs uppercase {$mode ===
+                                                'dark'
+                                                    ? 'text-slate-500'
+                                                    : 'text-gray-500'}"
+                                                >Or Fill Manually</span
+                                            ><span
+                                                class="flex-grow border-t {$mode ===
+                                                'dark'
+                                                    ? 'border-slate-700'
+                                                    : 'border-gray-300'}"
+                                            ></span>
+                                        </div>
+                                    {/if}
 
                                     <div class="space-y-4">
                                         <div class="space-y-2">
@@ -5379,26 +6759,15 @@
                                                 <Input
                                                     id="solver_id_step"
                                                     bind:value={solverId_input}
+                                                    on:input={() => {
+                                                        solverId_box_found =
+                                                            false;
+                                                        participationSolverId =
+                                                            "";
+                                                    }}
                                                     placeholder="e.g., a1b2..."
                                                     class="font-mono"
                                                 />
-                                                <Button
-                                                    variant="outline"
-                                                    on:click={() => {
-                                                        const randomBytes =
-                                                            new Uint8Array(32);
-                                                        window.crypto.getRandomValues(
-                                                            randomBytes,
-                                                        );
-                                                        solverId_input =
-                                                            uint8ArrayToHex(
-                                                                randomBytes,
-                                                            );
-                                                    }}
-                                                    title="Generate Random"
-                                                >
-                                                    <Wand2 class="h-4 w-4" />
-                                                </Button>
                                             </div>
                                             <p
                                                 class="text-xs text-muted-foreground"
@@ -5486,14 +6855,16 @@
                                             variant="ghost"
                                             on:click={() => {
                                                 showSolverIdStep = false;
-                                                showParticipantGuide = true;
+                                                showExecutionStep = true;
                                             }}
                                         >
                                             Back
                                         </Button>
                                         <Button
                                             on:click={() => {
-                                                if (solverId_box_found) {
+                                                if (solverId_box_found || get(isDevMode)) {
+                                                    participationSolverId =
+                                                        solverId_input.trim();
                                                     showSolverIdStep = false;
                                                 } else {
                                                     checkSolverIdBox().then(
@@ -5508,7 +6879,7 @@
                                                 }
                                             }}
                                             disabled={!solverId_box_found &&
-                                                !transactionId}
+                                                !transactionId && !get(isDevMode)}
                                         >
                                             Continue <ArrowRight
                                                 class="ml-2 h-4 w-4"
@@ -5518,32 +6889,6 @@
                                 </div>
                             {:else}
                                 <div class="space-y-6 max-w-3xl mx-auto">
-                                    <!-- Back to Guide Button -->
-                                    <div class="flex justify-start">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            on:click={() =>
-                                                (showParticipantGuide = true)}
-                                            class="gap-2"
-                                        >
-                                            <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="16"
-                                                height="16"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                ><path
-                                                    d="m15 18-6-6 6-6"
-                                                /></svg
-                                            >
-                                            Back to Participant Guide
-                                        </Button>
-                                    </div>
 
                                     <!-- Ceremony Phase Warning -->
                                     {#if openCeremony}
@@ -5625,6 +6970,17 @@
                                                 {jsonUploadError}
                                             </p>
                                         {/if}
+                                        {#if checksumStatus === 'valid'}
+                                            <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-green-400' : 'text-green-600'}">
+                                                <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                                Checksum verified — file integrity confirmed.
+                                            </p>
+                                        {:else if checksumStatus === 'missing'}
+                                            <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}">
+                                                <span class="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>
+                                                No checksum found in file — integrity could not be verified.
+                                            </p>
+                                        {/if}
                                     </div>
 
                                     <!-- "Or Fill Manually" Divider -->
@@ -5685,17 +7041,23 @@
                                                 'dark'
                                                     ? 'text-gray-200'
                                                     : 'text-gray-700'}"
-                                                >Solver ID / Name</Label
+                                                >Solver ID</Label
                                             >
                                             <Input
                                                 id="solverId"
                                                 type="text"
-                                                bind:value={solverId_input}
-                                                placeholder="e.g., my_solver.celaut.bee"
+                                                value={participationSolverId}
+                                                readonly
+                                                placeholder="Solver ID verified on-chain"
                                                 class="w-full {$mode === 'dark'
                                                     ? 'bg-slate-800/50 border-slate-700'
                                                     : 'bg-white border-gray-200'}"
                                             />
+                                            <p class="mt-1 text-xs text-muted-foreground">
+                                                This Solver ID comes from the
+                                                on-chain verification step and
+                                                cannot be edited here.
+                                            </p>
                                         </div>
 
                                         <!-- Hash Logs -->
@@ -5722,37 +7084,54 @@
 
                                         <!-- Scores -->
                                         <div>
-                                            <Label
-                                                for="user_score"
-                                                class="block text-sm font-medium mb-1.5 {$mode ===
-                                                'dark'
-                                                    ? 'text-gray-200'
-                                                    : 'text-gray-700'}"
-                                            >
-                                                Your Score
-                                            </Label>
+                                            {#if scores_list.length === 0}
+                                                <Label
+                                                    for="user_score"
+                                                    class="block text-sm font-medium mb-1.5 {$mode ===
+                                                    'dark'
+                                                        ? 'text-gray-200'
+                                                        : 'text-gray-700'}"
+                                                >
+                                                    Your Score
+                                                </Label>
 
-                                            <Input
-                                                id="user_score"
-                                                type="number"
-                                                bind:value={user_score}
-                                                placeholder="e.g., 85"
-                                                class="w-full {$mode === 'dark'
-                                                    ? 'bg-slate-800/50 border-slate-700'
-                                                    : 'bg-white border-gray-200'}"
-                                            />
+                                                <Input
+                                                    id="user_score"
+                                                    type="number"
+                                                    bind:value={user_score}
+                                                    placeholder="e.g., 85"
+                                                    class="w-full {$mode === 'dark'
+                                                        ? 'bg-slate-800/50 border-slate-700'
+                                                        : 'bg-white border-gray-200'}"
+                                                />
 
-                                            <p
-                                                class="text-xs text-muted-foreground mt-1.5"
-                                            >
-                                                Enter your result. Will be mixed
-                                                with random data to preserve
-                                                your score private on-chain.
-                                            </p>
-
-                                            {#if scores_list.length > 0}
                                                 <p
-                                                    class="text-xs text-blue-500 mt-2"
+                                                    class="text-xs text-muted-foreground mt-1.5"
+                                                >
+                                                    Enter your result. Will be mixed
+                                                    with random data to preserve
+                                                    your score private on-chain.
+                                                </p>
+
+                                            {:else}
+                                                <Label
+                                                    for="user_score"
+                                                    class="block text-sm font-medium mb-1.5 {$mode ===
+                                                    'dark'
+                                                        ? 'text-gray-200'
+                                                        : 'text-gray-700'}"
+                                                >
+                                                    Obfuscated Score
+                                                </Label>
+                                                <p
+                                                    class="text-xs mt-1.5 {$mode === 'dark'
+                                                        ? 'text-gray-400'
+                                                        : 'text-gray-500'}"
+                                                    >
+                                                    Your score is anonymized using decoy values
+                                                </p>
+                                                <p
+                                                    class="text text-blue-500 mt-2"
                                                 >
                                                     Public data (Anonymized): {scores_list.join(
                                                         ", ",
@@ -5781,7 +7160,7 @@
                                                 on:click={handleSubmitScore}
                                                 disabled={isSubmitting ||
                                                     !commitmentC_input.trim() ||
-                                                    !solverId_input.trim() ||
+                                                    !participationSolverId.trim() ||
                                                     !hashLogs_input.trim() ||
                                                     scores_list.length === 0 ||
                                                     openCeremony}
@@ -5862,28 +7241,43 @@
                                                                 class="text-xs text-yellow-600/90 mb-1.5 block"
                                                                 >Simulate Error</Label
                                                             >
-                                                            <select
+                                                            <Select
                                                                 bind:value={
                                                                     devGenErrorType
                                                                 }
-                                                                class="w-full h-8 text-xs rounded-md bg-transparent border border-yellow-500/30 focus:border-yellow-500/50 text-foreground px-2"
                                                             >
-                                                                <option
-                                                                    value="none"
-                                                                    >None
-                                                                    (Valid)</option
+                                                                <SelectTrigger
+                                                                    class="cyber-select w-full h-8 text-xs"
+                                                                    aria-label="Simulate error"
                                                                 >
-                                                                <option
-                                                                    value="wrong_commitment"
-                                                                    >Invalid
-                                                                    Commitment</option
-                                                                >
-                                                                <option
-                                                                    value="wrong_score"
-                                                                    >Score
-                                                                    Mismatch</option
-                                                                >
-                                                            </select>
+                                                                    <SelectValue placeholder="Select error type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent class="cyber-select-content">
+                                                                    <SelectItem
+                                                                        value="none"
+                                                                        label="None (Valid)"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        None (Valid)
+                                                                    </SelectItem>
+                                                                    <SelectItem
+                                                                        value="wrong_commitment"
+                                                                        label="Invalid Commitment"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        Invalid
+                                                                        Commitment
+                                                                    </SelectItem>
+                                                                    <SelectItem
+                                                                        value="wrong_score"
+                                                                        label="Score Mismatch"
+                                                                        class="cyber-select-item text-xs"
+                                                                    >
+                                                                        Score
+                                                                        Mismatch
+                                                                    </SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
                                                         </div>
                                                     </div>
 
@@ -5899,8 +7293,18 @@
                                             {/if}
                                         </div>
                                     {/if}
+
+                                    <Button
+                                        variant="ghost"
+                                        on:click={() => {
+                                            showSolverIdStep = true;
+                                        }}
+                                    >
+                                        Back
+                                    </Button>
                                 </div>
                             {/if}
+
                         {:else if currentActionType === "resolve_game"}
                             <div class="space-y-4">
                                 <div>
@@ -6612,6 +8016,17 @@
                                             {jsonUploadError}
                                         </p>
                                     {/if}
+                                    {#if checksumStatus === 'valid'}
+                                        <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-green-400' : 'text-green-600'}">
+                                            <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                            Checksum verified — file integrity confirmed.
+                                        </p>
+                                    {:else if checksumStatus === 'missing'}
+                                        <p class="text-xs mt-1 flex items-center gap-1 {$mode === 'dark' ? 'text-yellow-400' : 'text-yellow-600'}">
+                                            <span class="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>
+                                            No checksum found in file — integrity could not be verified.
+                                        </p>
+                                    {/if}
                                     <p class="text-xs text-muted-foreground">
                                         Optional. If provided, fields below will be
                                         auto-filled.
@@ -6684,9 +8099,33 @@
                                             type="number"
                                             step="1"
                                             bind:value={judgeReferenceScore_input}
-                                            placeholder="Ej. 98"
+                                            placeholder="e.g. 98"
                                         />
                                     </div>
+
+                                    {#if showScorePicker}
+                                        <div class="p-3 rounded-md border mt-3 {$mode === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-gray-50 border-gray-200'}">
+                                            <p class="font-semibold mb-1">Choose the real score from the uploaded list</p>
+                                            <p class="text-sm text-muted-foreground mb-3">Select one of the scores below or cancel to fill the score manually.</p>
+                                            <div class="space-y-2 max-h-40 overflow-auto">
+                                                {#each scorePickerOptions as s, i}
+                                                    <label class="flex items-center gap-3 text-sm">
+                                                        <input
+                                                            type="radio"
+                                                            name="scorePicker"
+                                                            on:change={() => (scorePickerSelection = s)}
+                                                            checked={scorePickerSelection === s}
+                                                        />
+                                                        <span class="font-mono">{i}: {s}</span>
+                                                    </label>
+                                                {/each}
+                                            </div>
+                                            <div class="flex gap-2 mt-3">
+                                                <Button on:click={confirmScorePicker} disabled={scorePickerSelection === null}>Confirm</Button>
+                                                <Button variant="ghost" on:click={cancelScorePicker}>Cancel</Button>
+                                            </div>
+                                        </div>
+                                    {/if}
                                 </div>
 
                                 <Button
@@ -6810,6 +8249,164 @@
                             </div>
                         {/if}
                     </div>
+
+                    {#if showBotAssistantModal}
+                        <div
+                            class="absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+                            on:click|self={() => (showBotAssistantModal = false)}
+                            role="presentation"
+                        >
+                            <BodyScrollLock />
+                            <div
+                                class="w-full max-w-3xl rounded-xl border shadow-2xl p-5 md:p-6 max-h-[85vh] overflow-y-auto {$mode === 'dark'
+                                    ? 'bg-slate-900/95 text-gray-100 border-slate-700'
+                                    : 'bg-white/95 text-gray-800 border-gray-200'}"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="bot-assistant-modal-title"
+                            >
+                                <div class="flex items-start justify-between gap-4 mb-5">
+                                    <div>
+                                        <h4
+                                            id="bot-assistant-modal-title"
+                                            class="text-xl font-semibold"
+                                        >
+                                            Need help drafting your bot?
+                                        </h4>
+                                        <p class="text-sm text-muted-foreground mt-1">
+                                            Open this assistant only if you want an AI-generated
+                                            first pass based on the game description and paper.
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        on:click={() => (showBotAssistantModal = false)}
+                                        aria-label="Close AI assistant modal"
+                                        class="flex-shrink-0"
+                                    >
+                                        <X class="w-5 h-5" />
+                                    </Button>
+                                </div>
+
+                                <AI_ASSISTANT
+                                    prompt={botAssistantPrompt}
+                                    title={null}
+                                    description={null}
+                                />
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if showRobotDevelopmentGuideModal}
+                        <div
+                            class="absolute inset-0 z-30 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+                            on:click|self={() =>
+                                (showRobotDevelopmentGuideModal = false)}
+                            role="presentation"
+                        >
+                            <BodyScrollLock />
+                            <div
+                                class="w-full max-w-6xl xl:max-w-7xl rounded-xl border shadow-2xl p-0 max-h-[92vh] overflow-hidden flex flex-col {$mode === 'dark'
+                                    ? 'bg-slate-900/95 text-gray-100 border-slate-700'
+                                    : 'bg-white/95 text-gray-800 border-gray-200'}"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="robot-development-guide-modal-title"
+                            >
+                                <div
+                                    class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b px-5 py-4 md:px-7 md:py-5 backdrop-blur-sm {$mode ===
+                                    'dark'
+                                        ? 'border-slate-700 bg-slate-900/90'
+                                        : 'border-gray-200 bg-white/90'}"
+                                >
+                                    <div>
+                                        <h4
+                                            id="robot-development-guide-modal-title"
+                                            class="text-xl font-semibold"
+                                        >
+                                            Robot Development Guide
+                                        </h4>
+                                        <p
+                                            class="text-sm text-muted-foreground mt-1"
+                                        >
+                                            Read the guide directly here while
+                                            preparing your submission.
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                        <a
+                                            href={ROBOT_DEVELOPMENT_GUIDE}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class={`${buttonVariants({ variant: "outline" })} gap-2`}
+                                        >
+                                            <ExternalLink class="w-4 h-4" />
+                                            Open original guide
+                                        </a>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            on:click={() =>
+                                                (showRobotDevelopmentGuideModal = false)}
+                                            aria-label="Close development guide modal"
+                                            class="flex-shrink-0"
+                                        >
+                                            <X class="w-5 h-5" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div class="flex-1 min-h-0 overflow-y-auto px-5 py-5 md:px-8 md:py-7 overscroll-contain">
+                                    {#if isRobotDevelopmentGuideLoading}
+                                        <div
+                                            class="h-full min-h-[18rem] flex flex-col items-center justify-center text-center text-muted-foreground"
+                                        >
+                                            <Loader2
+                                                class="w-8 h-8 animate-spin mb-3"
+                                            />
+                                            <p class="text-sm">
+                                                Loading guide...
+                                            </p>
+                                        </div>
+                                    {:else if robotDevelopmentGuideError}
+                                        <div
+                                            class="min-h-[18rem] flex flex-col items-center justify-center text-center"
+                                        >
+                                            <p
+                                                class="text-sm text-muted-foreground max-w-md"
+                                            >
+                                                {robotDevelopmentGuideError}
+                                            </p>
+                                            <Button
+                                                variant="outline"
+                                                class="mt-4"
+                                                on:click={openRobotDevelopmentGuide}
+                                            >
+                                                Try again
+                                            </Button>
+                                        </div>
+                                    {:else}
+                                        <div
+                                            class="guide-prose prose prose-base md:prose-lg {$mode ===
+                                            'dark'
+                                                ? 'prose-invert'
+                                                : ''} max-w-none"
+                                        >
+                                            {@html marked.parse(
+                                                robotDevelopmentGuideContent,
+                                                {
+                                                    breaks: true,
+                                                    gfm: true,
+                                                    renderer: guideRenderer,
+                                                },
+                                            )}
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
             </div>
         {/if}
@@ -6959,6 +8556,7 @@
         on:click|self={closeDidacticModal}
         role="presentation"
     >
+        <BodyScrollLock />
         <div
             class="modal-content {$mode === 'dark'
                 ? 'bg-slate-800 text-gray-200 border border-slate-700'
@@ -7023,6 +8621,7 @@
         role="button"
         tabindex="0"
     >
+        <BodyScrollLock />
         <!-- svelte-ignore a11y-no-static-element-interactions -->
         <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div on:click|stopPropagation>
@@ -7032,6 +8631,7 @@
                 source_explorer_url={$source_explorer_url}
                 onSourceAdded={handleFileSourceAdded}
                 hash={writable(modalFileHash)}
+                fixedHashFunctionId={HASH_ALGORITHM_IDS.blake2b256}
                 class="{$mode === 'dark'
                     ? 'bg-slate-900'
                     : 'bg-white'} border border-border rounded-lg shadow-xl w-full max-w-3xl mx-4 p-6"
@@ -7066,6 +8666,124 @@
     }
     .prose :global(p) {
         margin-bottom: 0.75em;
+    }
+    .paper-prose :global(h1) {
+        @apply text-3xl md:text-4xl font-bold tracking-tight mb-6 mt-2;
+    }
+    .paper-prose :global(h2) {
+        @apply text-2xl md:text-3xl font-semibold mt-10 mb-4 pb-2 border-b border-border;
+    }
+    .paper-prose :global(h3) {
+        @apply text-xl md:text-2xl font-semibold mt-8 mb-3;
+    }
+    .paper-prose :global(h4) {
+        @apply text-lg font-semibold mt-6 mb-2;
+    }
+    .paper-prose :global(p) {
+        @apply leading-8 mb-5;
+    }
+    .paper-prose :global(ul),
+    .paper-prose :global(ol) {
+        @apply my-5 pl-6;
+        list-style-position: outside;
+    }
+    .paper-prose :global(ul) {
+        list-style-type: disc;
+    }
+    .paper-prose :global(ol) {
+        list-style-type: decimal;
+    }
+    .paper-prose :global(li) {
+        @apply mb-2 leading-8;
+    }
+    .paper-prose :global(blockquote) {
+        @apply my-6 border-l-4 border-amber-500/50 bg-amber-500/10 px-4 py-3 italic rounded-r-lg;
+    }
+    .paper-prose :global(pre) {
+        @apply my-6 overflow-x-auto rounded-xl border border-border bg-slate-950/95 p-4 text-sm shadow-inner;
+    }
+    .paper-prose :global(code) {
+        @apply rounded bg-muted px-1.5 py-0.5 text-[0.9em];
+    }
+    .paper-prose :global(pre code) {
+        @apply bg-transparent p-0 text-inherit;
+    }
+    .paper-prose :global(hr) {
+        @apply my-8 border-border;
+    }
+    .paper-prose :global(table) {
+        @apply my-6 w-full border-collapse text-sm;
+    }
+    .paper-prose :global(th) {
+        @apply border border-border bg-muted/60 px-3 py-2 text-left font-semibold;
+    }
+    .paper-prose :global(td) {
+        @apply border border-border px-3 py-2 align-top;
+    }
+    .paper-prose :global(tbody tr:nth-child(even)) {
+        @apply bg-muted/30;
+    }
+    .paper-prose :global(a) {
+        @apply text-blue-500 underline decoration-blue-500/40 underline-offset-4 transition-colors hover:text-blue-400;
+    }
+    .guide-prose :global(h1) {
+        @apply text-3xl md:text-4xl font-bold tracking-tight mb-6 mt-2;
+    }
+    .guide-prose :global(h2) {
+        @apply text-2xl md:text-3xl font-semibold mt-10 mb-4 pb-2 border-b border-border;
+    }
+    .guide-prose :global(h3) {
+        @apply text-xl md:text-2xl font-semibold mt-8 mb-3;
+    }
+    .guide-prose :global(h4) {
+        @apply text-lg font-semibold mt-6 mb-2;
+    }
+    .guide-prose :global(p) {
+        @apply leading-8 mb-5;
+    }
+    .guide-prose :global(ul),
+    .guide-prose :global(ol) {
+        @apply my-5 pl-6;
+        list-style-position: outside;
+    }
+    .guide-prose :global(ul) {
+        list-style-type: disc;
+    }
+    .guide-prose :global(ol) {
+        list-style-type: decimal;
+    }
+    .guide-prose :global(li) {
+        @apply mb-2 leading-8;
+    }
+    .guide-prose :global(blockquote) {
+        @apply my-6 border-l-4 border-amber-500/50 bg-amber-500/10 px-4 py-3 italic rounded-r-lg;
+    }
+    .guide-prose :global(pre) {
+        @apply my-6 overflow-x-auto rounded-xl border border-border bg-slate-950/95 p-4 text-sm shadow-inner;
+    }
+    .guide-prose :global(code) {
+        @apply rounded bg-muted px-1.5 py-0.5 text-[0.9em];
+    }
+    .guide-prose :global(pre code) {
+        @apply bg-transparent p-0 text-inherit;
+    }
+    .guide-prose :global(hr) {
+        @apply my-8 border-border;
+    }
+    .guide-prose :global(table) {
+        @apply my-6 w-full border-collapse text-sm;
+    }
+    .guide-prose :global(th) {
+        @apply border border-border bg-muted/60 px-3 py-2 text-left font-semibold;
+    }
+    .guide-prose :global(td) {
+        @apply border border-border px-3 py-2 align-top;
+    }
+    .guide-prose :global(tbody tr:nth-child(even)) {
+        @apply bg-muted/30;
+    }
+    .guide-prose :global(a) {
+        @apply text-blue-500 underline decoration-blue-500/40 underline-offset-4 transition-colors hover:text-blue-400;
     }
 
     .stat-block {
@@ -7181,7 +8899,7 @@
     }
 
     .countdown-container {
-        padding-top: 1.5rem;
+        padding-top: 0;
     }
 
     .timeleft {
@@ -7193,12 +8911,36 @@
         @apply text-foreground;
     }
 
+    .timeleft-header {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+
+    .timeleft-label-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        @apply bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-200;
+    }
+
     .timeleft-label {
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-size: 1.125rem;
+        font-weight: 700;
         text-align: left;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.14em;
+        line-height: 1.2;
+        font-family:
+            "Avenir Next",
+            "Segoe UI",
+            "Helvetica Neue",
+            Arial,
+            sans-serif;
     }
 
     .secondary-text {
@@ -7252,6 +8994,34 @@
         opacity: 0.7;
     }
 
+    @media (max-width: 640px) {
+        .timeleft {
+            gap: 1rem;
+        }
+
+        .timeleft-header {
+            margin-top: 0.25rem;
+            gap: 0.625rem;
+        }
+
+        .timeleft-label {
+            font-size: 1rem;
+        }
+
+        .countdown-items {
+            gap: 0.75rem;
+        }
+
+        .item {
+            width: calc(50% - 0.375rem);
+            height: 76px;
+        }
+
+        .item > div:first-child {
+            font-size: 1.75rem;
+        }
+    }
+
     /* Prize Distribution Bar Styles */
     .distribution-bar {
         @apply w-full h-4 flex overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800;
@@ -7293,5 +9063,25 @@
     }
     .legend-color.developers {
         background-color: #a855f7;
+    }
+
+    /* Override source-application FileCard hardcoded green → purple for Game Service Sources */
+    /* Tailwind class overrides */
+    .service-file-card-wrapper :global(.text-green-500),
+    .service-file-card-wrapper :global([class*="text-green"]) {
+        color: #a855f7 !important; /* purple-500 */
+    }
+    .service-file-card-wrapper :global(.bg-green-500\/10),
+    .service-file-card-wrapper :global([class*="bg-green"]) {
+        background-color: rgb(168 85 247 / 0.1) !important;
+    }
+    /* Inline style overrides — Timeline dot (background-color) and label (color) */
+    .service-file-card-wrapper :global([style*="color: #22c55e"]),
+    .service-file-card-wrapper :global([style*="color:#22c55e"]) {
+        color: #a855f7 !important;
+    }
+    .service-file-card-wrapper :global([style*="background-color: #22c55e"]),
+    .service-file-card-wrapper :global([style*="background-color:#22c55e"]) {
+        background-color: #a855f7 !important;
     }
 </style>

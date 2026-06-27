@@ -99,6 +99,8 @@ export async function judges_invalidation_chained(
     const newDeadline = BigInt(currentHeight + game.constants.JUDGE_PERIOD + JUDGE_PERIOD_MARGIN);
     const resolutionErgoTree = getGopGameResolutionErgoTreeHex();
 
+    const resolverPenalization = Math.floor(game.resolverCommission * game.creatorSlashRatio / game.constants.COMMISSION_DENOMINATOR);
+
     const recreatedGameBoxOutput = new OutputBuilder(newGameBoxValue, resolutionErgoTree)
         .addTokens(gameTokens)
         .setAdditionalRegisters({
@@ -115,9 +117,10 @@ export async function judges_invalidation_chained(
                 BigInt(game.deadlineBlock),
                 BigInt(game.resolverStakeAmount),
                 BigInt(game.participationFeeAmount),
-                BigInt(game.perJudgeCommission) + BigInt(game.resolverCommission),
-                0n,  // resolver commission goes to judges
+                BigInt(game.perJudgeCommission) + BigInt(resolverPenalization),
+                BigInt(game.resolverCommission) - BigInt(resolverPenalization),
                 BigInt(game.devCommission),
+                BigInt(game.creatorSlashRatio),
                 BigInt(newDeadline)
             ]).toHex(),
             R9: SColl(SColl(SByte), [

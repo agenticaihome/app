@@ -91,7 +91,8 @@ export async function contribute_to_ceremony(
         game.participationFeeAmount,
         game.perJudgeCommission,
         BigInt(game.resolverCommission),
-        BigInt(game.devCommission)
+        BigInt(game.devCommission),
+        BigInt(game.creatorSlashRatio)
     ];
     const r8Hex = SColl(SLong, numericalParams).toHex();
 

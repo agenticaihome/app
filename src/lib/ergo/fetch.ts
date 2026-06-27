@@ -16,7 +16,7 @@ import {
     type MalformedParticipationReason,
     resolve_participation_commitment
 } from "../common/game";
-import { CACHE_DURATION_MS, explorer_uri } from "./envs";
+import { CACHE_DURATION_MS, explorer_uri, isDevMode } from "./envs";
 import {
     getGopGameResolutionTemplateHash,
     getGopParticipationTemplateHash,
@@ -29,8 +29,9 @@ import {
     getGopGameActiveTemplateHash,
     getGopEndGameTemplateHash,
     getGopParticipationBatchTemplateHash,
-    getGopFalseTemplateHash,
-    getGopMintIdtErgoTreeHex
+    getGopMintIdtErgoTreeHex,
+    getReputationProofTemplateHash,
+    getGopFalseTemplateHash
 } from "./contract"; // Assumes this file exports functions to get script hashes
 import {
     hexToUtf8,
@@ -46,6 +47,13 @@ import { calculate_reputation as calculate_reputation_proof } from "reputation-s
 import { get } from "svelte/store";
 import { games, judges as judgesStore, isLoadingGames } from "../common/store";
 import { getGameConstants } from "$lib/common/constants";
+import {
+    buildDevCompetitionsMap,
+    getDevCompetition,
+    getDevCompetitionHistory,
+    getDevCompetitionParticipations,
+    isDevCompetitionId,
+} from "$lib/dev/dev-competitions";
 
 export interface TokenEIP4 {
     name: string,
@@ -179,7 +187,7 @@ function calculate_reputation(game: AnyGame): number {
         const proof = get(judgesStore).data.get(game.content.creatorTokenId);
         reputation += (proof ? calculate_reputation_proof(proof) : 0);
     }
-    return reputation / 1e9;
+    return reputation;
 }
 
 /**
@@ -205,6 +213,10 @@ async function fetchReputationOpinionsForTarget(
 }
 
 export async function getTransactionInfo(transactionId: string): Promise<any> {
+    if (transactionId.startsWith("devtx_")) {
+        return null;
+    }
+
     const url = `${get(explorer_uri)}/api/v1/transactions/${transactionId}`;
     try {
         const response = await fetch(url);
@@ -257,16 +269,12 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             .split(",").filter((e: string) => e.length === 64);
 
         // R8: numericalParameters
-        const r8RenderedValue = box.additionalRegisters.R8?.renderedValue;
-        let parsedR8Array: any[] | null = null;
-        if (typeof r8RenderedValue === 'string') {
-            try { parsedR8Array = JSON.parse(r8RenderedValue); }
-            catch (e) { console.warn(`Could not JSON.parse R8 for ${box.boxId}: ${r8RenderedValue}`); }
-        } else if (Array.isArray(r8RenderedValue)) { parsedR8Array = r8RenderedValue; }
-        const numericalParams = parseLongColl(parsedR8Array);
-        // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission]
-        if (!numericalParams || numericalParams.length < 8) throw new Error("R8 does not contain the 8 expected numerical parameters.");
-        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission] = numericalParams;
+        // Use getArrayFromValue for robustness (handles rendered strings like '[1,2,3]' or bare lists)
+        const r8Array = getArrayFromValue(box.additionalRegisters.R8?.renderedValue);
+        const numericalParams = parseLongColl(r8Array);
+        // structure: [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio]
+        if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio] = numericalParams;
 
         if (!await fetch_conditions(gameId, Number(createdAt), Number(deadlineBlock))) {
             console.warn(`parseGameActiveBox: Box ${box.boxId} failed validity conditions.`);
@@ -311,6 +319,7 @@ async function parseGameActiveBox(box: any): Promise<GameActive | null> {
             constants: getGameConstants(),
             seed: seed,
             ceremonyDeadline: Number(deadlineBlock) - getGameConstants().PARTICIPATION_TIME_WINDOW,
+            creatorSlashRatio: Number(creatorSlashRatio),
         };
 
         gameActive.reputation = calculate_reputation(gameActive);
@@ -409,11 +418,11 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             .map(parseCollByteToHex)
             .filter((judge): judge is string => judge !== null && judge !== undefined);
 
-        // R8: Coll[Long] -> [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, resolutionDeadline]
+        // R8: Coll[Long] -> [createdAt, timeWeight, deadline, resolverStake, participationFee, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline]
         const r8Array = getArrayFromValue(box.additionalRegisters.R8?.renderedValue);
         const numericalParams = parseLongColl(r8Array);
-        if (!numericalParams || numericalParams.length < 9) throw new Error("R8 does not contain the 9 expected numerical parameters.");
-        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, resolutionDeadline] = numericalParams;
+        if (!numericalParams || numericalParams.length < 10) throw new Error("R8 does not contain the 10 expected numerical parameters.");
+        const [createdAt, timeWeight, deadlineBlock, resolverStakeAmount, participationFeeAmount, perJudgeCommission, resolverCommission, devCommission, creatorSlashRatio, resolutionDeadline] = numericalParams;
 
         if (!await fetch_conditions(gameId, Number(createdAt), Number(deadlineBlock))) {
             console.warn(`parseGameResolutionBox: Box ${box.boxId} failed validity conditions.`);
@@ -458,6 +467,7 @@ export async function parseGameResolutionBox(box: any): Promise<GameResolution |
             timeWeight: timeWeight, // From R8
             resolverCommission: Number(resolverCommission), // Added from R8
             devCommission: Number(devCommission), // Added from R8
+            creatorSlashRatio: Number(creatorSlashRatio), // Added from R8
             devScript,
             constants: getGameConstants(),
             seed: seed, // Added from R5
@@ -817,6 +827,13 @@ export async function fetchFinalizedGames(): Promise<Map<string, GameFinalized>>
         const judgeFinalizationBlock = lastResolutionBox?.resolutionDeadline || 0;
         const winnerFinalizationGracePeriod = getGameConstants().END_GAME_AUTH_GRACE_PERIOD;
 
+        // Prize pool is derived from the HISTORICAL record, not the live box: once a
+        // game is finalized the NFT sits in a non-contract box (winner/resolver wallet)
+        // that no longer holds the participation tokens, so the live box reports 0.
+        // The last resolution/end-game contract box (the one spent by the finalize tx)
+        // still carries the participation-token balance, i.e. the final prize pool.
+        const finalPrizeValue = lastResolutionBox?.value ?? lastBox.value;
+
         const finalized: GameFinalized = {
             boxId: lastResolutionBox?.boxId || currentBox.boxId, // Use resolution box ID if available
             box: lastResolutionBox?.box || currentBox, // Use resolution box if available
@@ -825,7 +842,7 @@ export async function fetchFinalizedGames(): Promise<Map<string, GameFinalized>>
             deadlineBlock: lastBox.deadlineBlock,
             gameId,
             content: lastBox.content,
-            value: lastBox.value,
+            value: finalPrizeValue,
             participationTokenId: lastBox.participationTokenId,
             participationFeeAmount: BigInt(lastBox.participationFeeAmount || 0),
             reputationOpinions: await fetchReputationOpinionsForTarget("game", gameId),
@@ -843,6 +860,7 @@ export async function fetchFinalizedGames(): Promise<Map<string, GameFinalized>>
             resolverPK_Hex: lastResolutionBox?.resolverPK_Hex || null,
             resolverScript_Hex: lastResolutionBox?.resolverScript_Hex || "",
             resolverCommission: lastResolutionBox?.resolverCommission || 0,
+            devCommission: lastResolutionBox?.devCommission || 0,
             createdAt: lastResolutionBox?.createdAt || (('createdAt' in lastBox) ? (lastBox as any).createdAt : 0)
         };
 
@@ -864,6 +882,10 @@ export async function fetchFinalizedGames(): Promise<Map<string, GameFinalized>>
  * @returns A promise that resolves to an array of AnyGame objects representing the game's history, sorted by creation height.
  */
 export async function fetchGameHistory(gameId: string): Promise<AnyGame[]> {
+    if (isDevCompetitionId(gameId)) {
+        return getDevCompetitionHistory(gameId);
+    }
+
     const history: AnyGame[] = [];
     const templateHashes = [
         getGopGameActiveTemplateHash(),
@@ -938,37 +960,81 @@ export async function fetchGameHistory(gameId: string): Promise<AnyGame[]> {
 // === STATE: PARTICIPATION SUBMITTED & RESOLVED
 // =================================================================
 
+function getOldestBox<T extends { creationHeight?: number }>(
+    boxes: T[],
+): T | null {
+    if (boxes.length === 0) return null;
 
+    return boxes.reduce((oldest, current) =>
+        (current.creationHeight ?? Number.MAX_SAFE_INTEGER) <
+        (oldest.creationHeight ?? Number.MAX_SAFE_INTEGER)
+            ? current
+            : oldest,
+    );
+}
 
 export async function fetchSolverIdBox(solverId: string): Promise<Box<Amount> | null> {
-    const url = `${get(explorer_uri)}/api/v1/boxes/unspent/search`;
+    const normalizedSolverId = solverId.trim();
+    if (!normalizedSolverId) return null;
+
+    const url = `${get(explorer_uri)}/api/v1/boxes/search`;
+    
+    const uniqueBoxes = new Map<string, Box<Amount>>();
+
     try {
-        // Search for boxes where R4 == solverId
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        const reputationResponse = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                ergoTreeTemplateHash: getGopFalseTemplateHash(),
+                ergoTreeTemplateHash: getReputationProofTemplateHash(),
                 registers: {
-                    R4: solverId
-                }
+                    R5: normalizedSolverId,
+                },
             }),
         });
 
-        if (!response.ok) return null;
+        if (reputationResponse.ok) {
+            const data = await reputationResponse.json();
+            const items = (data.items || []) as Box<Amount>[];
+            for (const item of items) {
+                uniqueBoxes.set(item.boxId, item);
+            }
+        }
 
-        const data = await response.json();
-        const items: Box[] = data.items || [];
+        const registerKeys = ["R4", "R5", "R6", "R7", "R8", "R9"] as const;
+        const falseResponses = await Promise.all(
+            registerKeys.map(async (registerKey) => {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ergoTreeTemplateHash: getGopFalseTemplateHash(),
+                        registers: {
+                            [registerKey]: normalizedSolverId,
+                        },
+                    }),
+                });
 
-        // Return the first one found. 
-        return items.length > 0 ? items[0] : null;
+                if (!response.ok) return [];
+
+                const data = await response.json();
+                return (data.items || []) as Box<Amount>[];
+            }),
+        );
+
+        for (const items of falseResponses) {
+            for (const item of items) {
+                uniqueBoxes.set(item.boxId, item);
+            }
+        }
+
+        return getOldestBox(Array.from(uniqueBoxes.values()));
+
     } catch (error) {
         console.error("Error fetching solver ID box:", error);
         return null;
     }
 }
-
-
 
 async function _parseParticipationBox(box: any, participationTokenId: string): Promise<ParticipationBase | null> {
     try {
@@ -1021,6 +1087,10 @@ async function _parseParticipationBox(box: any, participationTokenId: string): P
  * @returns A `Promise` with an array of `Participation`.
  */
 export async function fetchParticipations(game: AnyGame): Promise<AnyParticipation[]> {
+    if (isDevCompetitionId(game.gameId)) {
+        return getDevCompetitionParticipations(game.gameId);
+    }
+
     const gameNftId = game.gameId;
     const gameDeadline = game.deadlineBlock;
 
@@ -1169,6 +1239,10 @@ export async function fetchParticipations(game: AnyGame): Promise<AnyParticipati
  * @returns A `Promise` with an array of batch boxes.
  */
 export async function fetchParticipationBatches(game: AnyGame): Promise<Box<Amount>[]> {
+    if (isDevCompetitionId(game.gameId)) {
+        return [];
+    }
+
     const gameNftId = game.gameId;
     const batches: Box<Amount>[] = [];
     const scriptHash = getGopParticipationBatchTemplateHash();
@@ -1223,6 +1297,13 @@ export async function fetchGoPGames(force: boolean = false, avoidFullLoad: boole
     if (force && avoidFullLoad) {
         alert("Incorrect use of fetchGoPGames function. Check code.");
         return new Map();
+    }
+
+    if (get(isDevMode)) {
+        const devGames = buildDevCompetitionsMap();
+        games.set({ data: devGames, last_fetch: Date.now() });
+        isLoadingGames.set(false);
+        return devGames;
     }
 
     const current = get(games);
@@ -1314,6 +1395,10 @@ export async function fetchGoPGames(force: boolean = false, avoidFullLoad: boole
  */
 export async function fetchGame(id: string): Promise<AnyGame | null> {
     console.log("FETCH GAME FOR ID: ", id);
+    if (isDevCompetitionId(id)) {
+        return getDevCompetition(id);
+    }
+
     // 1) try store first
     try {
         const current = get(games);
@@ -1367,8 +1452,10 @@ export async function fetchGame(id: string): Promise<AnyGame | null> {
         console.error(`fetchGame: error parsing current box for ${id}:`, e);
     }
 
-    // 4) If we reached here we need to collect historical contract boxes for this token id
-    const templateHashes = [activeTemplate, resolutionTemplate, cancellationTemplate];
+    // 4) If we reached here we need to collect historical contract boxes for this token id.
+    //    endGameTemplate must be included: the end-game box is the contract box spent by
+    //    the finalize tx and the one that still carries the participation-token prize pool.
+    const templateHashes = [activeTemplate, resolutionTemplate, endGameTemplate, cancellationTemplate];
     const histBoxes: AnyGame[] = [];
 
     const limit = 100;
@@ -1434,6 +1521,23 @@ export async function fetchGame(id: string): Promise<AnyGame | null> {
         const judgeFinalizationBlock = lastResolutionBox?.resolutionDeadline || 0;
         const winnerFinalizationGracePeriod = 64800; // 90 days (as in fetchFinalizedGames) - TODO: take from contract constants if available
 
+        // Prize pool is derived from the HISTORICAL record, not the live box. `currentBox`
+        // (the box now holding the NFT) is a winner/resolver wallet box that no longer
+        // carries the participation tokens, so `currentBox.value` / `lastBox.box.value`
+        // would report a near-zero prize pool. The contract box that still carries the
+        // full pot (participation balance + stake) right before the finalize tx is the
+        // one with the LARGEST value across the historical record. Selecting the max is
+        // robust even when no Resolution box is present (e.g. games finalized straight
+        // from an end-game/timeout box) — the previous `lastResolutionBox?.value ??
+        // lastBox.value` fell back to a near-zero box in that case, yielding prize pool 0.
+        const maxHistValue = histBoxes.reduce(
+            (max, b) => (BigInt(b.value ?? 0n) > max ? BigInt(b.value ?? 0n) : max),
+            0n,
+        );
+        const finalPrizeValue =
+            lastResolutionBox?.value ??
+            (maxHistValue > 0n ? maxHistValue : lastBox.value);
+
         // build finalized object
         try {
             const finalized: GameFinalized = {
@@ -1444,7 +1548,7 @@ export async function fetchGame(id: string): Promise<AnyGame | null> {
                 deadlineBlock: lastBox.deadlineBlock,
                 gameId: id,
                 content: lastBox.content,
-                value: BigInt(lastBox.box.value),
+                value: finalPrizeValue,
                 participationFeeAmount: BigInt(lastBox.participationFeeAmount || 0),
                 participationTokenId: lastBox.participationTokenId,
                 reputationOpinions: await fetchReputationOpinionsForTarget("game", id),
@@ -1463,6 +1567,7 @@ export async function fetchGame(id: string): Promise<AnyGame | null> {
                 resolverPK_Hex: lastResolutionBox?.resolverPK_Hex || null,
                 resolverScript_Hex: lastResolutionBox?.resolverScript_Hex || "",
                 resolverCommission: lastResolutionBox?.resolverCommission || 0,
+                devCommission: lastResolutionBox?.devCommission || 0,
                 createdAt: lastResolutionBox?.createdAt || (('createdAt' in lastBox) ? (lastBox as any).createdAt : 0)
             };
 
@@ -1525,6 +1630,7 @@ export async function fetchGame(id: string): Promise<AnyGame | null> {
                 resolverPK_Hex: null,
                 resolverScript_Hex: "",
                 resolverCommission: 0,
+                devCommission: 0,
                 createdAt: await tokenCreationHeight(id) || 0
             };
             minimal.reputation = calculate_reputation(minimal);

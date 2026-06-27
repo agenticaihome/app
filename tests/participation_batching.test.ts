@@ -22,7 +22,8 @@ import {
     getGopParticipationBatchErgoTree,
     getGopGameResolutionErgoTree
 } from "$lib/ergo/contract";
-import { DefaultGameConstants } from "$lib/common/constants";
+import { DefaultGameConstants, getGameConstants } from "$lib/common/constants";
+import { DEV_COMMISSION_PERCENTAGE, DEV_SCRIPT } from "$lib/ergo/envs";
 
 const ERG_BASE_TOKEN = "";
 const USD_BASE_TOKEN = "ebb40ecab7bb7d2a935024100806db04f44c62c33ae9756cf6fc4cb6b9aa2d12";
@@ -31,6 +32,8 @@ const USD_BASE_TOKEN_NAME = "USD"; // Added to support the new tokenName propert
 const baseModes = [
     { name: "USD Token Mode", token: USD_BASE_TOKEN, tokenName: USD_BASE_TOKEN_NAME },
 ];
+const COMMISSION_DENOMINATOR = getGameConstants().COMMISSION_DENOMINATOR;
+const CREATOR_SLASH_RATIO = BigInt(COMMISSION_DENOMINATOR);
 
 describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
     const mockChain = new MockChain({ height: 800_000 });
@@ -85,10 +88,22 @@ describe.each(baseModes)("Participation Batching - (%s)", (mode) => {
                 R5: SColl(SByte, hexToBytes(seed) || new Uint8Array(0)).toHex(),
                 R6: SPair(SColl(SByte, secret), SColl(SByte, new Uint8Array(32))).toHex(), // No winner candidate yet
                 R7: SColl(SColl(SByte), []).toHex(),
-                R8: SColl(SLong, [1n, 20n, BigInt(mockChain.height + 500), 2_000_000_000n, participationFee, 10000n, 200000n, BigInt(mockChain.height + 1000)]).toHex(),
+                R8: SColl(SLong, [
+                    1n,
+                    20n,
+                    BigInt(mockChain.height + 500),
+                    2_000_000_000n,
+                    participationFee,
+                    10000n,
+                    200000n,
+                    BigInt(Math.round(DEV_COMMISSION_PERCENTAGE / 100 * COMMISSION_DENOMINATOR)),
+                    CREATOR_SLASH_RATIO,
+                    BigInt(mockChain.height + 1000)
+                ]).toHex(),
                 R9: SColl(SColl(SByte), [
                     stringToBytes('utf8', "{}"),
                     mode.token !== ERG_BASE_TOKEN ? (hexToBytes(mode.token) || new Uint8Array(0)) : new Uint8Array(0),
+                    hexToBytes(DEV_SCRIPT) || new Uint8Array(0),
                     prependHexPrefix(resolver.address.getPublicKeys()[0], "0008cd")
                 ]).toHex()
             }
